@@ -1,0 +1,212 @@
+openapi: 3.0.3
+info:
+  title: Clinical Helper API
+  description: API for Clinical Helper application frontend.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000 # Adjust as needed for dev/prod
+    description: Development server
+paths:
+  /:
+    get:
+      summary: Read Root
+      tags:
+        - General
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Welcome to the Clinical Helper API
+  # --- Authentication Endpoints (Placeholder) ---
+  /api/auth/google/login:
+    post:
+      summary: Initiate Google OAuth Login
+      tags:
+        - Authentication
+      responses:
+        '307': # Temporary Redirect
+          description: Redirects user to Google for authentication.
+        '500':
+          description: Internal Server Error (config issue, etc.)
+  /api/auth/callback/google:
+    get:
+      summary: Google OAuth Callback Handler
+      tags:
+        - Authentication
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authorization code from Google.
+        - name: state
+          in: query
+          required: false # Or true depending on your flow
+          schema:
+            type: string
+          description: State parameter for CSRF protection.
+      responses:
+        '307': # Temporary Redirect
+          description: Redirects user to frontend upon successful login (with session cookie).
+        '400':
+          description: Bad Request (missing code, invalid state).
+        '500':
+          description: Internal Server Error (token exchange failed, DB error).
+  /api/auth/status:
+    get:
+      summary: Get Current Authentication Status
+      tags:
+        - Authentication
+      security:
+        - cookieAuth: [] # Indicates this might use cookie auth, but can be optional
+      responses:
+        '200':
+          description: Returns user info if logged in, or status indicating not logged in.
+          content:
+            application/json:
+              schema:
+                # Define schema for logged-in user or anonymous status
+                type: object
+                properties:
+                  is_authenticated:
+                    type: boolean
+                  user:
+                    type: object # Or null if not authenticated
+                    properties:
+                      id:
+                        type: string # Or integer depending on DB
+                      email:
+                        type: string
+                      name:
+                        type: string
+        '401':
+           description: Potentially used if endpoint strictly requires auth (design choice)
+
+  # --- Patient Endpoints (Placeholder) ---
+  /api/patients:
+    get:
+      summary: List User's Patients
+      tags:
+        - Patients
+      security:
+        - cookieAuth: [] # Requires authentication
+      responses:
+        '200':
+          description: List of patients.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PatientSummary' # Define this schema later
+        '401':
+          description: Unauthorized.
+    post:
+      summary: Create New Patient
+      tags:
+        - Patients
+      security:
+        - cookieAuth: [] # Requires authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientCreate' # Define this schema later
+      responses:
+        '201':
+          description: Patient created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Patient' # Define this schema later
+        '400':
+          description: Bad Request (invalid input data).
+        '401':
+          description: Unauthorized.
+
+  # --- Analysis Endpoints (Public Placeholder) ---
+  /api/analyze/blood_gas:
+    post:
+      summary: Analyze Blood Gas Data (Public)
+      tags:
+        - Analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloodGasInput' # Define this schema later
+      responses:
+        '200':
+          description: Blood gas analysis results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BloodGasResult' # Define this schema later
+        '400':
+          description: Bad Request (invalid input data).
+
+components:
+  schemas:
+    # --- Define common data models here ---
+    PatientSummary:
+      type: object
+      properties:
+        id:
+          type: string # Or integer
+        name:
+          type: string
+        # Add other summary fields as needed
+    PatientCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        # Add other required fields for creation
+      required:
+        - name
+    Patient:
+      type: object
+      properties:
+        id:
+          type: string # Or integer
+        name:
+          type: string
+        # Add all patient fields
+    BloodGasInput:
+      type: object
+      properties:
+        ph:
+          type: number
+          format: float
+        pco2:
+          type: number
+          format: float
+        hco3:
+          type: number
+          format: float
+        # Add other necessary inputs
+      required:
+        - ph
+        - pco2
+        - hco3
+    BloodGasResult:
+       type: object
+       properties:
+         interpretation:
+           type: string
+         # Add other result fields
+
+  securitySchemes:
+    cookieAuth: # Name this scheme
+      type: apiKey
+      in: cookie
+      name: session # Name of your session cookie 

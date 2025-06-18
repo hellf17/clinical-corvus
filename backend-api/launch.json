@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: FastAPI",
+            "type": "python",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--reload",
+                "--host", "0.0.0.0", 
+                "--port", "8000"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "env": {
+                "DATABASE_URL": "sqlite:///./test.db",
+                "FRONTEND_URL": "http://localhost:3000",
+                "SECRET_KEY": "testsecretkey",
+                "GOOGLE_CLIENT_ID": "test_client_id",
+                "GOOGLE_CLIENT_SECRET": "test_client_secret",
+                "GOOGLE_REDIRECT_URI": "http://localhost:8000/api/auth/callback/google",
+                "OPENAI_API_KEY": "test_api_key"
+            }
+        }
+    ]
+} 

@@ -1,0 +1,128 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=clinical_helper
+      - POSTGRES_PASSWORD=clinical_helper_pass
+      - POSTGRES_DB=clinical_helper
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - clinical-helper-network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-clinical_helper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend-api/Dockerfile
+    image: clinical-helper-backend-dev
+    restart: always
+    env_file:
+      - ./.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend-api:/app
+      - ./baml_client:/app/baml_client
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - POSTGRES_URL=postgresql://clinical_helper:clinical_helper_pass@postgres:5432/clinical_helper 
+      - DATABASE_URL=postgresql://clinical_helper:clinical_helper_pass@postgres:5432/clinical_helper 
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - SECRET_KEY=${SECRET_KEY}
+      - FRONTEND_URL=http://localhost:3000
+      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NCBI_API_KEY=${NCBI_API_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:8000/auth/google/callback}
+      - REDIRECT_URI=http://localhost:8501/
+      - MCP_SERVER_URL=http://mcp_server:8765
+      - CORS_ORIGINS=http://localhost:3000
+      - ENVIRONMENT=development
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app:/app/backend-api
+    networks:
+      - clinical-helper-network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+        - POSTGRES_URL=${POSTGRES_URL}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+      - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding
+      - NEXT_PUBLIC_BACKEND_URL=http://backend:8000
+      - DEEPL_API_KEY=${DEEPL_API_KEY}
+    depends_on:
+      - backend
+    command: npm run dev
+    dns:
+      - 127.0.0.11
+      - 8.8.8.8
+    networks:
+      - clinical-helper-network
+
+  mcp_server:
+    build:
+      context: .
+      dockerfile: mcp_server/Dockerfile.prod
+      args:
+        - ENVIRONMENT=development
+    ports:
+      - "8765:8765"
+    env_file:
+      - ./.env
+    volumes:
+      - ./mcp_server:/app
+      - ./backend-api/services:/app/services
+    environment:
+      - NCBI_API_KEY=${NCBI_API_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - MCP_PORT=8765
+      - ENVIRONMENT=development
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    networks:
+      - clinical-helper-network
+    restart: always
+    command: python mcp_server.py --debug
+
+networks:
+  clinical-helper-network:
+    driver: bridge
+
+volumes:
+  postgres_data: 

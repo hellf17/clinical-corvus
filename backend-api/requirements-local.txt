@@ -1,0 +1,8 @@
+# Requirements for Local Development - Backend API
+# Use this file for local development: pip install -r requirements-local.txt
+
+# Shared dependencies
+-r ../requirements-shared.txt
+
+# Backend specific dependencies  
+-r requirements.txt 
