@@ -414,12 +414,6 @@ Contributions are welcome! Please follow the style guide and commit standards.
   - **Quality Assessment:** Continuous evaluation of result quality
   - **Detailed Reports:** Generates executive summaries, in-depth analyses, and actionable recommendations to optimize future searches
 
-#### Decentralized Architecture with Ritual
-Aligned with our mission to **"Decentralize Knowledge, Democratize Health"**, the next evolution of the platform will be built on decentralized AI principles using the **Ritual Foundation**. This approach will provide unprecedented guarantees of privacy, transparency, and data sovereignty.
-*   **Verifiable and Auditable AI:** On-chain execution of AI models with cryptographic proofs, ensuring analyses are transparent and tamper-proof.
-*   **Hardware Privacy (TEEs):** Processing sensitive data in *Trusted Execution Environments*, ensuring patient privacy is absolute and inviolable.
-*   **True User Sovereignty:** Giving patients and doctors full control over their data and the models they use, breaking dependence on centralized infrastructures.
-
 ## Testing and Quality
 
 ### Multi-Layered Strategy
