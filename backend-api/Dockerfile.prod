@@ -1,0 +1,61 @@
+FROM python:3.10-slim AS builder
+
+WORKDIR /app
+
+# Instalar dependências do sistema para build
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de dependências (a ordem importa!)
+COPY requirements-shared.txt .
+COPY backend-api/requirements.txt ./backend-requirements.txt
+
+# Copiar o cliente BAML para o contexto do builder
+COPY baml_client /app/baml_client_temp
+
+# Criar e ativar ambiente virtual
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Instalar primeiro as dependências compartilhadas, depois as específicas
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-shared.txt && \
+    pip install --no-cache-dir -r backend-requirements.txt
+
+# Segunda etapa: imagem final
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Copiar ambiente virtual da etapa de build
+COPY --from=builder /opt/venv /opt/venv
+
+# Configurar PATH para usar o ambiente virtual
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Instalar dependências mínimas para runtime
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar código da aplicação
+COPY backend-api/ .
+
+# Copiar o cliente BAML da raiz do projeto para o diretório /app
+COPY --from=builder /app/baml_client_temp /app/baml_client
+
+# Expor porta
+EXPOSE 8000
+
+# Variáveis de ambiente para produção
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Comando para iniciar o servidor
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] 

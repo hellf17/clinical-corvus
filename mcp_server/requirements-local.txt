@@ -1,0 +1,8 @@
+# Requirements for Local Development - MCP Server
+# Use this file for local development: pip install -r requirements-local.txt
+
+# Shared dependencies
+-r ../requirements-shared.txt
+
+# MCP Server specific dependencies  
+-r requirements.txt 

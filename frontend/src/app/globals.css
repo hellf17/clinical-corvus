@@ -1,0 +1,531 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --primary: #1976D2; /* Blue-700 - Primary Blue */
+  --primary-foreground: #FFFFFF; /* White */
+  --secondary: #8B5CF6; /* Purple-500 - Primary Purple */
+  --secondary-foreground: #FFFFFF; /* White */
+  
+  --background: transparent; /* Make default background transparent to see Trianglify */
+  --foreground: #1A202C; /* Dark Gray */
+  --card: #FFFFFF; /* White */
+  --card-foreground: #1A202C; /* Dark Gray */
+  --popover: #FFFFFF; /* White */
+  --popover-foreground: #1A202C; /* Dark Gray */
+  
+  --muted: #F1F5F9; /* Lighter Gray (derived from Tailwind slate-200) */
+  --muted-foreground: #64748B; /* Mid Gray (derived from Tailwind slate-500) */
+  --accent: #6366F1; /* Indigo-500 - Brand Guide Accent */
+  --accent-foreground: #FFFFFF; /* White - for Indigo-500 accent */
+  
+  --destructive: #EF4444; /* Kept from original */
+  --border: #E2E8F0; /* Light Gray (derived from Tailwind slate-300) */
+  --input: #E2E8F0; /* Light Gray */
+  --ring: #3B82F6; /* Blue for focus rings */
+  
+  --gray-bg: #F5F5F5; /* Soft Gray - consistent with accent */
+  --danger: #EF4444; /* Kept */
+  --success: #10B981; /* Kept for success states only */
+  
+  --brand-solid-bg: #1A202C;
+  --brand-solid-fg: #FFFFFF;
+  
+  /* Academy-specific colors */
+  --academy-primary: #3B82F6; /* Blue-500 */
+  --academy-secondary: #8B5CF6; /* Purple-500 */
+  --academy-accent: #6366F1; /* Indigo-500 */
+  --academy-gradient-from: #3B82F6; /* Blue-500 */
+  --academy-gradient-to: #8B5CF6; /* Purple-500 */
+
+  --tertiary: #0D9488; /* Teal-700 - Brand Guide Tertiary/Contextual */
+  --tertiary-foreground: #FFFFFF; /* White - for Teal-700 tertiary */
+  
+  --font-sans: 'Inter', sans-serif;
+  --radius: 0.625rem;
+
+  /* Chart colors - can be reviewed later based on brand guide if needed */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Sidebar colors - shadcn/ui specific values */
+  --sidebar-background: hsla(220, 25%, 94%, 0.85); /* Light cool gray-blue, 85% opacity */
+  --sidebar-foreground: hsl(220, 15%, 30%); /* Dark gray-blue for text contrast */
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+html {
+  font-family: var(--font-sans);
+  background: transparent; /* Ensure HTML is transparent - removed !important */
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  /* Ensure these also use the new direct sidebar variables */
+  --color-sidebar: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground); /* Corrected from var(--accent-foreground) */
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring); /* Corrected from var(--ring) */
+}
+
+.dark {
+  --primary: #60A5FA; /* Blue-400 - Lighter blue for dark mode */
+  --primary-foreground: #1E3A8A; /* Blue-900 for contrast */
+  --secondary: #A78BFA; /* Purple-400 - Lighter purple for dark mode */
+  --secondary-foreground: #581C87; /* Purple-900 for contrast */
+  
+  --background: transparent; /* Make default background transparent to see Trianglify */
+  --foreground: #E2E8F0; /* Light Gray Text */
+  --card: #1A202C; /* Dark Gray Card */
+  --card-foreground: #E2E8F0; /* Light Gray Text on Card */
+  --popover: #1A202C; /* Dark Gray Popover */
+  --popover-foreground: #E2E8F0; /* Light Gray Text on Popover */
+  
+  --muted: #334155; /* Darker Gray (derived from Tailwind slate-700) */
+  --muted-foreground: #94A3B8; /* Lighter Gray (derived from Tailwind slate-400) */
+  --accent: #2D3748; /* Dark Gray Accent */
+  --accent-foreground: #E2E8F0; /* Light Gray Text on Accent */
+  
+  --destructive: #EF4444; /* Kept - check contrast on dark bg */
+  --border: #2D3748; /* Dark Gray Border */
+  --input: #2D3748; /* Dark Gray Input */
+  --ring: #60A5FA; /* Blue-400 for focus rings */
+
+  /* Academy-specific colors for dark mode */
+  --academy-primary: #60A5FA; /* Blue-400 */
+  --academy-secondary: #A78BFA; /* Purple-400 */
+  --academy-accent: #818CF8; /* Indigo-400 */
+  --academy-gradient-from: #60A5FA; /* Blue-400 */
+  --academy-gradient-to: #A78BFA; /* Purple-400 */
+
+  --tertiary: #14B8A6; /* Teal-500 - Lighter Teal for dark mode */
+  --tertiary-foreground: #F0FDFA; /* Teal-50/White - for Teal-500 */
+
+  /* Sidebar colors in dark mode - shadcn/ui specific values */
+  --sidebar-background: hsla(221, 40%, 15%, 0.36); /* New: Deep Blue */
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+/* From Uiverse.io by PauloRFJ for Social Icons */
+.card_social_buttons { /* Renamed .card to avoid conflict if you have another .card class */
+  width: fit-content;
+  height: fit-content;
+  background-color: transparent; /* Changed from rgb(238, 238, 238) to be transparent */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px; /* Reduced padding */
+  gap: 10px; /* Reduced gap */
+  /* box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.055); */ /* Optional: remove shadow if not desired */
+}
+
+/* for all social containers*/
+.socialContainer {
+  width: 40px; /* Original: 52px -> 40px */
+  height: 40px; /* Original: 52px -> 40px */
+  background-color: rgb(44, 44, 44);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition-duration: .3s; /* Original: 1.2s -> .3s */
+  border-radius: 10px; /* Original: 15px 0 15px 0px -> 10px simpler radius */
+}
+
+/* GitHub - using a generic hover, or you can define specific ones */
+.containerGithub:hover {
+  background-color: #333; /* GitHub dark color */
+  transition-duration: .3s;
+}
+/* Twitter */
+.containerTwitter:hover {
+  background-color: #00acee;
+  transition-duration: .3s;
+}
+/* Email - generic hover or specific */
+.containerMail:hover {
+  background-color: #c71610; /* Example: Gmail red */
+  transition-duration: .3s;
+}
+
+.socialContainer:active {
+  transform: scale(0.9);
+  transition-duration: .3s;
+}
+
+.socialSvg {
+  width: 20px; /* Original: 17px -> 20px for slightly larger icons */
+  height: 20px; /* Added height */
+}
+
+.socialSvg path {
+  fill: rgb(255, 255, 255);
+}
+
+.socialContainer:hover .socialSvg {
+  animation: slide-in-top 0.3s both; /* Original: 1.2s -> 0.3s */
+}
+
+@keyframes slide-in-top {
+  0% {
+    transform: translateY(-20px); /* Original: -50px -> -20px */
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Custom Hero Action Button Styles */
+.btn {
+  --button-color: var(--primary); /* Using project's primary color */
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all .5s;
+  background-color: transparent;
+  text-decoration: none; /* Ensure links don't get default underline */
+}
+
+.btn div {
+  letter-spacing: 2px;
+  font-weight: bold;
+  background: var(--button-color);
+  border-radius: 1rem;
+  color: var(--primary-foreground); /* Ensure text contrasts with button color */
+  padding: 1rem 2rem; /* Added more horizontal padding */
+}
+
+.btn::before {
+  content: '';
+  z-index: -1;
+  background-color: var(--button-color);
+  border: 2px solid var(--secondary-foreground); /* Border that contrasts with button color */
+  border-radius: 1rem;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  transform: rotate(10deg);
+  transition: .5s;
+  opacity: 0.3;
+}
+
+.btn:hover {
+  cursor: pointer;
+  /* filter: brightness(1.2); Tailwind hover effects on parent can achieve this */
+  transform: scale(1.01); /* Slightly reduced scale */
+}
+
+.btn:hover::before {
+  transform: rotate(0deg) scale(1.05);
+  opacity: 1;
+}
+
+.btn:active {
+  /* filter: brightness(1.4); */
+  transform: scale(1.05); /* Slightly reduced active scale */
+}
+/* End Custom Hero Action Button Styles */
+
+/* Custom styles for SidebarMenuButton hover */
+.peer\/menu-button:hover {
+  background-color: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+/* CSS for Analysis Page Upload Modal */
+*, *:after, *:before {
+	box-sizing: border-box;
+}
+
+/* Re-declaring these variables locally for the modal, 
+   in case the main :root variables are different or overridden by Tailwind defaults for body. 
+   Alternatively, ensure the main :root variables are not overridden for the modal context. */
+.modal-context-vars {
+	--c-action-primary: #2e44ff;
+	--c-action-primary-accent: #e9e5ff;
+	--c-action-secondary: #e5e5e5;
+	--c-text-primary: #0d0f21; 
+	--c-text-secondary: #6a6b76;
+	/* --c-background-primary: #d0d1de; /* This might not be needed if modal has its own bg */
+}
+
+/* Ensure modal inputs/buttons inherit font if not already covered by existing global input/button style */
+.modal input, .modal button, .modal select, .modal textarea {
+	font: inherit;
+}
+
+.modal {
+	width: 100%;
+	max-width: 800px;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: 2vh;
+	margin-bottom: 2vh;
+	background-color: #FFF; /* Modal background */
+	border-radius: .5rem;
+	box-shadow: 0 5px 15px rgba(0,0,0, .2); 
+	color: var(--c-text-primary); /* Text color for modal content */
+}
+
+.modal-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 1.5rem 1.5rem 1rem;
+}
+
+.logo-circle {
+	width: 3.5rem;
+	height: 3.5rem;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	border-radius: 50%;
+	background-color: var(--c-action-primary-accent);
+}
+
+.logo-circle svg {
+	max-width: 1.5rem;
+}
+
+.btn-close {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: .25rem;
+	border: none;
+	background-color: transparent;
+}
+
+.btn-close:hover, .btn-close:focus {
+	background-color: var(--c-action-primary-accent);
+}
+
+.modal-body {
+	padding: 1.5rem 2rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.modal-title {
+	font-weight: 700;
+    color: var(--c-text-primary); /* Ensure title uses the correct variable */
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.modal-description {
+	color: var(--c-text-secondary);
+}
+
+.upload-area {
+	margin-top: 1rem;
+	border: none;
+	background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%23ccc' stroke-width='3' stroke-dasharray='6%2c 14' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+	background-color: transparent;
+	padding: 3rem;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+} 
+
+.upload-area:hover, .upload-area:focus {
+	background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' stroke='%232e44ff' stroke-width='3' stroke-dasharray='6%2c 14' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+}
+
+.upload-area-icon {
+	display: block;
+	width: 2.25rem;
+	height: 2.25rem;
+}
+
+.upload-area-icon svg {
+	max-height: 100%;
+	max-width: 100%;
+}
+
+.upload-area-title {
+	margin-top: 1rem;
+	display: block;
+	font-weight: 700;
+	color: var(--c-text-primary);
+	text-align: center;
+}
+
+.upload-area-description {
+	display: block;
+	color: var(--c-text-secondary);
+	text-align: center;
+}
+
+.upload-area-description strong {
+	color: var(--c-action-primary);
+	font-weight: 700;
+}
+
+.modal-footer {
+	padding: 1rem 1.5rem 1.5rem;
+	display: flex;
+	justify-content: center;
+}
+
+.modal-footer [class*="btn-"] {
+	margin-left: .75rem;
+}
+
+.btn-secondary {
+	padding: .5rem 1rem;
+	font-weight: 500;
+	border: 2px solid var(--c-action-secondary);
+	border-radius: .25rem;
+	background-color: transparent;
+    color: var(--c-text-primary);
+}
+
+.btn-primary {
+	padding: .5rem 1rem;
+	font-weight: 500;
+	border: 2px solid var(--c-action-secondary);
+	border-radius: .25rem;
+	background-color: transparent;
+    color: var(--c-text-secondary); /* Default text for secondary */
+}
+/* End CSS for Analysis Page Upload Modal */
+
+/* Academy-specific utility classes */
+.academy-gradient-header {
+  background: linear-gradient(135deg, var(--academy-gradient-from) 0%, var(--academy-gradient-to) 100%);
+}
+
+.academy-primary-bg {
+  background-color: var(--academy-primary);
+}
+
+.academy-secondary-bg {
+  background-color: var(--academy-secondary);
+}
+
+.academy-accent-bg {
+  background-color: var(--academy-accent);
+}
+
+.academy-border-left {
+  border-left: 4px solid var(--academy-primary);
+}
+
+.academy-border-left-secondary {
+  border-left: 4px solid var(--academy-secondary);
+}
+
+.academy-border-left-accent {
+  border-left: 4px solid var(--academy-accent);
+}
+
+/* Academy module-specific colors */
+.module-reasoning {
+  --module-color: #3B82F6; /* Blue */
+  --module-color-light: #DBEAFE; /* Blue-100 */
+  --module-color-border: #93C5FD; /* Blue-300 */
+}
+
+.module-differential {
+  --module-color: #8B5CF6; /* Purple */
+  --module-color-light: #EDE9FE; /* Purple-100 */
+  --module-color-border: #C4B5FD; /* Purple-300 */
+}
+
+.module-metacognition {
+  --module-color: #6366F1; /* Indigo */
+  --module-color-light: #E0E7FF; /* Indigo-100 */
+  --module-color-border: #A5B4FC; /* Indigo-300 */
+}
+
+.module-evidence {
+  --module-color: #10B981; /* Emerald - kept for MBE as it's working well */
+  --module-color-light: #D1FAE5; /* Emerald-100 */
+  --module-color-border: #6EE7B7; /* Emerald-300 */
+}
+
+/* Standardized content blocks */
+.content-block-info {
+  background-color: #DBEAFE; /* Blue-100 */
+  border-color: #93C5FD; /* Blue-300 */
+}
+
+.content-block-success {
+  background-color: #D1FAE5; /* Emerald-100 */
+  border-color: #6EE7B7; /* Emerald-300 */
+}
+
+.content-block-warning {
+  background-color: #FEF3C7; /* Amber-100 */
+  border-color: #FCD34D; /* Amber-300 */
+}
+
+.content-block-danger {
+  background-color: #FEE2E2; /* Red-100 */
+  border-color: #FCA5A5; /* Red-300 */
+}
+
+.content-block-purple {
+  background-color: #EDE9FE; /* Purple-100 */
+  border-color: #C4B5FD; /* Purple-300 */
+}

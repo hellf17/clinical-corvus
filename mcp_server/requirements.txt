@@ -1,0 +1,30 @@
+# Core Framework for MCP Server
+fastapi==0.115.12
+uvicorn==0.34.1
+pydantic
+pydantic-settings==2.1.0
+python-dotenv>=1.1.0
+python-multipart==0.0.9
+
+# NOTE: Shared dependencies (BAML, research services, HTTP clients, etc.) 
+# are installed separately in Docker builds from requirements-shared.txt
+
+# MCP Server specific utilities
+certifi==2024.2.2
+charset-normalizer==3.4.1
+click==8.1.8
+colorama==0.4.6
+idna==3.10
+packaging==23.2
+six==1.16.0
+urllib3==2.4.0
+
+# FastAPI dependencies
+starlette==0.46.2
+sniffio==1.3.1
+
+# Date/time handling (duplicated from shared for local dev)
+python-dateutil==2.8.2
+pytz==2024.1
+PyYAML==6.0.2
+tenacity==9.1.2 

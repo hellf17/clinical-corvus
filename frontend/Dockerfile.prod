@@ -1,0 +1,83 @@
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copiar arquivos de dependências
+COPY package.json package-lock.json ./
+
+# Instalar dependências de build para node-canvas (e outras compilações nativas)
+# E também as dependências de runtime que precisam persistir
+RUN apk add --no-cache --virtual .build-deps \
+    python3 \
+    make \
+    g++ \
+    build-base \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    librsvg-dev && \
+    apk add --no-cache \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    librsvg
+
+# Instalar dependências de Node.js
+RUN npm ci
+
+# Após npm ci, podemos remover as dependências de build para manter a imagem menor
+RUN apk del .build-deps
+
+# Copiar código fonte
+COPY . .
+
+# Declare build arguments needed during the build
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ARG POSTGRES_URL
+# ARG CLERK_SECRET_KEY # Uncomment if needed for build
+
+# Set environment variables from build arguments for the build stage
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+ENV POSTGRES_URL=${POSTGRES_URL}
+# ENV CLERK_SECRET_KEY=${CLERK_SECRET_KEY} # Uncomment if needed for build
+
+# Construir a aplicação
+RUN npm run build
+
+# Segunda etapa: imagem final
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Definir variáveis de ambiente
+ENV NODE_ENV=production
+# Note: Runtime environment variables (like POSTGRES_URL for the running app if it does SSR data fetching)
+# should be set here as well, or when running the container.
+# For now, focusing on build-time vars.
+
+# Copiar package.json e package-lock.json (needed for npm prune and npm start)
+COPY --from=builder /app/package.json /app/package-lock.json ./
+
+# Copiar node_modules construídos do builder, que já contém canvas.node compilado
+COPY --from=builder /app/node_modules ./node_modules
+
+# Remover dependências de desenvolvimento para manter a imagem final menor
+# (substitui o antigo RUN npm ci --production)
+RUN npm prune --omit=dev
+
+# Copiar arquivos de build
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.mjs ./
+
+# Expor porta
+EXPOSE 3000
+
+# Adicionar healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+
+# Iniciar a aplicação
+CMD ["npm", "start"] 
