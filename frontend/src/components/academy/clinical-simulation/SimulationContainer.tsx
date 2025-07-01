@@ -306,54 +306,54 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
       <div className="mt-8 flex justify-end">
           <Button onClick={onExit} variant="ghost">Sair da Simulação</Button>
       </div>
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <StepNavigation
-            steps={snappsWorkflowSteps}
-            currentStepIndex={currentStep}
-            completedSteps={completedSteps}
-            onStepClick={(stepId) => {
-                const stepIndex = snappsWorkflowSteps.findIndex(s => s.id === stepId);
-                if (stepIndex !== -1) setCurrentStep(stepIndex);
-            }}
-          />
-        </div>
-        <div className="lg:col-span-2">
-          <SimulationWorkspace
-            currentStep={{
-                id: currentWorkflowStep.id,
-                title: currentWorkflowStep.title,
-                description: currentWorkflowStep.description,
-                completed: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs].trim() !== '',
-                userInput: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs],
-            }}
-            currentStepIndex={currentStep}
-            isLoading={isLoading}
-            showSubmitSuccess={false} // This can be enhanced later if needed
-            batchMode={true}
-            allInputsCollected={allInputsCollected}
-            onInputChange={handleInputChange}
-            onSubmitStep={() => {}} // Not used in batch mode
-            onBatchSubmit={handleBatchSubmit}
-            clinicalCase={selectedCase}
-          />
-          <div className="mt-6 flex justify-between items-center">
-            <Button onClick={handleBack} disabled={currentStep === 0 || isLoading}>
-              Anterior
-            </Button>
-            
-            {currentStep < snappsWorkflowSteps.length - 1 ? (
-              <Button onClick={handleNext} disabled={isLoading}>
-                Próximo
-              </Button>
-            ) : (
-              <Button onClick={handleBatchSubmit} disabled={isLoading || !allInputsCollected} className="bg-green-600 hover:bg-green-700">
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                Analisar Caso Completo
-              </Button>
-            )}
-          </div>
-           {error && <Alert variant="destructive" className="mt-4"><AlertDescription>{error}</AlertDescription></Alert>}
+      <div className="mt-8 flex flex-col gap-8">
+        <StepNavigation
+          steps={snappsWorkflowSteps}
+          currentStepIndex={currentStep}
+          completedSteps={completedSteps}
+          onStepClick={(stepId) => {
+              const stepIndex = snappsWorkflowSteps.findIndex(s => s.id === stepId);
+              if (stepIndex !== -1) setCurrentStep(stepIndex);
+          }}
+        />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-3">
+              <SimulationWorkspace
+                currentStep={{
+                    id: currentWorkflowStep.id,
+                    title: currentWorkflowStep.title,
+                    description: currentWorkflowStep.description,
+                    completed: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs].trim() !== '',
+                    userInput: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs],
+                }}
+                currentStepIndex={currentStep}
+                isLoading={isLoading}
+                showSubmitSuccess={false}
+                batchMode={true}
+                allInputsCollected={allInputsCollected}
+                onInputChange={handleInputChange}
+                onSubmitStep={() => {}} 
+                onBatchSubmit={handleBatchSubmit}
+                clinicalCase={selectedCase}
+              />
+              <div className="mt-6 flex justify-between items-center">
+                <Button onClick={handleBack} disabled={currentStep === 0 || isLoading}>
+                  Anterior
+                </Button>
+                
+                {currentStep < snappsWorkflowSteps.length - 1 ? (
+                  <Button onClick={handleNext} disabled={isLoading}>
+                    Próximo
+                  </Button>
+                ) : (
+                  <Button onClick={handleBatchSubmit} disabled={isLoading || !allInputsCollected} className="bg-green-600 hover:bg-green-700">
+                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                    Analisar Caso Completo
+                  </Button>
+                )}
+              </div>
+              {error && <Alert variant="destructive" className="mt-4"><AlertDescription>{error}</AlertDescription></Alert>}
+            </div>
         </div>
       </div>
     </div>

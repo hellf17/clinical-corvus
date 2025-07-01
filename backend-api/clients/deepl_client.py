@@ -8,8 +8,10 @@ DEEPL_API_KEY = os.getenv("DEEPL_API_KEY")
 if not DEEPL_API_KEY:
     logger.warning("DEEPL_API_KEY not found in environment variables. DeepL translation will fail.")
 
-# Use the free API endpoint if it's the free key, otherwise use the pro endpoint
-DEEPL_API_URL = "https://api-free.deepl.com/v2/translate" if DEEPL_API_KEY and ":fx" in DEEPL_API_KEY else "https://api.deepl.com/v2/translate"
+# Default to the pro API endpoint, switch to free if the key indicates it.
+DEEPL_API_URL = "https://api.deepl.com/v2/translate"
+if DEEPL_API_KEY and ":fx" in DEEPL_API_KEY:
+    DEEPL_API_URL = "https://api-free.deepl.com/v2/translate"
 
 async def translate_text_deepl(text: str, target_lang: str = "EN-US") -> str | None:
     """

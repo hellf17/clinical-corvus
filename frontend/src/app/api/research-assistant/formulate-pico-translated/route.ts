@@ -34,13 +34,19 @@ interface PICOFormulationOutput {
 /**
  * POST handler for formulating a PICO question. This endpoint is a proxy to the backend.
  */
+function getAPIUrl(): string {
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+}
+
 export async function POST(request: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
+  const { getToken } = await auth();
+  const token = await getToken();
+
+  if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const backendUrl = `${process.env.BACKEND_URL || 'http://backend-api:8000'}/api/research/formulate-pico-translated`;
+  const backendUrl = `${getAPIUrl()}/api/research/formulate-pico`;
 
   try {
     const body = await request.json();
@@ -49,8 +55,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.CLERK_SECRET_KEY}`,
-        'X-User-Id': userId,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(body),
     });

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 function getAPIUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://backend-api:8000';
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 }
 
 export async function POST(request: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/generate-clinical-workflow-questions-translated`, {
+    const response = await fetch(`${apiUrl}/generate-clinical-workflow-questions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

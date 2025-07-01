@@ -1,4 +1,5 @@
-import { IntegratedWorkflowCard, WorkflowStep } from '@/components/academy/IntegratedWorkflowCard';
+import { WorkflowStepper } from './WorkflowStepper';
+import type { WorkflowStep } from './WorkflowStepper';
 
 interface StepNavigationProps {
   steps: WorkflowStep[];
@@ -8,21 +9,15 @@ interface StepNavigationProps {
 }
 
 export function StepNavigation({ steps, currentStepIndex, completedSteps = [], onStepClick }: StepNavigationProps) {
-  // Map currentStepIndex to step id
   const activeStepId = steps[currentStepIndex]?.id;
-  // Defensive: Provide a default no-op if onStepClick is not supplied (should never happen)
-  const handleStepClick = onStepClick || (() => {});
+
   return (
-    <div className="w-full md:w-1/3 lg:w-1/4 space-y-4">
-      <IntegratedWorkflowCard
+    <div className="w-full">
+      <WorkflowStepper
         steps={steps}
         activeStepId={activeStepId}
         completedSteps={completedSteps}
-        onStepClick={handleStepClick}
-        title={"Workflow"}
-        subtitle={""}
-        themeColorName={"blue"}
-        totalSteps={steps.length}
+        onStepClick={onStepClick}
       />
     </div>
   );

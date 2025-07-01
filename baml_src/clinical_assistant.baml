@@ -318,8 +318,6 @@ function TeachQuestionPrioritization(input: DdxQuestioningInput) -> DdxQuestioni
     {% endfor %}
     Demographics: {{ input.patient_demographics }}
 
-    **DISCLAIMER: Este é um exercício educacional para aprimorar a habilidade de formular perguntas diagnósticas. Não deve ser usado como única fonte para investigação clínica.**
-
     **OUTPUT INSTRUCTIONS:**
     Your final output must be a JSON object that strictly adheres to the `DdxQuestioningOutput` class structure.
     - Populate the `prioritized_questions` array with the "ESSENTIAL AND SPECIFIC" questions (Questions 1-4).
@@ -328,7 +326,6 @@ function TeachQuestionPrioritization(input: DdxQuestioningInput) -> DdxQuestioni
     {{ ctx.output_format }}
   """#
 }
-
 
 // --- Classes and Function for the CLINICAL WORKFLOW Module (Differential Diagnosis Builder) ---
 

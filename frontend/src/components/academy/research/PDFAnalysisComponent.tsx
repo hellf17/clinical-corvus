@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from "@/components/ui/Badge";
 import { Separator } from "@/components/ui/Separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
 import { 
   Upload, 
   FileText, 
@@ -20,7 +21,11 @@ import {
   X,
   Zap,
   Settings,
-  Crown
+  Crown,
+  ChevronDown,
+  Loader2,
+  HelpCircle,
+  ShieldCheck
 } from "lucide-react";
 import { useAuth } from '@clerk/nextjs';
 import { PDFAnalysisOutput } from '@/types/research';
@@ -33,7 +38,6 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
   const { getToken } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados principais
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisFocus, setAnalysisFocus] = useState('');
   const [clinicalQuestion, setClinicalQuestion] = useState('');
@@ -60,10 +64,23 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
+    setResults(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  const handleClearForm = () => {
+    setSelectedFile(null);
+    setAnalysisFocus('');
+    setClinicalQuestion('');
+    setExtractionMode('balanced');
+    setResults(null);
+    setError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +110,7 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
         formData.append('clinical_question', clinicalQuestion);
       }
 
-      const response = await fetch('/api/research-assistant/analyze-pdf', {
+      const response = await fetch('/api/research-assistant/analyze-pdf-translated', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -124,302 +141,215 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getExtractionModeIcon = (mode: string) => {
-    switch (mode) {
-      case 'fast': return <Zap className="h-4 w-4" />;
-      case 'premium': return <Crown className="h-4 w-4" />;
-      default: return <Settings className="h-4 w-4" />;
-    }
-  };
-
-  const getExtractionModeDescription = (mode: string) => {
-    switch (mode) {
-      case 'fast': return 'Extração rápida e econômica, ideal para documentos simples';
-      case 'premium': return 'Máxima fidelidade, preserva estrutura complexa, tabelas e formatação';
-      default: return 'Equilibrio entre precisão, estrutura e performance (recomendado)';
-    }
-  };
-
   return (
-    <div className={className}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileText className="h-6 w-6 mr-2 text-green-500" />
-            Análise Avançada de Documentos PDF
+    <Card className={`w-full ${className} border-l-4 border-blue-600`}>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center text-xl">
+            <FileText className="mr-3 h-6 w-6 text-blue-600" />
+            Análise de Artigo Científico (PDF)
           </CardTitle>
-          <CardDescription>
-            Faça upload de artigos científicos, guidelines ou outros documentos médicos em PDF para análise detalhada pelo Dr. Corvus.
-            Utiliza LlamaParse para extração avançada de texto e estrutura.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Upload de arquivo */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Documento PDF *
-              </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                {selectedFile ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-center space-x-2">
-                      <FileText className="h-8 w-8 text-green-500" />
-                      <div className="text-left">
-                        <p className="font-medium text-sm">{selectedFile.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(selectedFile.size)}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveFile}
-                        className="ml-2"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <Upload className="h-12 w-12 text-gray-400 mx-auto" />
-                    <div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        Selecionar PDF
-                      </Button>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Máximo 10MB • Apenas arquivos PDF
-                      </p>
-                    </div>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
+        </div>
+        <CardDescription className="pl-9">
+          Extraia e sintetize informações chave de artigos em formato PDF para otimizar sua revisão de literatura.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div 
+            className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors duration-200 bg-gray-50"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              const files = e.dataTransfer.files;
+              if (files && files.length > 0) {
+                handleFileSelect({ target: { files } } as any);
+              }
+            }}
+          >
+            <Upload className="w-10 h-10 text-gray-400 mb-2" />
+            <p className="text-sm text-gray-600">
+              <span 
+                className="font-semibold text-blue-600 cursor-pointer hover:underline"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Clique para selecionar
+              </span> ou arraste e solte o arquivo PDF aqui.
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Tamanho máximo: 10MB</p>
+            <Input ref={fileInputRef} type="file" className="sr-only" accept=".pdf" onChange={handleFileSelect} id="pdf-upload"/>
+          </div>
+
+          {selectedFile && (
+            <div className="flex items-center justify-between p-3 bg-slate-100 rounded-md border border-slate-200">
+              <div className="flex items-center min-w-0">
+                <FileText className="h-5 w-5 text-slate-600 mr-3 flex-shrink-0" />
+                <span className="text-sm font-medium text-slate-800 truncate pr-2">{selectedFile.name}</span>
+                <Badge variant="secondary">{formatFileSize(selectedFile.size)}</Badge>
               </div>
+              <Button variant="ghost" size="icon" type="button" onClick={handleRemoveFile} className="text-slate-500 hover:text-slate-800">
+                <X className="h-4 w-4" />
+              </Button>
             </div>
+          )}
 
-            {/* Modo de extração */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Modo de Extração
-              </label>
-              <Select value={extractionMode} onValueChange={setExtractionMode}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o modo de extração" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fast">
-                    <div className="flex items-center">
-                      <Zap className="h-4 w-4 mr-2 text-yellow-500" />
-                      Rápido
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="balanced">
-                    <div className="flex items-center">
-                      <Settings className="h-4 w-4 mr-2 text-[#44154a]" />
-                      Equilibrado (Recomendado)
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="premium">
-                    <div className="flex items-center">
-                      <Crown className="h-4 w-4 mr-2 text-purple-500" />
-                      Premium
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {getExtractionModeDescription(extractionMode)}
-              </p>
-            </div>
-
-            {/* Foco da análise */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Foco da Análise (Opcional)
-              </label>
-              <Select value={analysisFocus} onValueChange={setAnalysisFocus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o foco da análise" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="general">Análise Geral</SelectItem>
-                  <SelectItem value="methodology">Foco em Metodologia</SelectItem>
-                  <SelectItem value="results">Foco em Resultados</SelectItem>
-                  <SelectItem value="clinical">Aplicabilidade Clínica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Pergunta clínica */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Pergunta Clínica de Referência (Opcional)
-              </label>
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="link" className="p-0 text-sm text-blue-600">
+                <Settings className="h-4 w-4 mr-2" />
+                Opções Avançadas
+                <ChevronDown className="h-4 w-4 ml-1" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-4 animate-in slide-in-from-top-4">
               <Textarea
+                placeholder="Opcional: Qual o foco principal da sua análise? (ex: metodologia, resultados, limitações)"
+                value={analysisFocus}
+                onChange={(e) => setAnalysisFocus(e.target.value)}
+                className="w-full"
+              />
+              <Textarea
+                placeholder="Opcional: Qual pergunta clínica você quer responder com este artigo?"
                 value={clinicalQuestion}
                 onChange={(e) => setClinicalQuestion(e.target.value)}
-                placeholder="Ex: Este estudo responde à pergunta sobre a eficácia da metformina em pacientes diabéticos?"
-                className="min-h-[60px]"
+                className="w-full"
               />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Modo de Extração</label>
+                <Select value={extractionMode} onValueChange={setExtractionMode}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o modo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="balanced"><div className="flex items-center"><Settings className="h-4 w-4 mr-2 text-blue-500" />Equilibrado</div></SelectItem>
+                    <SelectItem value="speed"><div className="flex items-center"><Zap className="h-4 w-4 mr-2 text-orange-500" />Rápido</div></SelectItem>
+                    <SelectItem value="deep"><div className="flex items-center"><Crown className="h-4 w-4 mr-2 text-purple-500" />Profundo</div></SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          <Separator />
+
+          <div className="flex justify-between items-center">
+            <Button variant="outline" type="button" onClick={handleClearForm} disabled={isLoading}>
+              Limpar
+            </Button>
+            <Button type="submit" disabled={isLoading || !selectedFile} className="min-w-[120px]">
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Analisar PDF'}
+            </Button>
+          </div>
+        </form>
+
+        {error && (
+          <Alert variant="destructive" className="mt-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Erro na Análise</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {!results && !isLoading && !error && (
+            <div className="mt-6 p-4 border rounded-md bg-sky-50 border-sky-200 text-center">
+              <HelpCircle className="mx-auto h-8 w-8 text-sky-600 mb-2" />
+              <h3 className="text-md font-semibold text-sky-800">Pronto para começar?</h3>
+              <p className="text-sm text-sky-700 mt-1">
+                Selecione um arquivo PDF para iniciar a análise e extrair insights valiosos.
+              </p>
+            </div>
+        )}
+
+        {results && (
+          <div className="mt-8 pt-6 border-t">
+            <div className="text-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">Resultados da Análise</h3>
+              {results.document_type && (
+                <Badge variant="secondary" className="mb-4 text-sm font-medium py-1 px-3 rounded-full">
+                  <FileText className="mr-2 h-4 w-4" />
+                  {results.document_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </Badge>
+              )}
+              <p className="text-muted-foreground mt-2">Análise detalhada do documento PDF fornecido.</p>
             </div>
 
-            <Button type="submit" variant="default" disabled={isLoading || !selectedFile} className="w-full">
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Analisando documento...
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4 mr-2" />
-                  Analisar Documento
-                </>
-              )}
-            </Button>
-          </form>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader><CardTitle className="flex items-center"><Target className="mr-2 h-5 w-5 text-blue-600" />Resumo Estruturado</CardTitle></CardHeader>
+                <CardContent><p className="text-muted-foreground whitespace-pre-line">{results.structured_summary}</p></CardContent>
+              </Card>
 
-          {results && (
-            <div className="mt-8 animate-fade-in">
-              <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold tracking-tight text-gray-800">
-                  Análise do Documento
-                </h2>
-                <p className="text-muted-foreground mt-1">
-                  Resultados detalhados para: <span className="font-medium text-purple-700">{selectedFile?.name}</span>
-                </p>
-              </div>
-
-              {/* Quick Summary Badges */}
-              <Card className="mb-6 bg-slate-50">
-                <CardHeader>
-                  <CardTitle className="text-lg">Resumo Rápido</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-4">
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-600 mb-1">Tipo de Documento</h4>
-                    <Badge variant="secondary" className="text-base">{results.document_type}</Badge>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-600 mb-1">Qualidade da Evidência</h4>
-                    <Badge variant="outline" className="text-base border-yellow-400 text-yellow-700">{results.evidence_quality}</Badge>
-                  </div>
+              <Card>
+                <CardHeader><CardTitle className="flex items-center"><BookOpen className="mr-2 h-5 w-5 text-purple-600" />Principais Achados</CardTitle></CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {results.key_findings.map((finding, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 mr-3 mt-1 text-blue-500 flex-shrink-0" />
+                        <span className="text-muted-foreground">{finding}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </CardContent>
               </Card>
 
-              {/* Main Content Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column (Main Content) */}
-                <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader><CardTitle className="flex items-center"><Lightbulb className="mr-2 h-5 w-5 text-green-600" />Recomendações e Conclusões</CardTitle></CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {results.recommendations.map((rec, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 mr-3 mt-1 text-green-500 flex-shrink-0" />
+                        <span className="text-muted-foreground">{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card>
+                  <CardHeader><CardTitle className="flex items-center text-base"><Settings className="mr-2 h-5 w-5 text-gray-600" />Metodologia</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground whitespace-pre-line">{results.methodology_summary}</p></CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle className="flex items-center text-base"><Zap className="mr-2 h-5 w-5 text-teal-600" />Relevância Clínica</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground whitespace-pre-line">{results.clinical_relevance}</p></CardContent>
+                </Card>
+                {results.evidence_quality && (
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center"><BookOpen className="mr-2 h-5 w-5 text-purple-600" /> Resumo Estruturado</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground whitespace-pre-line">{results.structured_summary}</p>
-                    </CardContent>
+                    <CardHeader><CardTitle className="flex items-center text-base"><ShieldCheck className="mr-2 h-5 w-5 text-indigo-600" />Qualidade da Evidência</CardTitle></CardHeader>
+                    <CardContent><p className="text-sm text-muted-foreground whitespace-pre-line">{results.evidence_quality}</p></CardContent>
                   </Card>
-
-                  {results.key_findings?.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center"><Target className="mr-2 h-5 w-5 text-blue-600" /> Principais Achados</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-3">
-                          {results.key_findings.map((finding, index) => (
-                            <li key={index} className="flex items-start">
-                              <CheckCircle className="h-5 w-5 mr-3 mt-0.5 text-blue-500 flex-shrink-0" />
-                              <span className="text-muted-foreground">{finding}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {results.recommendations?.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center"><Lightbulb className="mr-2 h-5 w-5 text-green-600" /> Recomendações e Conclusões</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-3">
-                          {results.recommendations.map((recommendation, index) => (
-                            <li key={index} className="flex items-start">
-                              <CheckCircle className="h-5 w-5 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
-                              <span className="text-muted-foreground">{recommendation}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                {/* Right Column (Side Content) */}
-                <div className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center"><Settings className="mr-2 h-5 w-5 text-gray-600" /> Metodologia</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line">{results.methodology_summary}</p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center"><Zap className="mr-2 h-5 w-5 text-teal-600" /> Relevância Clínica</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground whitespace-pre-line">{results.clinical_relevance}</p>
-                    </CardContent>
-                  </Card>
-
-                  {results.limitations?.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center"><AlertTriangle className="mr-2 h-5 w-5 text-orange-600" /> Limitações Identificadas</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="space-y-3">
-                          {results.limitations.map((limitation, index) => (
-                            <li key={index} className="flex items-start">
-                              <AlertTriangle className="h-5 w-5 mr-3 mt-0.5 text-orange-500 flex-shrink-0" />
-                              <span className="text-sm text-muted-foreground">{limitation}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
+                )}
               </div>
 
-              {/* Disclaimer */}
-              <Alert className="mt-6">
+              {results.limitations && results.limitations.length > 0 && (
+                <Card className="border-amber-500">
+                  <CardHeader><CardTitle className="flex items-center text-base"><AlertTriangle className="mr-2 h-5 w-5 text-amber-600" />Limitações Identificadas</CardTitle></CardHeader>
+                  <CardContent>
+                    <ul className="space-y-3">
+                      {results.limitations.map((limitation, index) => (
+                        <li key={index} className="flex items-start">
+                          <AlertTriangle className="h-5 w-5 mr-3 mt-1 text-amber-500 flex-shrink-0" />
+                          <span className="text-sm text-muted-foreground">{limitation}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Alert className="mt-8 border-l-4 border-blue-500">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Aviso</AlertTitle>
+                <AlertTitle>Aviso Importante</AlertTitle>
                 <AlertDescription>
-                  Esta é uma ferramenta de auxílio e não substitui o julgamento clínico profissional. Verifique sempre as informações com fontes primárias.
+                  Esta análise é gerada por IA e serve como um auxílio à pesquisa. Não substitui o julgamento clínico profissional. Sempre verifique as informações com as fontes primárias.
                 </AlertDescription>
               </Alert>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

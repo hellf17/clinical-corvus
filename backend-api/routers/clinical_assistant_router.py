@@ -555,6 +555,7 @@ class TeachQuestionPrioritizationInputModel(BaseModel):
 
 class TeachQuestionPrioritizationOutputModel(BaseModel):
     prioritized_questions: List[str]
+    complementary_questions: List[str]
     questioning_rationale: str
     potential_systems_to_explore: List[str]
 
@@ -1131,28 +1132,6 @@ async def generate_illness_script_translated(payload: IllnessScriptInputModel):
     except Exception as e:
         logger.error(f"Error in translated generate_illness_script endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing translated illness script request: {str(e)}")    
-
-@router.post(
-    "/generate-differential-diagnosis-questions-translated",
-    response_model=GenerateDDxQuestionsOutputModel,
-    summary="[PT] Generate Differential Diagnosis Questions",
-    description="Helps generate key questions to ask a patient based on their chief complaint and demographics to explore potential differential diagnoses. (BAML: GenerateDifferentialDiagnosisQuestions)"
-)
-async def generate_differential_diagnosis_questions_translated(payload: GenerateDDxQuestionsInputModel):
-    try:
-        # Call the original English endpoint
-        original_response = await generate_differential_diagnosis_questions(payload)
-        
-        # Translate the response
-        translated_response = await _translate_generate_ddx_questions_output(original_response, target_lang="PT")
-        
-        return translated_response
-    except HTTPException as he:
-        # Re-raise HTTP exceptions from the original endpoint
-        raise he
-    except Exception as e:
-        logger.error(f"Error in translated generate_differential_diagnosis_questions endpoint: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing translated differential diagnosis questions request: {str(e)}")
 
 @router.post(
     "/assist-identifying-cognitive-biases-scenario-translated",

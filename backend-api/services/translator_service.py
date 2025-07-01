@@ -82,12 +82,14 @@ async def translate_batch(texts: List[str], target_lang: Literal["EN", "PT"] = "
     
     # Wait for all translations to complete
     results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    # Handle any exceptions
+
+    # Check for any exceptions and raise the first one found
     for i, result in enumerate(results):
         if isinstance(result, Exception):
-            logger.error(f"Error translating batch item {i}: {result}")
-            # Replace failed translations with original text
-            results[i] = texts[i]
-    
+            # Log the specific item that failed
+            log_text = texts[i][:75] + '...' if len(texts[i]) > 75 else texts[i]
+            logger.error(f"Error translating batch item {i} ('{log_text}'): {result}")
+            # Raise the exception to prevent silent failure. This will bubble up to the endpoint.
+            raise result
+
     return results

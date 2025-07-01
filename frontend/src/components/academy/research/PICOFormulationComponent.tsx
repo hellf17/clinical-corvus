@@ -150,7 +150,7 @@ export default function PICOFormulationComponent({
         additional_context: additionalContext.trim() || undefined,
       };
 
-      const response = await fetch('/api/research-assistant/formulate-pico', {
+      const response = await fetch('/api/research-assistant/formulate-pico-translated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

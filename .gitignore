@@ -13,7 +13,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+
 lib60/
 parts/
 sdist/

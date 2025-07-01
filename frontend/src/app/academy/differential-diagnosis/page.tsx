@@ -23,18 +23,9 @@ interface ExpandDifferentialDiagnosisInput {
   student_initial_ddx_list: string[];
 }
 
-interface SuggestedDiagnosis {
-  diagnosis: string;
-  rationale: string;
-  category: string;
-  suspicion_level?: string;
-}
-
 interface ExpandedDdxOutput {
   applied_approach_description: string;
-  red_flags: SuggestedDiagnosis[];
-  systematic_diagnoses: SuggestedDiagnosis[];
-  disclaimer: string;
+  suggested_additional_diagnoses_with_rationale: string[];
 }
 
 // Interfaces para o gerador de perguntas de diagnóstico diferencial
@@ -101,7 +92,6 @@ interface CompareContrastFeedbackOutput {
   overall_feedback?: string;
   detailed_feedback_per_hypothesis: HypothesisComparisonFeedback[];
   suggested_learning_focus?: string;
-  disclaimer: string;
 }
 
 // Sample cases for different difficulty levels
@@ -747,96 +737,35 @@ export default function DifferentialDiagnosisPage() {
                       </div>
                     </div>
 
-                    {(expandedDdx.red_flags.length > 0 || expandedDdx.systematic_diagnoses.length > 0) ? (
-                      <div className="space-y-6">
-                        {/* Red Flags - Diagnósticos Urgentes */}
-                        {expandedDdx.red_flags.length > 0 && (
-                          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <div className="flex items-center mb-3">
-                              <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                                <Flag className="w-5 h-5 text-red-600" />
-                              </div>
-                              <h4 className="font-semibold text-red-800 text-lg">Red Flags - Considerar PRIMEIRO</h4>
-                            </div>
-                            <p className="text-sm text-red-700 mb-4">
-                              Condições potencialmente graves que requerem atenção imediata.
-                            </p>
-                            <div className="space-y-3">
-                              {expandedDdx.red_flags.map((item, index) => (
-                                <div key={`red-flag-${index}`} className="bg-white/70 p-3 rounded-md border border-red-100">
-                                  <div className="flex items-start">
-                                    <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
-                                      <span className="text-red-700 font-semibold text-xs">{index + 1}</span>
-                                    </div>
-                                    <div className="flex-1">
-                                      <p className="font-medium text-red-900 text-base leading-relaxed">{item.diagnosis}</p>
-                                      <div className="mt-2 p-2 bg-red-50/50 rounded-sm border-l-4 border-red-300">
-                                        <p className="text-sm text-red-700">
-                                          <span className="font-semibold">💡 Racional:</span> {item.rationale}
-                                        </p>
-                                      </div>
-                                      {item.suspicion_level && (
-                                        <Badge variant="destructive" className="mt-2 text-xs">
-                                          {item.suspicion_level}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                    {expandedDdx.suggested_additional_diagnoses_with_rationale && expandedDdx.suggested_additional_diagnoses_with_rationale.length > 0 ? (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="flex items-center mb-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                            <ListChecks className="w-5 h-5 text-blue-600" />
                           </div>
-                        )}
-
-                        {/* Diagnósticos Sistemáticos */}
-                        {expandedDdx.systematic_diagnoses.length > 0 && (
-                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                            <div className="flex items-center mb-3">
-                              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mr-3">
-                                <ListChecks className="w-5 h-5 text-amber-600" />
-                              </div>
-                              <h4 className="font-semibold text-amber-800 text-lg">Expansão Sistemática</h4>
-                            </div>
-                            <p className="text-sm text-amber-700 mb-4">
-                              Diagnósticos adicionais baseados em abordagens sistemáticas para garantir uma avaliação completa.
-                            </p>
-                            <div className="space-y-3">
-                              {expandedDdx.systematic_diagnoses.map((item, index) => (
-                                <div key={`systematic-${index}`} className="bg-white/70 p-3 rounded-md border border-amber-100">
-                                  <div className="flex items-start">
-                                    <div className="w-6 h-6 bg-amber-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
-                                      <span className="text-amber-700 font-semibold text-xs">{index + 1}</span>
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="flex items-center justify-between mb-1">
-                                        <p className="font-medium text-amber-900 text-base leading-relaxed">{item.diagnosis}</p>
-                                        {item.suspicion_level && (
-                                          <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 bg-amber-50 whitespace-nowrap">
-                                            {item.suspicion_level}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="mt-2 p-2 bg-amber-50/50 rounded-sm border-l-4 border-amber-300">
-                                        <p className="text-sm text-amber-800">
-                                          <span className="font-semibold">💡 Racional:</span> {item.rationale}
-                                        </p>
-                                      </div>
-                                      <Badge variant="outline" className="mt-2 text-xs border-amber-300 text-amber-700">
-                                        {item.category}
-                                      </Badge>
-                                    </div>
-                                  </div>
+                          <h4 className="font-semibold text-blue-800 text-lg">Sugestões de Diagnósticos Adicionais</h4>
+                        </div>
+                        <p className="text-sm text-blue-700 mb-4">
+                          Com base nos dados fornecidos, aqui estão alguns diagnósticos e racionais a serem considerados para ampliar sua perspectiva.
+                        </p>
+                        <div className="space-y-3">
+                          {expandedDdx.suggested_additional_diagnoses_with_rationale.map((item, index) => (
+                            <div key={`suggestion-${index}`} className="bg-white/70 p-3 rounded-md border border-blue-100">
+                              <div className="flex items-start">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
+                                  <span className="text-blue-700 font-semibold text-xs">{index + 1}</span>
                                 </div>
-                              ))}
+                                <div className="flex-1">
+                                  <p className="text-sm text-blue-900 leading-relaxed">{item}</p>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">Nenhum diagnóstico adicional foi sugerido com base nas informações fornecidas.</p>
                     )}
-                    
-                    <p className="text-xs italic text-muted-foreground">{expandedDdx.disclaimer}</p>
                   </div>
                 )}
                 
@@ -1309,8 +1238,6 @@ export default function DifferentialDiagnosisPage() {
                         </div>
                         </div>
                       )}
-                      
-                    <p className="text-xs italic text-muted-foreground">{hypothesisFeedback.disclaimer}</p>
                   </div>
                 )}
               </CardContent>

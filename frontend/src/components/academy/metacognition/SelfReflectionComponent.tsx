@@ -251,34 +251,42 @@ export default function SelfReflectionComponent({
     setError(null);
     setAnalysis(null);
 
-    let reflectionText = '';
-    
+    let final_reasoning_process = '';
+    let final_case_context = useContextualCase ? caseContext : (initialScenario || '');
+
     if (reflectionMode === 'guided') {
       if (!reasoningDescription.trim()) {
         setError('Por favor, descreva seu processo de raciocínio.');
         setIsLoading(false);
         return;
       }
-      reflectionText = `${caseContext ? `Contexto: ${caseContext}\n\n` : ''}Processo de raciocínio: ${reasoningDescription}`;
+      final_reasoning_process = reasoningDescription;
     } else if (reflectionMode === 'structured') {
       if (!selectedTemplate) {
         setError('Por favor, selecione um template de reflexão.');
         setIsLoading(false);
         return;
       }
-      reflectionText = generateStructuredReflection();
+      final_reasoning_process = generateStructuredReflection();
+      // O contexto já está em `final_case_context` se `useContextualCase` estiver ativo
     } else if (reflectionMode === 'example') {
       if (!selectedExample) {
         setError('Por favor, selecione um exemplo para análise.');
         setIsLoading(false);
         return;
       }
-      reflectionText = `Contexto: ${selectedExample.scenario}\n\nProcesso de raciocínio: ${selectedExample.reasoningDescription}`;
+      final_case_context = selectedExample.scenario;
+      final_reasoning_process = selectedExample.reasoningDescription;
     }
 
-    // Adicionando validação para o contexto do caso
-    if (useContextualCase && !caseContext.trim()) {
+    if (useContextualCase && !final_case_context.trim()) {
       setError('O contexto do caso é obrigatório quando a opção "Usar Contexto do Caso" está habilitada.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!final_reasoning_process.trim()) {
+      setError('O processo de raciocínio não pode estar vazio.');
       setIsLoading(false);
       return;
     }
@@ -291,8 +299,8 @@ export default function SelfReflectionComponent({
     }
 
     const payload = {
-      reasoning_process: reflectionText,
-      case_context: useContextualCase ? caseContext : "",
+      reasoning_process: final_reasoning_process,
+      case_context: final_case_context,
       reflection_metadata: {
         mode: reflectionMode,
         template_id: selectedTemplate?.id,

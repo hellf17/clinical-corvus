@@ -287,7 +287,7 @@ export default function FundamentalDiagnosticReasoningPage() {
       const token = await getToken();
       if (!token) throw new Error('Autenticação necessária.');
 
-      const response = await fetch('/api/clinical-assistant/generate-illness-script', {
+      const response = await fetch('/api/clinical-assistant/generate-illness-script-translated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ disease_name: diseaseForScript }),
@@ -317,7 +317,7 @@ export default function FundamentalDiagnosticReasoningPage() {
       if (!token) throw new Error('Autenticação necessária.');
 
       const fetchScript = async (diseaseName: string) => {
-        const response = await fetch('/api/clinical-assistant/generate-illness-script', {
+        const response = await fetch('/api/clinical-assistant/generate-illness-script-translated', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify({ disease_name: diseaseName }),
@@ -376,7 +376,7 @@ export default function FundamentalDiagnosticReasoningPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          main_complaint: mainComplaintCD,
+          chief_complaint: mainComplaintCD,
           demographics: demographicsCD,
           initial_findings: initialFindingsCD,
         }),
@@ -845,232 +845,538 @@ export default function FundamentalDiagnosticReasoningPage() {
 
         <TabsContent value="illness-scripts">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-6 w-6 mr-2 text-indigo-500" />
-                Construindo e Comparando Illness Scripts
-              </CardTitle>
-              <CardDescription>
-                Aprenda a estruturar o conhecimento sobre doenças em roteiros mentais para agilizar o diagnóstico.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              {/* Seção de Geração de Script Individual */}
-              <div className="p-4 border rounded-md bg-indigo-50 border-indigo-200">
-                <h3 className="font-semibold text-indigo-700 mb-2">Gerar um Illness Script</h3>
-                <form onSubmit={handleSubmitIllnessScript} className="space-y-3">
-                  <Input
-                    value={diseaseForScript}
-                    onChange={(e) => setDiseaseForScript(e.target.value)}
-                    placeholder="Digite o nome da doença (ex: Apendicite Aguda)"
-                    disabled={isLoadingIS}
-                  />
-                  <Button type="submit" disabled={isLoadingIS || !authIsLoaded} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {isLoadingIS ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Gerando...</> : 'Gerar Script'}
-                  </Button>
-                </form>
-                {errorIS && <Alert variant="destructive" className="mt-3"><AlertDescription>{errorIS}</AlertDescription></Alert>}
-                {isLoadingIS && <IllnessScriptSkeleton />}
-                {illnessScript && (
-                  <div className="mt-4 p-4 border bg-white rounded-md shadow-sm">
-                    <h4 className="font-bold text-lg text-indigo-800">{illnessScript.disease_name}</h4>
-                    <div className="mt-2 space-y-2 text-sm">
-                      <p><strong>Condições Predisponentes:</strong> {illnessScript.predisposing_conditions.join(', ')}</p>
-                      <p><strong>Resumo da Fisiopatologia:</strong> {illnessScript.pathophysiology_summary}</p>
-                      <p><strong>Sintomas e Sinais Chave:</strong> {illnessScript.key_symptoms_and_signs.join(', ')}</p>
-                      {illnessScript.relevant_diagnostics && <p><strong>Diagnósticos Relevantes:</strong> {illnessScript.relevant_diagnostics.join(', ')}</p>}
-                      <p className="text-xs italic text-gray-500 mt-2">{illnessScript.disclaimer}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+            <form onSubmit={handleSubmitIllnessScript}>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <FileText className="h-6 w-6 mr-2 text-green-500" />
+                  Construção de "Illness Scripts"
+                </CardTitle>
+                <CardDescription>
+                  Entenda e explore os "scripts de doença" para reconhecer padrões clínicos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="font-semibold mb-2 text-primary">Teoria Breve: O que são "Illness Scripts"?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    <GlossaryTooltip 
+                      term="Illness Scripts" 
+                      definition="Representações mentais organizadas de doenças que incluem fatores predisponentes, fisiopatologia e manifestações clínicas, facilitando o reconhecimento de padrões"
+                    >
+                      "Illness scripts"
+                    </GlossaryTooltip>{' '}
+                    são representações mentais organizadas de doenças, incluindo:
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                    <li><strong>Condições Predisponentes:</strong> Fatores de risco e demografia.</li>
+                    <li><strong>Fisiopatologia:</strong> Mecanismos da doença (de forma simplificada).</li>
+                    <li><strong>Consequências Clínicas:</strong> Sinais, sintomas, curso esperado.</li>
+                  </ul>
+                </div>
 
-              {/* Seção de Comparação de Scripts */}
-              <div className="p-4 border rounded-md bg-teal-50 border-teal-200">
-                <h3 className="font-semibold text-teal-700 mb-2">Comparar Dois Illness Scripts</h3>
-                <form onSubmit={handleCompareScripts} className="space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      value={disease1}
-                      onChange={(e) => setDisease1(e.target.value)}
-                      placeholder="Primeira doença (ex: Gota)"
-                      disabled={isLoadingComparison}
-                    />
-                    <Input
-                      value={disease2}
-                      onChange={(e) => setDisease2(e.target.value)}
-                      placeholder="Segunda doença (ex: Artrite Séptica)"
-                      disabled={isLoadingComparison}
-                    />
+                <div className="p-4 border rounded-md bg-sky-50 border-sky-200">
+                  <div className="flex items-center">
+                      <Lightbulb className="h-5 w-5 mr-2 text-sky-600" />
+                      <h3 className="text-md font-semibold text-sky-700">Ferramenta de Exploração</h3>
                   </div>
-                  <Button type="submit" disabled={isLoadingComparison || !authIsLoaded || !disease1 || !disease2} className="bg-teal-600 hover:bg-teal-700 text-white">
-                    {isLoadingComparison ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Comparando...</> : 'Comparar Scripts'}
-                  </Button>
-                </form>
-                {comparisonError && <Alert variant="destructive" className="mt-3"><AlertDescription>{comparisonError}</AlertDescription></Alert>}
-                {isLoadingComparison && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <IllnessScriptSkeleton />
-                    <IllnessScriptSkeleton />
-                  </div>
-                )}
-                {comparisonScript1 && comparisonScript2 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    {/* Script 1 */}
-                    <div className="p-4 border bg-white rounded-md shadow-sm">
-                      <h4 className="font-bold text-lg text-teal-800">{comparisonScript1.disease_name}</h4>
-                      <div className="mt-2 space-y-2 text-sm">
-                        <p><strong>Condições Predisponentes:</strong> {comparisonScript1.predisposing_conditions.join(', ')}</p>
-                        <p><strong>Resumo da Fisiopatologia:</strong> {comparisonScript1.pathophysiology_summary}</p>
-                        <p><strong>Sintomas e Sinais Chave:</strong> {comparisonScript1.key_symptoms_and_signs.join(', ')}</p>
-                      </div>
+                   <p className="text-sm text-sky-600 mt-1 mb-3">
+                    Digite uma doença para Dr. Corvus apresentar o "illness script" típico.
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="diseaseForScript" className="block text-sm font-medium mb-1">Nome da Doença: <span className="text-red-500">*</span></label>
+                      <Input 
+                        id="diseaseForScript" 
+                        placeholder="Ex: Pneumonia Comunitária" 
+                        value={diseaseForScript} 
+                        onChange={(e) => setDiseaseForScript(e.target.value)} 
+                        disabled={isLoadingIS}
+                        required 
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Entre 3 e 100 caracteres</p>
                     </div>
-                    {/* Script 2 */}
-                    <div className="p-4 border bg-white rounded-md shadow-sm">
-                      <h4 className="font-bold text-lg text-teal-800">{comparisonScript2.disease_name}</h4>
-                      <div className="mt-2 space-y-2 text-sm">
-                        <p><strong>Condições Predisponentes:</strong> {comparisonScript2.predisposing_conditions.join(', ')}</p>
-                        <p><strong>Resumo da Fisiopatologia:</strong> {comparisonScript2.pathophysiology_summary}</p>
-                        <p><strong>Sintomas e Sinais Chave:</strong> {comparisonScript2.key_symptoms_and_signs.join(', ')}</p>
-                      </div>
-                    </div>
+                    <Button type="submit" disabled={isLoadingIS || !authIsLoaded} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+                      {isLoadingIS ? (
+                        <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Buscando Script...</>
+                      ) : (
+                        <><FileText className="mr-2 h-4 w-4" /> Buscar Illness Script</>
+                      )}
+                    </Button>
                   </div>
-                )}
-              </div>
-            </CardContent>
+
+                  {errorIS && (
+                    <Alert variant="destructive" className="mt-4">
+                      <HelpCircle className="h-4 w-4" />
+                      <AlertTitle>Ops! Algo deu errado</AlertTitle>
+                      <AlertDescription className="mt-2">
+                        {errorIS}
+                        <br />
+                        <span className="text-sm mt-2 block">Se o problema persistir, tente recarregar a página ou entre em contato conosco.</span>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {isLoadingIS && <IllnessScriptSkeleton />}
+                  {illnessScript && (
+                     <div className="mt-6 p-4 border rounded-md bg-green-50 border-green-200 space-y-3">
+                      <h4 className="text-lg font-semibold text-green-800">Illness Script para: {illnessScript.disease_name}</h4>
+                      <div>
+                        <p className="font-semibold text-green-700">Condições Predisponentes:</p>
+                        {illnessScript.predisposing_conditions.length > 0 ? (
+                            <ul className="list-disc pl-5 text-sm text-green-600">
+                                {illnessScript.predisposing_conditions.map((item, index) => <li key={`cond-${index}`}>{item}</li>)}
+                            </ul>
+                        ) : <p className="text-sm text-green-600">N/A</p>}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-green-700">Resumo da Fisiopatologia:</p>
+                        <p className="text-sm text-green-600 whitespace-pre-wrap">{illnessScript.pathophysiology_summary || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-green-700">Sintomas e Sinais Chave:</p>
+                        {illnessScript.key_symptoms_and_signs.length > 0 ? (
+                            <ul className="list-disc pl-5 text-sm text-green-600">
+                                {illnessScript.key_symptoms_and_signs.map((item, index) => <li key={`symp-${index}`}>{item}</li>)}
+                            </ul>
+                        ) : <p className="text-sm text-green-600">N/A</p>}
+                      </div>
+                      {illnessScript.relevant_diagnostics && illnessScript.relevant_diagnostics.length > 0 && (
+                        <div>
+                            <p className="font-semibold text-green-700">Diagnósticos Relevantes/Testes:</p>
+                            <ul className="list-disc pl-5 text-sm text-green-600">
+                                {illnessScript.relevant_diagnostics.map((item, index) => <li key={`diag-${index}`}>{item}</li>)}
+                            </ul>
+                        </div>
+                      )}
+                      <p className="text-xs italic mt-2 text-muted-foreground">{illnessScript.disclaimer}</p>
+                    </div>
+                  )}
+                  {!illnessScript && !isLoadingIS && !errorIS && (
+                    <div className="mt-6 p-4 border rounded-md bg-sky-50 border-sky-200">
+                        <div className="flex items-center">
+                        <HelpCircle className="h-5 w-5 mr-2 text-sky-600" />
+                        <h3 className="text-md font-semibold text-sky-700">Pronto para explorar?</h3>
+                        </div>
+                        <p className="text-sm text-sky-600 mt-1">
+                        Digite o nome de uma doença e clique em "Buscar Illness Script" para ver suas características principais.
+                        </p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-6 p-4 border rounded-md bg-purple-50 border-purple-200">
+                     <div className="flex items-center">
+                        <HelpCircle className="h-5 w-5 mr-2 text-purple-600" />
+                        <h3 className="text-md font-semibold text-purple-700">Exercício de Construção Reverso</h3>
+                     </div>
+                    <p className="text-sm text-purple-600 mt-1 mb-3">
+                      Dr. Corvus apresenta achados clínicos. Você deve inferir a doença subjacente.
+                    </p>
+                    
+                    {!showReverseExercise ? (
+                      <Button 
+                        onClick={() => setShowReverseExercise(true)} 
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Brain className="mr-2 h-4 w-4" />
+                        Iniciar Exercício Reverso
+                      </Button>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-3 bg-white rounded border">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium text-purple-800">
+                              {reverseExerciseScenarios[selectedScenario].title}
+                            </h4>
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              reverseExerciseScenarios[selectedScenario].difficulty === 'Básico' 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {reverseExerciseScenarios[selectedScenario].difficulty}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1 mb-3">
+                            <p className="text-sm font-medium text-purple-700">Achados Clínicos:</p>
+                            {reverseExerciseScenarios[selectedScenario].findings.map((finding, idx) => (
+                              <p key={idx} className="text-sm text-purple-600">
+                                {finding}
+                              </p>
+                            ))}
+                          </div>
+                          
+                          {!showScenarioResult && (
+                            <>
+                              <div className="mb-2">
+                                <label className="block text-sm font-medium text-purple-700 mb-1">
+                                  Qual doença/condição você suspeita?
+                                </label>
+                                <Input
+                                  value={studentAnswer}
+                                  onChange={(e) => setStudentAnswer(e.target.value)}
+                                  placeholder="Digite sua hipótese diagnóstica..."
+                                  className="mb-2"
+                                />
+                              </div>
+                              <Button 
+                                onClick={handleReverseExerciseSubmit}
+                                disabled={!studentAnswer.trim()}
+                                size="sm"
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                Verificar Resposta
+                              </Button>
+                            </>
+                          )}
+                          
+                          {showScenarioResult && (
+                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded">
+                              <p className="text-sm font-medium text-green-800 mb-1">
+                                ✅ Resposta Esperada: {reverseExerciseScenarios[selectedScenario].correctAnswer}
+                              </p>
+                              <p className="text-sm text-green-700 mb-1">
+                                <strong>Sua Resposta:</strong> {studentAnswer}
+                              </p>
+                              <p className="text-xs text-green-600">
+                                💡 Compare sua resposta com a esperada. As variações de nomenclatura são normais!
+                              </p>
+                              <div className="mt-2 space-x-2">
+                                <Button 
+                                  onClick={handleNextScenario}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  Próximo Cenário
+                                </Button>
+                                <Button 
+                                  onClick={() => setShowReverseExercise(false)}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  Fechar Exercício
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                {/* Ferramenta de Comparação de Scripts */}
+                <div className="mt-6 p-4 border rounded-md bg-teal-50 border-teal-200">
+                  <div className="flex items-center">
+                    <Users className="h-5 w-5 mr-2 text-teal-600" />
+                    <h3 className="text-md font-semibold text-teal-700">Comparação de Scripts</h3>
+                  </div>
+                  <p className="text-sm text-teal-600 mt-1 mb-3">
+                    Compare dois illness scripts lado a lado para identificar características discriminatórias.
+                  </p>
+                  
+                  {!showComparison ? (
+                    <Button 
+                      onClick={() => setShowComparison(true)} 
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Iniciar Comparação
+                    </Button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-teal-700 mb-1">
+                            Primeira Doença:
+                          </label>
+                          <Input
+                            value={disease1}
+                            onChange={(e) => setDisease1(e.target.value)}
+                            placeholder="Ex: Gota"
+                            className="mb-2"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-teal-700 mb-1">
+                            Segunda Doença:
+                          </label>
+                          <Input
+                            value={disease2}
+                            onChange={(e) => setDisease2(e.target.value)}
+                            placeholder="Ex: Artrite Séptica"
+                            className="mb-2"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        <Button 
+                          onClick={handleCompareScripts}
+                          disabled={!disease1.trim() || !disease2.trim() || isLoadingComparison}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          {isLoadingComparison ? (
+                            <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Comparando...</>
+                          ) : (
+                            <><Users className="mr-2 h-4 w-4" /> Comparar Scripts</>
+                          )}
+                        </Button>
+                        <Button 
+                          onClick={() => setShowComparison(false)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Fechar
+                        </Button>
+                      </div>
+
+                      {comparisonError && (
+                        <Alert variant="destructive" className="mt-4">
+                          <HelpCircle className="h-4 w-4" />
+                          <AlertTitle>Erro na Comparação</AlertTitle>
+                          <AlertDescription>{comparisonError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {comparisonScript1 && comparisonScript2 && (
+                        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                          {/* Script 1 */}
+                          <div className="p-4 border rounded-md bg-blue-50 border-blue-200">
+                            <h4 className="text-lg font-semibold text-blue-800 mb-3">
+                              📋 {comparisonScript1.disease_name}
+                            </h4>
+                            
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <p className="font-semibold text-blue-700">Predisponentes:</p>
+                                <ul className="list-disc pl-4 text-blue-600">
+                                  {comparisonScript1.predisposing_conditions.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-semibold text-blue-700">Sintomas/Sinais:</p>
+                                <ul className="list-disc pl-4 text-blue-600">
+                                  {comparisonScript1.key_symptoms_and_signs.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-semibold text-blue-700">Fisiopatologia:</p>
+                                <p className="text-blue-600 text-xs">{comparisonScript1.pathophysiology_summary}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Script 2 */}
+                          <div className="p-4 border rounded-md bg-orange-50 border-orange-200">
+                            <h4 className="text-lg font-semibold text-orange-800 mb-3">
+                              📋 {comparisonScript2.disease_name}
+                            </h4>
+                            
+                            <div className="space-y-3 text-sm">
+                              <div>
+                                <p className="font-semibold text-orange-700">Predisponentes:</p>
+                                <ul className="list-disc pl-4 text-orange-600">
+                                  {comparisonScript2.predisposing_conditions.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-semibold text-orange-700">Sintomas/Sinais:</p>
+                                <ul className="list-disc pl-4 text-orange-600">
+                                  {comparisonScript2.key_symptoms_and_signs.map((item, idx) => (
+                                    <li key={idx}>{item}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-semibold text-orange-700">Fisiopatologia:</p>
+                                <p className="text-orange-600 text-xs">{comparisonScript2.pathophysiology_summary}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter>
+                <p className="text-xs text-muted-foreground italic">Esta ferramenta ajuda a construir illness scripts estruturados para melhor reconhecimento de padrões clínicos.</p>
+              </CardFooter>
+            </form>
           </Card>
         </TabsContent>
 
-        <TabsContent value="illness-scripts">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <FileText className="h-6 w-6 mr-2 text-indigo-500" />
-                Construindo e Comparando Illness Scripts
-              </CardTitle>
-              <CardDescription>
-                Aprenda a estruturar o conhecimento sobre doenças em roteiros mentais para agilizar o diagnóstico.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-8">
-              {/* Seção de Geração de Script Individual */}
-              <div className="p-4 border rounded-md bg-indigo-50 border-indigo-200">
-                <h3 className="font-semibold text-indigo-700 mb-2">Gerar um Illness Script</h3>
-                <form onSubmit={handleSubmitIllnessScript} className="space-y-3">
-                  <Input
-                    value={diseaseForScript}
-                    onChange={(e) => setDiseaseForScript(e.target.value)}
-                    placeholder="Digite o nome da doença (ex: Apendicite Aguda)"
-                    disabled={isLoadingIS}
-                  />
-                  <Button type="submit" disabled={isLoadingIS || !authIsLoaded} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                    {isLoadingIS ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Gerando...</> : 'Gerar Script'}
-                  </Button>
-                </form>
-                {errorIS && <Alert variant="destructive" className="mt-3"><AlertDescription>{errorIS}</AlertDescription></Alert>}
-                {isLoadingIS && <IllnessScriptSkeleton />}
-                {illnessScript && (
-                  <div className="mt-4 p-4 border bg-white rounded-md shadow-sm">
-                    <h4 className="font-bold text-lg text-indigo-800">{illnessScript.disease_name}</h4>
-                    <div className="mt-2 space-y-2 text-sm">
-                      <p><strong>Condições Predisponentes:</strong> {illnessScript.predisposing_conditions.join(', ')}</p>
-                      <p><strong>Resumo da Fisiopatologia:</strong> {illnessScript.pathophysiology_summary}</p>
-                      <p><strong>Sintomas e Sinais Chave:</strong> {illnessScript.key_symptoms_and_signs.join(', ')}</p>
-                      {illnessScript.relevant_diagnostics && <p><strong>Diagnósticos Relevantes:</strong> {illnessScript.relevant_diagnostics.join(', ')}</p>}
-                      <p className="text-xs italic text-gray-500 mt-2">{illnessScript.disclaimer}</p>
-                    </div>
-                  </div>
-                )}
-            </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
         <TabsContent value="data-collection">
           <Card>
             <form onSubmit={handleSubmitAnamnesis}>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <ListChecks className="h-6 w-6 mr-2 text-green-500" />
-                  Coleta de Dados Direcionada
+                  <Stethoscope className="h-6 w-6 mr-2 text-red-500" />
+                  Coleta de Dados Direcionada (Anamnese e Exame Físico)
                 </CardTitle>
                 <CardDescription>
-                  Aprenda a priorizar perguntas para explorar hipóteses diagnósticas de forma eficiente com base nos dados iniciais.
+                  Aprenda a realizar uma coleta de dados eficiente, guiada por hipóteses diagnósticas.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 border rounded-md bg-green-50 border-green-200">
-                  <h3 className="font-semibold text-green-700 mb-2">Simulador de Anamnese</h3>
-                  <div className="space-y-3">
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="font-semibold mb-2 text-primary">Teoria Breve: Coleta de Dados Guiada por Hipóteses</h3>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    O "Hypothesis-Driven Physical Exam (HDPE)" e uma anamnese direcionada focam na coleta de informações que ajudam a confirmar ou refutar suas hipóteses diagnósticas, tornando o processo mais eficiente e relevante.
+                  </p>
+                </div>
+
+                <div className="p-4 border rounded-md bg-indigo-50 border-indigo-200">
+                  <div className="flex items-center">
+                      <ListChecks className="h-5 w-5 mr-2 text-indigo-600" />
+                      <h3 className="text-md font-semibold text-indigo-700">Simulador de Anamnese</h3>
+                  </div>
+                  <p className="text-sm text-indigo-600 mt-1 mb-3">
+                    Receba uma queixa principal e dados demográficos. Dr. Corvus ajudará a gerar perguntas-chave.
+                  </p>
+                  <div className="space-y-4">
                     <div>
-                      <label htmlFor="mainComplaintCD" className="block text-sm font-medium mb-1">Queixa Principal e Duração <span className="text-red-500">*</span></label>
-                      <Input id="mainComplaintCD" value={mainComplaintCD} onChange={(e) => setMainComplaintCD(e.target.value)} placeholder="Ex: Dor torácica opressiva há 2 horas" disabled={isLoadingCD} required />
+                      <label htmlFor="mainComplaintCD" className="block text-sm font-medium mb-1">Queixa Principal: <span className="text-red-500">*</span></label>
+                      <Input 
+                        id="mainComplaintCD" 
+                        placeholder="Ex: Dor torácica" 
+                        value={mainComplaintCD} 
+                        onChange={(e) => setMainComplaintCD(e.target.value)} 
+                        disabled={isLoadingCD}
+                        required 
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Mínimo de 3 caracteres</p>
                     </div>
                     <div>
-                      <label htmlFor="demographicsCD" className="block text-sm font-medium mb-1">Dados Demográficos e Fatores de Risco <span className="text-red-500">*</span></label>
-                      <Input id="demographicsCD" value={demographicsCD} onChange={(e) => setDemographicsCD(e.target.value)} placeholder="Ex: Homem, 65 anos, diabético, hipertenso" disabled={isLoadingCD} required />
+                      <label htmlFor="initialFindingsCD" className="block text-sm font-medium mb-1">Achados Iniciais:</label>
+                      <Input 
+                        id="initialFindingsCD" 
+                        placeholder="Ex: leucocitose, PCR elevada" 
+                        value={initialFindingsCD} 
+                        onChange={(e) => setInitialFindingsCD(e.target.value)} 
+                        disabled={isLoadingCD}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">💡 Liste achados clínicos já conhecidos (separados por vírgula). Opcional.</p>
                     </div>
                     <div>
-                      <label htmlFor="initialFindingsCD" className="block text-sm font-medium mb-1">Achados Iniciais (Opcional)</label>
-                      <Textarea id="initialFindingsCD" value={initialFindingsCD} onChange={(e) => setInitialFindingsCD(e.target.value)} placeholder="Ex: Sudorese, irradiação para braço esquerdo, exame físico inicial..." disabled={isLoadingCD} rows={3} />
+                      <label htmlFor="demographicsCD" className="block text-sm font-medium mb-1">Dados Demográficos:</label>
+                      <Input 
+                        id="demographicsCD" 
+                        placeholder="Ex: Homem, 55 anos, fumante, HAS, DM2" 
+                        value={demographicsCD} 
+                        onChange={(e) => setDemographicsCD(e.target.value)} 
+                        disabled={isLoadingCD}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Inclua idade, sexo e comorbidades relevantes (opcional)</p>
                     </div>
-                    <Button type="submit" disabled={isLoadingCD || !authIsLoaded} className="bg-green-600 hover:bg-green-700 text-white">
-                      {isLoadingCD ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Priorizando...</> : 'Obter Perguntas Priorizadas'}
+                    <Button type="submit" disabled={isLoadingCD || !authIsLoaded} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+                      {isLoadingCD ? (
+                        <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Gerando Perguntas...</>
+                      ) : (
+                        <><Lightbulb className="mr-2 h-4 w-4" /> Gerar Perguntas-Chave</>
+                      )}
                     </Button>
                   </div>
+
+                  {errorCD && (
+                    <Alert variant="destructive" className="mt-4">
+                      <HelpCircle className="h-4 w-4" />
+                      <AlertTitle>Erro ao Gerar Perguntas</AlertTitle>
+                      <AlertDescription>{errorCD}</AlertDescription>
+                    </Alert>
+                  )}
+                  {isLoadingCD && <AnamnesisQuestionsSkeleton />}
+                  {anamnesisQuestions && (
+                    <div className="mt-6 p-4 border rounded-md bg-green-50 border-green-200 space-y-4">
+                        <h4 className="text-lg font-semibold text-green-800">Perguntas Sugeridas por Dr. Corvus:</h4>
+
+                        {/* Prioritized Questions */}
+                        {anamnesisQuestions.prioritized_questions && anamnesisQuestions.prioritized_questions.length > 0 && (
+                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <h5 className="font-semibold text-yellow-800 mb-2 flex items-center">
+                              <Star className="h-5 w-5 mr-2 text-yellow-500" /> Perguntas Prioritárias (faça PRIMEIRO)
+                            </h5>
+                            {anamnesisQuestions.questioning_rationale && (
+                                <div className="text-xs text-yellow-700 mb-3 italic bg-yellow-100 p-2 rounded">
+                                    💡 {anamnesisQuestions.questioning_rationale}
+                                </div>
+                            )}
+                            <ul className="space-y-2">
+                              {anamnesisQuestions.prioritized_questions.map((question, index) => (
+                                <li key={`priority-${index}`} className="p-2 bg-yellow-100 rounded-md border-l-4 border-yellow-400">
+                                  <p className="font-medium text-yellow-900">
+                                    {index + 1}. {question}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Complementary Questions */}
+                        {anamnesisQuestions.complementary_questions && anamnesisQuestions.complementary_questions.length > 0 && (
+                          <div className="p-4 bg-sky-50 border border-sky-200 rounded-lg">
+                            <h5 className="font-semibold text-sky-800 mb-2 flex items-center">
+                              <PlusCircle className="h-5 w-5 mr-2 text-sky-500" /> Perguntas Complementares
+                            </h5>
+                            <div className="text-xs text-sky-700 mb-3">
+                              Explore outras possibilidades e complete o quadro clínico com estas perguntas adicionais:
+                            </div>
+                            <ul className="space-y-2">
+                              {anamnesisQuestions.complementary_questions.map((question, index) => (
+                                <li key={`complementary-${index}`} className="p-2 bg-sky-100 rounded-md border-l-4 border-sky-400">
+                                  <p className="font-medium text-sky-900">
+                                    {question}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* Potential Systems to Explore */}
+                        {anamnesisQuestions.potential_systems_to_explore && anamnesisQuestions.potential_systems_to_explore.length > 0 && (
+                            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                                <h5 className="font-semibold text-purple-800 mb-2 flex items-center">
+                                    <BrainCircuit className="h-5 w-5 mr-2 text-purple-500" /> Sistemas Potenciais a Explorar
+                                </h5>
+                                <div className="flex flex-wrap gap-2">
+                                    {anamnesisQuestions.potential_systems_to_explore.map((system, index) => (
+                                        <Badge key={`system-${index}`} variant="secondary" className="bg-purple-100 text-purple-800 border border-purple-200 text-sm font-normal">
+                                            {system}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {(!anamnesisQuestions.prioritized_questions || anamnesisQuestions.prioritized_questions.length === 0) &&
+                        (!anamnesisQuestions.complementary_questions || anamnesisQuestions.complementary_questions.length === 0) && (
+                            <p className="text-sm text-green-600">Nenhuma pergunta específica gerada com base nos dados fornecidos.</p>
+                        )}
+                      </div>
+                  )}
+                  {!anamnesisQuestions && !isLoadingCD && !errorCD && (
+                    <div className="mt-6 p-4 border rounded-md bg-sky-50 border-sky-200">
+                        <div className="flex items-center">
+                        <HelpCircle className="h-5 w-5 mr-2 text-sky-600" />
+                        <h3 className="text-md font-semibold text-sky-700">Pronto para a anamnese guiada?</h3>
+                        </div>
+                        <p className="text-sm text-sky-600 mt-1">
+                        Insira a queixa principal e dados demográficos para receber sugestões de perguntas-chave do Dr. Corvus.
+                        </p>
+                    </div>
+                  )}
                 </div>
-                {errorCD && <Alert variant="destructive" className="mt-4"><AlertDescription>{errorCD}</AlertDescription></Alert>}
-                {isLoadingCD && <AnamnesisQuestionsSkeleton />}
-                {anamnesisQuestions && (
-                  <div className="mt-4 p-4 border bg-white rounded-md shadow-sm">
-                    <h4 className="font-bold text-lg text-green-800 mb-3">Perguntas Priorizadas e Racional</h4>
-                    
-                    {/* Prioritized Questions */}
-                    <div className="mb-4">
-                      <h5 className="font-semibold text-md text-gray-700 mb-2 flex items-center">
-                        <Star className="h-5 w-5 mr-2 text-yellow-500" />
-                        Perguntas Prioritárias
-                      </h5>
-                      <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800">
-                        {anamnesisQuestions.prioritized_questions.map((q, i) => <li key={`pri-${i}`}>{q}</li>)}
-                      </ul>
-                    </div>
-
-                    {/* Complementary Questions */}
-                    {anamnesisQuestions.complementary_questions && anamnesisQuestions.complementary_questions.length > 0 && (
-                      <div className="mb-4">
-                        <h5 className="font-semibold text-md text-gray-700 mb-2 flex items-center">
-                          <PlusCircle className="h-5 w-5 mr-2 text-blue-500" />
-                          Perguntas Complementares
-                        </h5>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800">
-                          {anamnesisQuestions.complementary_questions.map((q, i) => <li key={`comp-${i}`}>{q}</li>)}
-                        </ul>
-                      </div>
-                    )}
-
-                    {/* Rationale */}
-                    <div className="mb-4">
-                      <h5 className="font-semibold text-md text-gray-700 mb-2 flex items-center">
-                        <BrainCircuit className="h-5 w-5 mr-2 text-purple-500" />
-                        Racional do Raciocínio
-                      </h5>
-                      <p className="text-sm text-gray-600 italic bg-gray-50 p-3 rounded-md">{anamnesisQuestions.questioning_rationale}</p>
-                    </div>
-
-                    {/* Potential Systems */}
-                    <div className="mt-4 pt-3 border-t">
-                      <h5 className="font-semibold text-md text-gray-700 mb-2 flex items-center">
-                        <ShieldCheck className="h-5 w-5 mr-2 text-red-500" />
-                        Sistemas Potenciais a Explorar
-                      </h5>
-                      <div className="flex flex-wrap gap-2">
-                        {anamnesisQuestions.potential_systems_to_explore.map((system, i) => (
-                          <Badge key={`sys-${i}`} variant="secondary" className="bg-red-100 text-red-800">{system}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </CardContent>
               <CardFooter>
                 <p className="text-xs text-muted-foreground italic">Esta ferramenta gera perguntas direcionadas para uma anamnese mais eficiente e focada.</p>
@@ -1159,7 +1465,7 @@ export default function FundamentalDiagnosticReasoningPage() {
               Pratique casos clínicos integrados usando o framework SNAPPS para consolidar todo seu aprendizado.
             </p>
             <div className="text-center">
-              <Link href="/academy/clinical-simulation">
+              <Link href="/clinical-simulation">
                 <Button 
                   size="sm" 
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 w-full font-medium"
