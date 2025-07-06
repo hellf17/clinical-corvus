@@ -827,45 +827,40 @@ export default function DeepResearchComponent({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
-                      {/* Artigos Analisados - Sempre mostrar ou se > 0 */}
-                      {results.research_metrics?.total_articles_analyzed !== undefined && (
-                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {results.research_metrics.total_articles_analyzed}
-                          </div>
-                          <div className="text-sm text-blue-700 font-medium">Artigos Analisados</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                      {/* Artigos Analisados */}
+                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {results.research_metrics?.total_articles_analyzed || 0}
                         </div>
-                      )}
-                      {/* Consultas Executadas - Sempre mostrar ou se > 0 */}
-                      {results.research_metrics?.search_queries_executed !== undefined && (
-                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {results.research_metrics.search_queries_executed}
-                          </div>
-                          <div className="text-sm text-blue-700 font-medium">Consultas Executadas</div>
-                        </div>
-                      )}
-                      {/* Tempo de Pesquisa - Sempre mostrar */}
-                      <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
+                        <div className="text-sm text-blue-700 font-medium text-center">Artigos Analisados</div>
+                      </div>
+                      
+                      {/* Tempo de Pesquisa */}
+                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
                         <div className="text-2xl font-bold text-blue-600">
                           {typeof results.search_duration_seconds === 'number' 
-                            ? results.search_duration_seconds.toFixed(2) 
-                            : 'N/A'
-                          }
-                          <p className="text-sm text-blue-700 font-medium">segundos</p>
+                            ? results.search_duration_seconds.toFixed(0) 
+                            : 'N/A'}
                         </div>
-                        <div className="text-sm text-blue-700 font-medium">Tempo de Pesquisa</div>
+                        <div className="text-sm text-blue-700 font-medium text-center">Segundos de Pesquisa</div>
                       </div>
-                      {/* Revisões Sistemáticas */}
-                      {results.research_metrics?.systematic_reviews_count !== undefined && results.research_metrics.systematic_reviews_count > 0 && (
-                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
-                          <div className="text-2xl font-bold text-blue-600">
-                            {results.research_metrics.systematic_reviews_count}
-                          </div>
-                          <div className="text-sm text-blue-700 font-medium">Revisões Sistemáticas</div>
+                      
+                      {/* Periódicos Únicos */}
+                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {results.research_metrics?.unique_journals_found || 0}
                         </div>
-                      )}
+                        <div className="text-sm text-blue-700 font-medium text-center">Periódicos Únicos</div>
+                      </div>
+                      
+                      {/* Artigos de Alto Impacto */}
+                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {results.research_metrics?.high_impact_studies_count || 0}
+                        </div>
+                        <div className="text-sm text-blue-700 font-medium text-center">Alto Impacto</div>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
                       {/* Metanálises */}

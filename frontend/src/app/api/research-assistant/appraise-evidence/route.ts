@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     // The actual FastAPI endpoint is now prefixed with /api/deep-research
-    const targetUrl = `${BACKEND_API_URL}/api/deep-research/appraise-evidence`; 
+    const targetUrl = `${BACKEND_API_URL}/api/research/appraise-evidence`; 
 
-    console.log(`Forwarding POST request from /api/deep-research/appraise-evidence to ${targetUrl}`);
+    console.log(`Forwarding POST request from /api/research/appraise-evidence to ${targetUrl}`);
 
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(responseData, { status: backendResponse.status });
   } catch (error: any) {
-    console.error('Error in Next.js API route /api/deep-research/appraise-evidence:', error);
+    console.error('Error in Next.js API route /api/research-assistant/appraise-evidence:', error);
     return NextResponse.json(
       { message: 'Internal Server Error in Next.js API proxy', details: error.message },
       { status: 500 }

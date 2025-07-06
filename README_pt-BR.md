@@ -4,6 +4,28 @@ Sistema de auxílio para análise de dados clínicos, suporte à decisão e moni
 
 **Status Atual:** Plataforma funcional com recursos de gestão de pacientes, chat com IA contextual, visualizações de dados clínicos, notas clínicas com editor de rich text, **uma página de Análise (`/analysis`) completamente modernizada com interface redesenhada, tradução completa da interface para português, sistema avançado de Dr. Corvus Insights, loading states elegantes e error handling robusto para upload de exames (PDF) e entrada manual de dados com checagem de anormalidades via backend. A seção "Academia Clínica" (`/academy`) para treinamento em raciocínio clínico, utilizando funções BAML dedicadas, está com TODAS as suas 15 APIs educacionais 100% traduzidas para português, eliminando barreiras linguísticas. O sistema de pesquisa científica (`/academy/evidence-based-medicine`) foi expandido com novas fontes (Europe PMC, Lens.org) e um poderoso sistema de análise de qualidade e deduplicação (CiteSource), operando sobre uma arquitetura unificada de APIs bibliométricas que oferece métricas ricas e detalhadas. A arquitetura técnica foi otimizada com um novo sistema de gerenciamento de dependências Python, resultando em builds Docker mais rápidos e eficientes.** Utiliza tecnologias modernas como Next.js App Router, Clerk, Shadcn/UI, FastAPI e Docker. O sistema inclui processamento avançado de exames via upload de PDF, com extração e enriquecimento automático de resultados laboratoriais, e um conjunto expandido de visualizações gráficas e tabulares para esses dados. **A plataforma passou por uma unificação completa da arquitetura de APIs bibliométricas (Maio 2025), resultando em 30-40% de melhoria na performance e 40% de redução na complexidade do código.** Estamos em processo de migração de frameworks internos para a IA (ElizaOS > Langroid, LlamaParse > Marker) e avançando na implementação do core da IA (KG, AL).
 
+## Padrão de Roteamento e Proxy da API
+
+### Roteamento Backend
+- Todos os endpoints da API backend são expostos sob o prefixo `/api/*`, com os routers incluídos no `main.py` (ex: `/api/research`, `/api/clinical`).
+- Nenhum prefixo interno é definido nos arquivos de router; todo o prefixo é centralizado no `main.py` para garantir consistência.
+- Exemplos de endpoints backend:
+  - `/api/research/formulate-pico-translated`
+  - `/api/research/quick-search-translated`
+  - `/api/clinical/differential-diagnosis`
+
+### Proxy no Frontend
+- Todas as rotas `/api/*` no frontend atuam como proxies, repassando as requisições para o backend no mesmo caminho.
+- Nenhuma lógica de tradução ou negócio é implementada nas rotas de API do frontend; elas apenas fazem proxy das requisições e respostas.
+- Exemplo de rota proxy:
+  - `frontend/src/app/api/research-assistant/formulate-pico-translated/route.ts` → faz proxy para `/api/research/formulate-pico-translated` no backend.
+
+### Resumo do Roteamento
+- Esse design elimina duplicação de rotas e garante integração perfeita entre frontend e backend.
+- Para novos endpoints, sempre adicione o router no `main.py` com o prefixo `/api/<domínio>` desejado e crie a rota proxy correspondente no frontend, se necessário.
+
+---
+
 ## Funcionalidades Implementadas 
 
 ### Autenticação e Gestão de Usuários

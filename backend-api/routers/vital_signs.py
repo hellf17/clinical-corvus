@@ -13,7 +13,6 @@ from crud import patients as crud_patients
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="",
     tags=["vital-signs"],
 )
 

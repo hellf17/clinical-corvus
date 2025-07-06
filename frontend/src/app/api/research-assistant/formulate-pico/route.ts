@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { getAPIUrl } from '@/config';
 
+// For server-to-server communication within Docker, use the service name.
+const BACKEND_API_URL = 'http://backend-api:8000';
+
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -12,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const response = await fetch(`${getAPIUrl()}/api/deep-research/formulate-pico`, {
+    const response = await fetch(`${BACKEND_API_URL}/api/research/formulate-pico`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -39,3 +43,14 @@ export async function POST(request: NextRequest) {
     );
   }
 } 
+
+/**
+ * GET endpoint for health check and feature documentation.
+ */
+export async function GET() {
+  return NextResponse.json({
+    status: 'healthy',
+    endpoint: 'formulate-pico',
+    integration_note: 'This endpoint proxies to a backend service that handles all PICO formulation, translation, and business logic.'
+  });
+}

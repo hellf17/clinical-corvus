@@ -10,27 +10,25 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Separator } from '@/components/ui/Separator';
+import { Label } from '@/components/ui/Label';
 import {
   Scale,
   RefreshCw,
-  Info,
   Upload,
   X,
   FileText,
   AlertTriangle,
   CheckCircle,
-  ArrowRight,
   BookOpen,
   Target,
   Search,
   HelpCircle,
-  Copy,
-  ExternalLink,
   BarChart3,
   TrendingUp,
   Award,
+  CheckSquare,
   AlertCircle,
-  CheckSquare
+  Loader2
 } from 'lucide-react';
 
 // Interfaces for data types
@@ -45,68 +43,28 @@ interface PDFAnalysisOutput {
   structured_summary: string;
 }
 
-interface BiasAssessmentDetail {
-  bias_type: string;
-  risk_level: string;
-  explanation: string;
-  mitigation_strategies: string[];
+// Define interfaces for the new GRADE-based evidence appraisal output
+interface QualityFactor {
+  factor_name: string;
+  assessment: string; // 'POSITIVO', 'NEUTRO', 'NEGATIVO'
+  justification: string;
 }
 
-interface StatisticalAssessment {
-  sample_size_adequacy: string;
-  statistical_methods_appropriateness: string;
-  effect_size_interpretation: string;
-  confidence_intervals_assessment: string;
-  p_value_interpretation: string;
-  multiple_comparisons_concern: string;
+interface BiasAnalysis {
+  selection_bias: string;
+  performance_bias: string;
+  reporting_bias: string;
+  confirmation_bias: string;
 }
 
-interface ClinicalApplication {
-  clinical_relevance: string;
-  patient_population_match: string;
-  outcome_relevance: string;
-  practical_feasibility: string;
-  cost_effectiveness_considerations: string | null;
-  ethical_considerations: string[];
-}
-
-interface QualityAssessment {
-    overall_quality_grade: string;
-    methodological_rigor_score: string;
-    risk_of_bias_summary: string;
-    applicability_concerns: string[];
-    reporting_quality: string;
-}
-
-interface EnhancedAppraisalOutput {
-  identified_study_type: string;
-  study_design_appropriateness: string;
-  quality_assessment: QualityAssessment;
-  methodological_strengths: string[];
-  methodological_limitations: string[];
-  bias_assessments: BiasAssessmentDetail[];
-  overall_bias_risk: string;
-  statistical_assessment: StatisticalAssessment;
-  clinical_application: ClinicalApplication;
-  pico_alignment_assessment: string;
-  population_match_percentage: string;
-  intervention_comparability: string;
-  outcome_relevance_score: string;
-  strength_of_recommendation: string;
-  level_of_evidence: string;
-  confidence_in_findings: string;
-  recommendations_for_practice: string[];
-  areas_requiring_more_research: string[];
-  next_steps_for_evidence_evaluation: string[];
-  key_clinical_considerations: string[];
-  potential_harms_or_risks: string[];
-  patient_preference_factors: string[];
-  generalizability_assessment: string;
-  external_validity_concerns: string[];
-  study_limitations_impact: string;
-  learning_points: string[];
-  critical_appraisal_checklist: string[];
-  evidence_synthesis_date: string;
+interface GradeEvidenceAppraisalOutput {
+  overall_quality: string; // 'ALTA', 'MODERADA', 'BAIXA', 'MUITO BAIXA'
+  quality_reasoning: string;
+  quality_factors: QualityFactor[];
+  recommendation_strength: string; // 'FORTE', 'FRACA'
+  strength_reasoning: string;
+  bias_analysis: BiasAnalysis;
+  practice_recommendations: string[];
 }
 
 interface Props {
@@ -135,7 +93,9 @@ export default function UnifiedEvidenceAnalysisComponent({
 
   // Text State
   const [evidenceText, setEvidenceText] = useState(initialContent);
-  const [textResults, setTextResults] = useState<EnhancedAppraisalOutput | null>(null);
+  
+  // Unified Dashboard State
+  const [unifiedResults, setUnifiedResults] = useState<GradeEvidenceAppraisalOutput | null>(null);
 
   useEffect(() => {
     if (initialContent && initialContent !== evidenceText) {
@@ -169,86 +129,52 @@ export default function UnifiedEvidenceAnalysisComponent({
 
   const clearResults = () => {
     setPdfResults(null);
-    setTextResults(null);
+    setUnifiedResults(null);
     setError(null);
   };
-
-  const handlePDFSubmit = async () => {
-    if (!selectedFile) {
-      throw new Error('Por favor, selecione um arquivo PDF.');
+  
+  const handleUnifiedSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-    if (!clinicalQuestion.trim()) {
-      throw new Error('Por favor, insira sua pergunta ou questionamento clínico.');
-    }
-
-    const token = await getToken();
-    if (!token) throw new Error('Erro de autenticação. Por favor, faça login novamente.');
-
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('clinical_question', clinicalQuestion.trim());
-
-    const response = await fetch('/api/research-assistant/analyze-pdf-translated', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Falha na análise do PDF (status: ${response.status}).`);
-    }
-
-    const data: PDFAnalysisOutput = await response.json();
-    setPdfResults(data);
-    if (onContentExtracted) onContentExtracted(data.structured_summary);
-  };
-
-  const handleTextSubmit = async () => {
-    if (!evidenceText.trim()) {
-      throw new Error('Por favor, insira o resumo da evidência.');
-    }
-    if (!clinicalQuestion.trim()) {
-      throw new Error('Por favor, insira sua pergunta clínica.');
-    }
-
-    const token = await getToken();
-    if (!token) throw new Error('Erro de autenticação. Por favor, faça login novamente.');
-
-    const payload = {
-      evidence_summary_or_abstract: evidenceText.trim(),
-      clinical_question_PICO: clinicalQuestion.trim(),
-    };
-
-    const response = await fetch('/api/research-assistant/appraise-evidence-translated', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `Falha na avaliação crítica (status: ${response.status}).`);
-    }
-
-    const data: EnhancedAppraisalOutput = await response.json();
-    setTextResults(data);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+    
     setIsLoading(true);
-    clearResults();
+    setError(null);
+    setUnifiedResults(null);
 
     try {
-      if (analysisMode === 'pdf') {
-        await handlePDFSubmit();
-      } else {
-        await handleTextSubmit();
+      if (!evidenceText.trim()) {
+        throw new Error('Por favor, insira o texto completo do artigo.');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
-      console.error(`Error in ${analysisMode} submission:`, err);
+      if (!clinicalQuestion.trim()) {
+        throw new Error('Por favor, insira sua pergunta clínica.');
+      }
+
+      const token = await getToken();
+      if (!token) throw new Error('Erro de autenticação. Por favor, faça login novamente.');
+
+      const payload = {
+        paper_full_text: evidenceText.trim(),
+        clinical_question_PICO: clinicalQuestion.trim(),
+      };
+
+      const response = await fetch('/api/research-assistant/unified-evidence-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Falha na análise unificada (status: ${response.status}).`);
+      }
+
+      const data: GradeEvidenceAppraisalOutput = await response.json();
+      setUnifiedResults(data);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido ao processar sua solicitação.');
+      console.error("Error in unified evidence analysis:", err);
     } finally {
       setIsLoading(false);
     }
@@ -304,77 +230,213 @@ export default function UnifiedEvidenceAnalysisComponent({
     </div>
   );
 
-  const renderTextResults = () => textResults && (
+  const getAssessmentColor = (assessment: string) => {
+    switch (assessment) {
+      case 'POSITIVO': return 'text-green-600';
+      case 'NEUTRO': return 'text-amber-600';
+      case 'NEGATIVO': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const getAssessmentIcon = (assessment: string) => {
+    switch (assessment) {
+      case 'POSITIVO': return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'NEUTRO': return <AlertCircle className="h-5 w-5 text-amber-600" />;
+      case 'NEGATIVO': return <AlertTriangle className="h-5 w-5 text-red-600" />;
+      default: return <HelpCircle className="h-5 w-5 text-gray-600" />;
+    }
+  };
+
+  const getRecommendationColor = (strength: string) => {
+    return strength === 'FORTE' ? 'text-blue-600' : 'text-amber-600';
+  };
+
+  const renderUnifiedResults = () => unifiedResults && (
     <div className="space-y-8">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-center">
-            <Card>
-                <CardHeader><CardTitle className="text-base font-semibold">Qualidade Geral</CardTitle></CardHeader>
-                <CardContent><p className={`text-2xl font-bold ${getGradeColor(textResults.quality_assessment.overall_quality_grade)}`}>{textResults.quality_assessment.overall_quality_grade}</p></CardContent>
-            </Card>
-            <Card>
-                <CardHeader><CardTitle className="text-base font-semibold">Força da Recomendação</CardTitle></CardHeader>
-                <CardContent><p className="text-2xl font-bold text-gray-700">{textResults.strength_of_recommendation}</p></CardContent>
-            </Card>
-            <Card>
-                <CardHeader><CardTitle className="text-base font-semibold">Nível de Evidência</CardTitle></CardHeader>
-                <CardContent><p className="text-2xl font-bold text-gray-700">{textResults.level_of_evidence}</p></CardContent>
-            </Card>
-        </div>
+      {/* Dashboard de Confiança - Cabeçalho */}
+      <Card className="border-t-4 border-t-blue-600">
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl">
+            <Award className="mr-2 h-6 w-6 text-blue-600" />
+            Dashboard de Confiança da Evidência
+          </CardTitle>
+          <CardDescription>
+            Avaliação estruturada baseada no framework GRADE
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Qualidade da Evidência */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-lg">Qualidade da Evidência</h3>
+                <Badge 
+                  className={`text-md py-1 px-3 ${unifiedResults?.overall_quality === 'ALTA' ? 'bg-green-100 text-green-800' : 
+                    unifiedResults?.overall_quality === 'MODERADA' ? 'bg-amber-100 text-amber-800' : 
+                    unifiedResults?.overall_quality === 'BAIXA' ? 'bg-orange-100 text-orange-800' : 
+                    'bg-red-100 text-red-800'}`}
+                >
+                  {unifiedResults?.overall_quality}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-sm">{unifiedResults?.quality_reasoning}</p>
+            </div>
 
-        <Separator />
+            {/* Força da Recomendação */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-lg">Força da Recomendação</h3>
+                <Badge 
+                  className={`text-md py-1 px-3 ${unifiedResults?.recommendation_strength === 'FORTE' ? 
+                    'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
+                >
+                  {unifiedResults?.recommendation_strength}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground text-sm">{unifiedResults?.strength_reasoning}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Fatores de Qualidade */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <BarChart3 className="mr-2 h-5 w-5 text-blue-600" />
+            Fatores que Influenciam a Qualidade
+          </CardTitle>
+          <CardDescription>Detalhamento dos fatores que impactam a qualidade da evidência</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {unifiedResults?.quality_factors?.map((factor: QualityFactor, index: number) => (
+              <Card key={index} className="bg-white border-l-4 border-l-blue-600">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-md flex items-center">
+                    {getAssessmentIcon(factor.assessment)}
+                    <span className="ml-2">{factor.factor_name}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Badge 
+                    variant="outline" 
+                    className={`mb-2 ${getAssessmentColor(factor.assessment)}`}
+                  >
+                    {factor.assessment}
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">{factor.justification}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Análise de Viés */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Scale className="mr-2 h-5 w-5 text-blue-600" />
+            Análise de Viés
+          </CardTitle>
+          <CardDescription>Avaliação dos principais tipos de viés no estudo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <h3 className="font-semibold text-lg flex items-center mb-3"><TrendingUp className="mr-2 h-5 w-5 text-green-600" />Pontos Fortes Metodológicos</h3>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-2">
-                    {textResults.methodological_strengths.map((item, index) => <li key={index}>{item}</li>)}
-                </ul>
+              <h4 className="font-medium mb-2">Viés de Seleção</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.selection_bias}</p>
             </div>
             <div>
-                <h3 className="font-semibold text-lg flex items-center mb-3"><AlertTriangle className="mr-2 h-5 w-5 text-yellow-600" />Limitações Metodológicas</h3>
-                <ul className="list-disc list-inside space-y-1 text-muted-foreground pl-2">
-                    {textResults.methodological_limitations.map((item, index) => <li key={index}>{item}</li>)}
-                </ul>
+              <h4 className="font-medium mb-2">Viés de Performance</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.performance_bias}</p>
             </div>
-        </div>
+            <div>
+              <h4 className="font-medium mb-2">Viés de Relato</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.reporting_bias}</p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Viés de Confirmação</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.confirmation_bias}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Separator />
-
-        <div>
-            <h3 className="font-semibold text-lg flex items-center mb-4"><Scale className="mr-2 h-5 w-5" />Análise de Viés</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {textResults.bias_assessments.map((bias, index) => (
-                    <Card key={index} className="bg-white">
-                        <CardHeader>
-                            <CardTitle className="text-md">{bias.bias_type}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Badge variant={getRiskBadgeVariant(bias.risk_level)}>
-                                {bias.risk_level}
-                            </Badge>
-                            <p className="text-sm text-muted-foreground mt-2">{bias.explanation}</p>
-                        </CardContent>
-                    </Card>
+      {/* Recomendações para Prática */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <CheckSquare className="mr-2 h-5 w-5 text-blue-600" />
+            Recomendações para Prática Clínica
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert className="bg-blue-50">
+            <CheckCircle className="h-4 w-4 text-blue-600" />
+            <AlertTitle>Aplicação Clínica</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc list-inside space-y-2 mt-2">
+                {unifiedResults.practice_recommendations.map((rec, index) => (
+                  <li key={index} className="text-muted-foreground">{rec}</li>
                 ))}
-            </div>
-        </div>
-
-        <Separator />
-
-        <div>
-            <h3 className="font-semibold text-lg flex items-center mb-3"><CheckSquare className="mr-2 h-5 w-5 text-blue-600" />Recomendações para Prática</h3>
-            <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertTitle>Diretrizes Clínicas</AlertTitle>
-                <AlertDescription>
-                    <ul className="list-disc list-inside space-y-1">
-                        {textResults.recommendations_for_practice.map((rec, index) => <li key={index}>{rec}</li>)}
-                    </ul>
-                </AlertDescription>
-            </Alert>
-        </div>
+              </ul>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
     </div>
   );
+
+  // Add a PDF submission handler
+  const handlePdfSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!selectedFile) {
+      setError('Por favor, selecione um arquivo PDF.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    setPdfResults(null);
+
+    try {
+      const token = await getToken();
+      if (!token) throw new Error('Erro de autenticação. Por favor, faça login novamente.');
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      
+      if (clinicalQuestion.trim()) {
+        formData.append('clinical_question', clinicalQuestion.trim());
+      }
+
+      const response = await fetch('/api/research-assistant/analyze-pdf', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Falha na análise do PDF (status: ${response.status}).`);
+      }
+
+      const data: PDFAnalysisOutput = await response.json();
+      setPdfResults(data);
+    } catch (err: any) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido ao processar sua solicitação.');
+      console.error("Error in PDF analysis:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="w-full mx-auto space-y-6">
@@ -385,113 +447,175 @@ export default function UnifiedEvidenceAnalysisComponent({
             Análise de Evidências Unificada
           </CardTitle>
           <CardDescription className="pl-9">
-            Avalie criticamente artigos em PDF ou resumos de texto para informar sua prática clínica.
+            Avalie criticamente artigos fazendo upload de PDF ou colando o texto para uma análise detalhada.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <Tabs value={analysisMode} onValueChange={(v) => setAnalysisMode(v as 'pdf' | 'text')} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="pdf"><FileText className="mr-2 h-4 w-4"/>Analisar PDF</TabsTrigger>
-                <TabsTrigger value="text"><BookOpen className="mr-2 h-4 w-4"/>Analisar Texto</TabsTrigger>
-              </TabsList>
-              <TabsContent value="pdf" className="pt-6">
-                <div
-                  className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:border-indigo-500 transition-colors duration-200 bg-gray-50"
-                  onDragOver={(e) => e.preventDefault()}
+          <Tabs value={analysisMode} onValueChange={(v) => setAnalysisMode(v as 'pdf' | 'text')} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pdf"><FileText className="mr-2 h-4 w-4"/>Analisar PDF</TabsTrigger>
+              <TabsTrigger value="text"><BookOpen className="mr-2 h-4 w-4"/>Analisar Texto</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="pdf" className="pt-6">
+              <form onSubmit={handlePdfSubmit} className="space-y-6">
+                <label
+                  htmlFor="pdf-upload"
+                  className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-all duration-200 bg-gray-50 cursor-pointer"
                   onDrop={(e) => {
                     e.preventDefault();
-                    if (e.dataTransfer.files) {
+                    e.stopPropagation();
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                       handleFileSelect({ target: { files: e.dataTransfer.files } } as any);
                     }
                   }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                 >
-                  <Upload className="w-10 h-10 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">
-                    <span className="font-semibold text-indigo-600 cursor-pointer hover:underline" onClick={() => fileInputRef.current?.click()}>
-                      Clique para selecionar
-                    </span> ou arraste e solte o PDF.
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    id="pdf-upload"
+                    accept=".pdf"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium">Clique para selecionar um PDF</p>
+                  <p className="text-xs text-muted-foreground">
+                    ou arraste e solte aqui (máx. 10MB)
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Tamanho máximo: 10MB</p>
-                  <Input ref={fileInputRef} type="file" className="sr-only" accept=".pdf" onChange={handleFileSelect} id="pdf-upload"/>
-                </div>
+                </label>
+                
                 {selectedFile && (
-                  <div className="flex items-center justify-between p-3 mt-4 bg-slate-100 rounded-md border border-slate-200">
+                  <div className="flex items-center justify-between p-3 bg-slate-100 rounded-md border border-slate-200">
                     <div className="flex items-center min-w-0">
                       <FileText className="h-5 w-5 text-slate-600 mr-3 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{selectedFile.name}</p>
-                        <p className="text-xs text-slate-500">{formatFileSize(selectedFile.size)}</p>
-                      </div>
+                      <span className="text-sm font-medium text-slate-800 truncate pr-2">{selectedFile.name}</span>
+                      <Badge variant="secondary">{formatFileSize(selectedFile.size)}</Badge>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={handleRemoveFile} type="button">
+                    <Button variant="ghost" size="icon" type="button" onClick={handleRemoveFile} className="text-slate-500 hover:text-slate-800">
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 )}
-              </TabsContent>
-              <TabsContent value="text" className="pt-6">
+                
+                <Button type="submit" disabled={isLoading || !selectedFile}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analisando...
+                    </>
+                  ) : (
+                    <>Analisar Evidência</>
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+            
+            <TabsContent value="text" className="space-y-4">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleUnifiedSubmit(e);
+              }} className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="clinical-question-text">Pergunta Clínica (formato PICO)</Label>
                   <Textarea
+                    id="clinical-question-text"
+                    placeholder="Ex: Em pacientes adultos com hipertensão (P), o uso de inibidores da ECA (I) comparado com bloqueadores de canais de cálcio (C) resulta em melhor controle da pressão arterial (O)?"
+                    value={clinicalQuestion}
+                    onChange={(e) => setClinicalQuestion(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="evidence-text">Texto Completo do Artigo</Label>
+                  <Textarea
+                    id="evidence-text"
+                    placeholder="Cole o texto completo do artigo aqui..."
                     value={evidenceText}
                     onChange={(e) => setEvidenceText(e.target.value)}
-                    placeholder="Cole aqui o resumo, abstract ou trecho da evidência..."
-                    rows={10}
-                    className="w-full"
+                    className="min-h-[300px]"
                   />
-              </TabsContent>
-            </Tabs>
+                </div>
 
-            <div className="space-y-2 pt-4">
-              <label htmlFor="clinical-question" className="block text-sm font-medium text-gray-700">
-                <HelpCircle className="inline-block mr-2 h-4 w-4" />
-                Pergunta Clínica ou PICO
-              </label>
-              <Textarea
-                id="clinical-question"
-                value={clinicalQuestion}
-                onChange={(e) => setClinicalQuestion(e.target.value)}
-                placeholder="Ex: Em pacientes com diabetes tipo 2, o uso de SGLT2 inibidores, comparado a placebo, reduz eventos cardiovasculares?"
-                rows={3}
-                className="w-full"
-              />
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Analisando...
-                </>
-              ) : (
-                <>
-                  <Search className="mr-2 h-4 w-4" />
-                  Analisar Evidência
-                </>
-              )}
-            </Button>
-          </form>
+                <Button type="submit" disabled={isLoading || !evidenceText || !clinicalQuestion}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Analisando...
+                    </>
+                  ) : (
+                    <>Analisar Evidência</>
+                  )}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
-      {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Erro na Análise</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="mt-6">
-        {isLoading && (
-          <div className="flex justify-center items-center p-10">
-            <RefreshCw className="h-8 w-8 text-indigo-600 animate-spin" />
-            <p className="ml-4 text-lg">Processando sua solicitação...</p>
+    {/* Análise de Viés */}
+    {unifiedResults && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Scale className="mr-2 h-5 w-5 text-blue-600" />
+            Análise de Viés
+          </CardTitle>
+          <CardDescription>Avaliação dos principais tipos de viés no estudo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="font-medium mb-2">Viés de Seleção</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.selection_bias}</p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Viés de Performance</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.performance_bias}</p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Viés de Relato</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.reporting_bias}</p>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">Viés de Confirmação</h4>
+              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.confirmation_bias}</p>
+            </div>
           </div>
-        )}
-        {!isLoading && !error && (
-          analysisMode === 'pdf' ? renderPDFResults() : renderTextResults()
-        )}
-      </div>
-    </div>
-  );
+        </CardContent>
+      </Card>
+    )}
+
+    {/* Recomendações para Prática */}
+    {unifiedResults && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <CheckSquare className="mr-2 h-5 w-5 text-blue-600" />
+            Recomendações para Prática Clínica
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert className="bg-blue-50">
+            <CheckCircle className="h-4 w-4 text-blue-600" />
+            <AlertTitle>Aplicação Clínica</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc list-inside space-y-2 mt-2">
+                {unifiedResults?.practice_recommendations.map((rec, index) => (
+                  <li key={index} className="text-muted-foreground">{rec}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    )}
+  </div>
+);
 }

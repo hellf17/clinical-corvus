@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/cli-simulationnical/provide-session-summary-snapps`, {
+    const response = await fetch(`${apiUrl}/api/simulation/provide-session-summary-snapps`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

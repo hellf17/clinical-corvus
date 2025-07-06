@@ -19,11 +19,17 @@ from baml_client.types import (
     PICOQuestion,
     PDFAnalysisInput,
     PDFAnalysisOutput,
-    EvidenceAppraisalInput,
-    EnhancedAppraisalOutput,
     ClinicalScenarioInput,
     PICOFormulationOutput,
-    ResearchMetrics
+    ResearchMetrics,
+    # Novos tipos para o pipeline de análise de evidências
+    EvidenceAnalysisData,
+    EvidenceAppraisalOutput as GradeEvidenceAppraisalOutput,
+    GradeLevel,
+    RecommendationStrength,
+    AssessmentValue,
+    QualityFactor,
+    BiasAnalysis
 )
 
 # Importar os serviços unificados
@@ -65,8 +71,7 @@ from clients.google_scholar_client import search_google_scholar_enhanced, Schola
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="",
-    tags=["Deep Research with Dr. Corvus"],
+    tags=["Research with Dr. Corvus"],
 )
 
 # --- Request/Response Models ---
@@ -77,6 +82,10 @@ class DeepResearchRequest(BaseModel):
     research_focus: Optional[str] = None
     target_audience: Optional[str] = None
     research_mode: Optional[str] = 'quick'  # 'quick' ou 'expanded'
+    
+class UnifiedEvidenceAnalysisRequest(BaseModel):
+    paper_full_text: str
+    clinical_question_PICO: Optional[str] = None
 
 class PDFAnalysisRequest(BaseModel):
     analysis_focus: Optional[str] = None
@@ -345,95 +354,6 @@ async def perform_quick_research(request: DeepResearchRequest):
         logger.error(f"❌ Error during research via /quick-search (mode: {service_mode}) for query '{request.user_original_query}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during the research process: {str(e)}")
 
-@router.post("/analyze-pdf", response_model=PDFAnalysisOutput)
-async def analyze_pdf_document(
-    file: UploadFile = File(...),
-    analysis_focus: Optional[str] = Form(None),
-    clinical_question: Optional[str] = Form(None),
-    extraction_mode: Optional[str] = Form("balanced")
-):
-    """
-    Analisa um documento PDF e extrai insights clínicos relevantes usando LlamaParse
-    """
-    try:
-        # Validar tipo de arquivo
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Apenas arquivos PDF são suportados")
-        
-        # Ler o conteúdo do arquivo
-        logger.info(f"Processando PDF: {file.filename} com modo {extraction_mode}")
-        file_content = await file.read()
-        
-        if len(file_content) == 0:
-            raise HTTPException(status_code=400, detail="Arquivo PDF está vazio")
-        
-        # Extrair texto usando o serviço de PDF (LlamaParse + PyPDF2 fallback)
-        extraction_result = await pdf_service.extract_text_from_pdf(
-            file_content=file_content,
-            filename=file.filename,
-            extraction_mode=extraction_mode
-        )
-        
-        if not extraction_result["success"] or not extraction_result["text"].strip():
-            raise HTTPException(status_code=400, detail="Não foi possível extrair texto do PDF")
-        
-        pdf_text = extraction_result["text"]
-        metadata = extraction_result["metadata"]
-        
-        logger.info(f"✅ Texto extraído: {len(pdf_text)} caracteres usando {metadata['extraction_method']}")
-        
-        # Preparar input para análise BAML
-        analysis_input = PDFAnalysisInput(
-            pdf_content=pdf_text,
-            analysis_focus=analysis_focus,
-            clinical_question=clinical_question
-        )
-        
-        # Analisar com BAML
-        logger.info("Analisando documento com Dr. Corvus")
-        analysis_output: PDFAnalysisOutput = await b.AnalyzePDFDocument(analysis_input)
-        
-        extraction_info = f"Documento processado usando {metadata['extraction_method'].upper()}"
-        if metadata.get('pages_processed'):
-            extraction_info += f" ({metadata['pages_processed']} páginas)"
-        if metadata.get('has_tables'):
-            extraction_info += " - Tabelas detectadas"
-        if metadata.get('has_images'):
-            extraction_info += " - Imagens detectadas"
-        
-        logger.info(f"Análise de PDF concluída: {file.filename}")
-        return analysis_output
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erro na análise de PDF: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro na análise de PDF: {str(e)}")
-
-@router.post("/appraise-evidence", response_model=EnhancedAppraisalOutput)
-async def appraise_evidence(request: EvidenceAppraisalRequest):
-    """
-    Avalia criticamente uma evidência científica
-    """
-    try:
-        # Preparar input para avaliação BAML
-        appraisal_input = EvidenceAppraisalInput(
-            clinical_question_PICO=request.clinical_question_PICO,
-            evidence_summary_or_abstract=request.evidence_summary_or_abstract,
-            study_type_if_known=request.study_type_if_known
-        )
-        
-        # Avaliar com BAML
-        logger.info("Avaliando evidência com Dr. Corvus")
-        appraisal_output: EnhancedAppraisalOutput = await b.AssistEvidenceAppraisal(appraisal_input)
-        
-        logger.info("Avaliação de evidência concluída")
-        return appraisal_output
-        
-    except Exception as e:
-        logger.error(f"Erro na avaliação de evidência: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro na avaliação de evidência: {str(e)}")
-
 @router.post("/formulate-pico", response_model=PICOFormulationOutput)
 async def formulate_pico_question(request: PICOFormulationRequest):
     """
@@ -482,127 +402,304 @@ async def formulate_search_strategy(
         logger.error(f"Erro ao formular estratégia: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao formular estratégia: {str(e)}")
 
+@router.post("/analyze-pdf", response_model=PDFAnalysisOutput)
+async def analyze_pdf_document(
+    file: UploadFile = File(...),
+    analysis_focus: Optional[str] = Form(None),
+    clinical_question: Optional[str] = Form(None),
+    extraction_mode: Optional[str] = Form("balanced")
+):
+    """
+    Analyzes a PDF document and returns the results.
+    """
+    try:
+        logger.info(f"📄 Analyzing PDF: {file.filename}")
+        
+        # Read the PDF content
+        pdf_content = await file.read()
+        
+        # Use pdf_service to extract text from the PDF
+        extracted_text = await pdf_service.extract_text_from_pdf(pdf_content)
+        
+        if not extracted_text:
+            raise HTTPException(status_code=400, detail="Could not extract text from the PDF.")
+        
+        # Create the input for the BAML function
+        pdf_analysis_input = PDFAnalysisInput(
+            pdf_content=extracted_text,
+            analysis_focus=analysis_focus,
+            clinical_question=clinical_question
+        )
+        
+        # Call the BAML function
+        logger.info(f"🧠 Processing PDF analysis with mode: {extraction_mode}")
+        analysis_result = await b.AnalyzePDFDocument(pdf_analysis_input)
+        
+        logger.info(f"✅ PDF analysis completed for: {file.filename}")
+        return analysis_result
+        
+    except Exception as e:
+        logger.error(f"❌ Error in PDF analysis: {e}")
+        raise HTTPException(status_code=500, detail=f"Error in PDF analysis: {str(e)}")
+
 # === TRANSLATION HELPERS FOR RESEARCH OUTPUTS ===
 async def _translate_pdf_analysis_output(output: PDFAnalysisOutput, target_lang="PT") -> PDFAnalysisOutput:
     """
-    Translates the user-facing fields of a PDFAnalysisOutput object.
+    Translates the user-facing fields of a PDFAnalysisOutput object using BAML as primary service.
     """
+    if not output:
+        return output
+
+    logger.info(f"🌐 Starting translation of PDF analysis output to {target_lang}")
+    
     try:
         # _translate_field can handle nested Pydantic models recursively
         translated_output = await _translate_field(output, target_lang, "PDFAnalysisOutput")
+        
+        # Verify translation was successful by checking a key field
+        if hasattr(translated_output, 'key_findings') and translated_output.key_findings:
+            if translated_output.key_findings == output.key_findings and target_lang == "PT":
+                logger.warning("PDF analysis translation may have failed - key_findings unchanged")
+                
+        logger.info(f"✅ PDF analysis translation completed successfully")
         return translated_output
     except Exception as e:
-        logger.error(f"❌ Failed to translate PDFAnalysisOutput: {e}")
+        logger.error(f"❌ Failed to translate PDFAnalysisOutput: {e}", exc_info=True)
         return output
 
-async def _translate_enhanced_appraisal_output(output: EnhancedAppraisalOutput, target_lang="PT") -> EnhancedAppraisalOutput:
-    """
-    Translates the user-facing fields of an EnhancedAppraisalOutput object.
-    """
-    try:
-        translated_output = await _translate_field(output, target_lang, "EnhancedAppraisalOutput")
-        return translated_output
-    except Exception as e:
-        logger.error(f"❌ Failed to translate EnhancedAppraisalOutput: {e}")
-        return output
+# Enhanced appraisal translation function removed (deprecated)
 
 async def _translate_pico_formulation_output(output: PICOFormulationOutput, target_lang="PT") -> PICOFormulationOutput:
     """
     Translates the user-facing fields of a PICOFormulationOutput object, keeping search terms in English.
+    Uses BAML as primary translation service with DeepL fallback.
     """
+    if not output:
+        return output
+        
+    logger.info(f"🌐 Starting translation of PICO formulation output to {target_lang}")
+    
     try:
-        translated_output = await _translate_field(output, target_lang, "PICOFormulationOutput")
+        # Create a copy of the output to modify
+        from copy import deepcopy
+        output_copy = deepcopy(output)
+        
+        # Store search terms and strategies before translation
+        search_terms = output_copy.search_terms_suggestions if hasattr(output_copy, 'search_terms_suggestions') else None
+        boolean_strategies = output_copy.boolean_search_strategies if hasattr(output_copy, 'boolean_search_strategies') else None
+        
+        # Translate the main output
+        translated_output = await _translate_field(output_copy, target_lang, "PICOFormulationOutput")
+        
         # Keep search terms and strategies in English for database queries
-        if output.search_terms_suggestions:
-            translated_output.search_terms_suggestions = output.search_terms_suggestions
-        if output.boolean_search_strategies:
-            translated_output.boolean_search_strategies = output.boolean_search_strategies
+        if search_terms:
+            translated_output.search_terms_suggestions = search_terms
+        if boolean_strategies:
+            translated_output.boolean_search_strategies = boolean_strategies
+            
+        # Verify translation was successful by checking a key field
+        if hasattr(translated_output, 'formulated_question') and translated_output.formulated_question:
+            if translated_output.formulated_question == output.formulated_question and target_lang == "PT":
+                logger.warning("PICO formulation translation may have failed - formulated_question unchanged")
+                # Try direct translation of formulated_question as fallback
+                try:
+                    if output.formulated_question:
+                        translated_question = await translate(output.formulated_question, target_lang=target_lang)
+                        if translated_question:
+                            translated_output.formulated_question = translated_question
+                except Exception as retry_error:
+                    logger.error(f"Retry translation of formulated_question also failed: {retry_error}")
+        
+        logger.info(f"✅ PICO formulation translation completed successfully")
         return translated_output
     except Exception as e:
-        logger.error(f"❌ Failed to translate PICOFormulationOutput: {e}")
+        logger.error(f"❌ Failed to translate PICOFormulationOutput: {e}", exc_info=True)
         return output
 
 async def _translate_field(field, target_lang="PT", field_name=None):
+    """
+    Flattens all translatable strings in the structure, batch translates them using BAML as primary service,
+    and reconstructs the structure.
+    """
+    import collections.abc
     try:
-        if field is None:
-            return None
-        if isinstance(field, str):
-            return await translate(field, target_lang, field_name=field_name)
-        if isinstance(field, list):
-            return [await _translate_field(item, target_lang, f"{field_name}[{i}]" if field_name else None) 
-                    for i, item in enumerate(field)]
-        if isinstance(field, dict):
-            return {k: await _translate_field(v, target_lang, f"{field_name}.{k}" if field_name else k) 
-                    for k, v in field.items()}
-        return field
+        # Helper to flatten all strings and record their paths
+        def flatten(obj, path_prefix=None):
+            items = []
+            if isinstance(obj, str):
+                # Skip empty strings, numeric strings, and all-uppercase strings (likely codes)
+                if obj and obj.strip() and not obj.isnumeric() and not (obj.isupper() and len(obj) < 10):
+                    items.append((path_prefix, obj))
+            elif isinstance(obj, list):
+                for i, v in enumerate(obj):
+                    items.extend(flatten(v, f"{path_prefix}[{i}]" if path_prefix else f"[{i}]"))
+            elif isinstance(obj, dict):
+                for k, v in obj.items():
+                    items.extend(flatten(v, f"{path_prefix}.{k}" if path_prefix else k))
+            else:
+                # For pydantic/BaseModel, try to flatten its dict
+                if hasattr(obj, 'model_dump'):
+                    items.extend(flatten(obj.model_dump(), path_prefix))
+            return items
+
+        # Helper to set value by path
+        def set_by_path(obj, path, value):
+            if path is None:
+                return value
+            parts = []
+            buf = ''
+            i = 0
+            while i < len(path):
+                if path[i] == '[':
+                    if buf:
+                        parts.append(buf)
+                        buf = ''
+                    j = i+1
+                    while j < len(path) and path[j] != ']':
+                        j += 1
+                    parts.append(int(path[i+1:j]))
+                    i = j
+                elif path[i] == '.':
+                    if buf:
+                        parts.append(buf)
+                        buf = ''
+                else:
+                    buf += path[i]
+                i += 1
+            if buf:
+                parts.append(buf)
+            # Now walk and set
+            cur = obj
+            for idx, part in enumerate(parts[:-1]):
+                if isinstance(part, int):
+                    while len(cur) <= part:
+                        cur.append(None)
+                    if cur[part] is None:
+                        # Guess next type
+                        if isinstance(parts[idx+1], int):
+                            cur[part] = []
+                        else:
+                            cur[part] = {}
+                    cur = cur[part]
+                else:
+                    if part not in cur or cur[part] is None:
+                        if isinstance(parts[idx+1], int):
+                            cur[part] = []
+                        else:
+                            cur[part] = {}
+                    cur = cur[part]
+            last = parts[-1]
+            if isinstance(last, int):
+                while len(cur) <= last:
+                    cur.append(None)
+                cur[last] = value
+            else:
+                cur[last] = value
+            return obj
+
+        # Flatten all strings
+        flattened = flatten(field)
+        if not flattened:
+            return field
+        paths, strings = zip(*flattened)
+        
+        # Skip translation if all strings are very short (likely codes or non-translatable content)
+        if all(len(s) < 5 for s in strings):
+            logger.info(f"Skipping translation for field {field_name}: all strings too short")
+            return field
+            
+        # Batch translate with better error handling
+        try:
+            translated = await translate(list(strings), target_lang)
+            if not translated or len(translated) != len(strings):
+                logger.warning(f"Translation returned incomplete results for field: {field_name}")
+                return field
+        except Exception as e:
+            logger.error(f"Translation failed for field batch: {field_name or 'unknown'} | Error: {e}")
+            return field
+            
+        # Reconstruct
+        def reconstruct(obj):
+            if isinstance(obj, str):
+                # Find its path in flattened
+                try:
+                    idx = flattened.index((None, obj))
+                except ValueError:
+                    idx = None
+                if idx is not None:
+                    return translated[idx]
+                return obj
+            elif isinstance(obj, list):
+                return [reconstruct(v) for v in obj]
+            elif isinstance(obj, dict):
+                return {k: reconstruct(v) for k, v in obj.items()}
+            else:
+                if hasattr(obj, 'model_dump'):
+                    # Try to reconstruct from dict and re-instantiate
+                    model_cls = type(obj)
+                    new_dict = reconstruct(obj.model_dump())
+                    return model_cls(**new_dict)
+                return obj
+                
+        # For paths, reconstruct by setting translated values by path
+        # Build a mutable base structure
+        import copy
+        if hasattr(field, 'model_dump'):
+            base = field.model_dump()
+            is_model = True
+        else:
+            base = copy.deepcopy(field)
+            is_model = False
+        for p, v, t in zip(paths, strings, translated):
+            set_by_path(base, p, t)
+        if is_model:
+            return type(field)(**base)
+        return base
     except Exception as e:
         logger.error(f"Translation failed for field: {field_name or 'unknown'} | Error: {e}")
         return field  # Fallback to original
 
 async def _translate_synthesized_output(output: SynthesizedResearchOutput, target_lang="PT") -> SynthesizedResearchOutput:
     """
-    Translates only the essential, user-facing synthesized fields of the research output.
-    Avoids translating raw data like individual abstracts to improve performance and reduce cost.
+    Translates all user-facing fields of the SynthesizedResearchOutput in a single batch.
+    Uses BAML as primary translation service with DeepL fallback.
+    Handles nested objects, arrays, and maintains the original structure.
     """
     if not output:
         return output
 
-    # Log which fields are being translated
-    logger.info(f"🌐 Starting translation of synthesized research output to {target_lang}")
-
-    # Translate original_query first
-    if hasattr(output, 'original_query') and output.original_query:
-        output.original_query = await _translate_field(output.original_query, target_lang, "original_query")
+    logger.info(f"🌐 Starting batch translation of research output to {target_lang}")
     
-    # Translate high-level summary fields
-    output.executive_summary = await _translate_field(output.executive_summary, target_lang, "executive_summary")
-    if hasattr(output, 'professional_detailed_reasoning_cot') and output.professional_detailed_reasoning_cot:
-        output.professional_detailed_reasoning_cot = await _translate_field(
-            output.professional_detailed_reasoning_cot, target_lang, "professional_detailed_reasoning_cot")
-    
-    # Translate key findings/themes
-    if output.key_findings_by_theme:
-        for i, theme in enumerate(output.key_findings_by_theme):
-            theme_prefix = f"key_findings_by_theme[{i}]"
-            if hasattr(theme, 'theme_name'):
-                theme.theme_name = await _translate_field(theme.theme_name, target_lang, f"{theme_prefix}.theme_name")
-            if hasattr(theme, 'summary'):
-                theme.summary = await _translate_field(theme.summary, target_lang, f"{theme_prefix}.summary")
-            if hasattr(theme, 'strength_of_evidence'):
-                theme.strength_of_evidence = await _translate_field(
-                    theme.strength_of_evidence, target_lang, f"{theme_prefix}.strength_of_evidence")
-
-            # Traduzir cada finding dentro de key_findings
-            if hasattr(theme, 'key_findings') and isinstance(theme.key_findings, list):
-                translated_key_findings = []
-                for finding_idx, finding_text in enumerate(theme.key_findings):
-                    if isinstance(finding_text, str):
-                        translated_finding = await _translate_field(
-                            finding_text, target_lang, f"{theme_prefix}.key_findings[{finding_idx}]"
-                        )
-                        translated_key_findings.append(translated_finding)
-                    else:
-                        # Se não for string, manter o original (ou logar um aviso)
-                        logger.warning(f"Item em key_findings não é uma string: {finding_text} em {theme_prefix}.key_findings[{finding_idx}]")
-                        translated_key_findings.append(finding_text) 
-                theme.key_findings = translated_key_findings
-
-    # Translate final assessment sections (which are lists of strings)
-    if hasattr(output, 'evidence_quality_assessment'):
-        output.evidence_quality_assessment = await _translate_field(
-            output.evidence_quality_assessment, target_lang, "evidence_quality_assessment")
-    if hasattr(output, 'clinical_implications'):
-        output.clinical_implications = await _translate_field(
-            output.clinical_implications, target_lang, "clinical_implications")
-    if hasattr(output, 'research_gaps_identified'):
-        output.research_gaps_identified = await _translate_field(
-            output.research_gaps_identified, target_lang, "research_gaps_identified")
-    
-    # DO NOT translate individual reference abstracts, titles, authors, or journals to avoid excessive API calls and preserve fidelity.
-    # Only the high-level synthesized fields above are translated.
-    
-    logger.info(f"✅ Completed translation of synthesized research output to {target_lang}")
-    return output
+    try:
+        # Convert the output to a dictionary for batch processing
+        output_dict = output.model_dump() if hasattr(output, 'model_dump') else dict(output)
+        
+        # Use _translate_field to handle the entire structure with a single batch translation
+        translated_output = await _translate_field(output_dict, target_lang, "synthesized_research_output")
+        
+        # Verify translation success by checking a key field
+        if translated_output.get('executive_summary') == output_dict.get('executive_summary') and target_lang == "PT":
+            logger.warning("Research output translation may have failed - executive_summary unchanged")
+            # Try again with smaller batches if the full batch failed
+            try:
+                logger.info("Attempting translation with smaller batches")
+                # Translate executive_summary separately
+                if 'executive_summary' in output_dict and output_dict['executive_summary']:
+                    translated_summary = await translate(output_dict['executive_summary'], target_lang=target_lang)
+                    if translated_summary:
+                        translated_output['executive_summary'] = translated_summary
+            except Exception as retry_error:
+                logger.error(f"Retry translation also failed: {retry_error}")
+        
+        # Convert back to the original model type
+        if hasattr(output, 'model_validate'):
+            return type(output).model_validate(translated_output)
+        return type(output)(**translated_output)
+        
+    except Exception as e:
+        logger.error(f"❌ Error during batch translation of research output: {str(e)}", exc_info=True)
+        # Return original output if translation fails
+        return output
 
 # === TRANSLATED ENDPOINTS ===
 @router.post("/quick-search-translated", response_model=SynthesizedResearchOutput)
@@ -680,22 +777,7 @@ async def analyze_pdf_document_translated(
         raise HTTPException(status_code=500, detail=f"Error in translated PDF analysis: {str(e)}")
 
 
-@router.post("/appraise-evidence-translated", response_model=EnhancedAppraisalOutput)
-async def appraise_evidence_translated(request: EvidenceAppraisalRequest):
-    """
-    Appraises a piece of scientific evidence and returns the results translated to Portuguese.
-    """
-    try:
-        appraisal_output = await appraise_evidence(request)
-        logger.info(f"Translating evidence appraisal for: {request.clinical_question_PICO[:50]}...")
-        translated_output = await _translate_enhanced_appraisal_output(appraisal_output, target_lang="PT")
-        logger.info("✅ Translation of evidence appraisal complete.")
-        return translated_output
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Erro na avaliação de evidência traduzida: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro na avaliação de evidência traduzida: {str(e)}")
+# Deprecated route removed - replaced by unified-evidence-analysis-translated endpoint
 
 
 @router.post("/formulate-pico-translated", response_model=PICOFormulationOutput)
@@ -714,6 +796,27 @@ async def formulate_pico_question_translated(request: PICOFormulationRequest):
     except Exception as e:
         logger.error(f"Erro na formulação PICO traduzida: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na formulação PICO traduzida: {str(e)}")
+
+@router.post("/unified-evidence-analysis-translated", response_model=GradeEvidenceAppraisalOutput)
+async def unified_evidence_analysis_translated(request: UnifiedEvidenceAnalysisRequest):
+    """
+    Performs unified evidence analysis and returns the results translated to Portuguese.
+    """
+    try:
+        # Call the original endpoint
+        evidence_analysis = await unified_evidence_analysis(request)
+        
+        # Translate the results
+        logger.info(f"Translating unified evidence analysis results to Portuguese")
+        translated_output = await _translate_enhanced_appraisal_output(evidence_analysis, target_lang="PT")
+        logger.info(f"✅ Translation of unified evidence analysis complete")
+        
+        return translated_output
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erro na análise unificada de evidências traduzida: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro na análise unificada de evidências traduzida: {str(e)}")
 
 @router.get("/health")
 async def health_check():
@@ -1004,6 +1107,43 @@ async def cite_source_analysis(request: CiteSourceAnalysisRequest):
         logger.error(f"❌ Erro na análise CiteSource: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na análise CiteSource: {str(e)}")
 
+@router.post("/unified-evidence-analysis", response_model=GradeEvidenceAppraisalOutput)
+async def unified_evidence_analysis(request: UnifiedEvidenceAnalysisRequest):
+    """
+    Endpoint unificado para análise de evidências médicas usando o pipeline de duas etapas:
+    1. Extração de fatos (AnalyzeMedicalPaper)
+    2. Avaliação crítica (GenerateEvidenceAppraisal)
+    """
+    try:
+        logger.info(f"🔬 Iniciando análise unificada de evidências")
+        
+        # Extrair dados do request
+        paper_full_text = request.paper_full_text
+        clinical_question_PICO = request.clinical_question_PICO
+        
+        if not paper_full_text:
+            raise HTTPException(status_code=400, detail="Texto do artigo não fornecido")
+        
+        # Etapa 1: Extração de fatos
+        logger.info("📑 Etapa 1: Extraindo fatos do artigo")
+        extracted_data = await b.AnalyzeMedicalPaper(
+            paper_full_text=paper_full_text,
+            clinical_question_PICO=clinical_question_PICO
+        )
+        
+        # Etapa 2: Avaliação crítica
+        logger.info("⚖️ Etapa 2: Realizando avaliação crítica")
+        appraisal_result = await b.GenerateEvidenceAppraisal(
+            extracted_data=extracted_data
+        )
+        
+        logger.info("✅ Análise unificada de evidências concluída com sucesso")
+        return appraisal_result
+        
+    except Exception as e:
+        logger.error(f"❌ Erro na análise unificada de evidências: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+
 @router.post("/cite-source-comprehensive-test")
 async def cite_source_comprehensive_test(request: CiteSourceTestRequest):
     """
@@ -1264,3 +1404,35 @@ async def cite_source_quick_demo(
     except Exception as e:
         logger.error(f"❌ Erro na demo CiteSource: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na demo CiteSource: {str(e)}")
+
+async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOutput, target_lang="PT") -> GradeEvidenceAppraisalOutput:
+    """
+    Translates the user-facing fields of an EvidenceAppraisalOutput object using BAML as primary service.
+    """
+    if not output:
+        return output
+        
+    logger.info(f"🌐 Starting translation of evidence appraisal output to {target_lang}")
+    
+    try:
+        # _translate_field can handle nested Pydantic models recursively
+        translated_output = await _translate_field(output, target_lang, "GradeEvidenceAppraisalOutput")
+        
+        # Verify translation was successful by checking a key field
+        if hasattr(translated_output, 'summary') and translated_output.summary:
+            if translated_output.summary == output.summary and target_lang == "PT":
+                logger.warning("Evidence appraisal translation may have failed - summary unchanged")
+                # Try direct translation of summary as fallback
+                try:
+                    if output.summary:
+                        translated_summary = await translate(output.summary, target_lang=target_lang)
+                        if translated_summary:
+                            translated_output.summary = translated_summary
+                except Exception as retry_error:
+                    logger.error(f"Retry translation of summary also failed: {retry_error}")
+        
+        logger.info(f"✅ Evidence appraisal translation completed successfully")
+        return translated_output
+    except Exception as e:
+        logger.error(f"❌ Failed to translate EvidenceAppraisalOutput: {e}", exc_info=True)
+        return output

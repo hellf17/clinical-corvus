@@ -103,8 +103,7 @@
   - [x] Refactor research-assistant/autonomous-translated/route.ts to use backend proxy logic
   - [x] Refactor research-assistant/generate-pico-question-translated/route.ts to use backend proxy logic
 - [ ] Finalize Deep Research and other Clinical Academy features in 'frontend/src/app/academy' and other related files
-  - [x] Ensure all deep research features are working as expected
-  - [x] Ensure we are properly displaying the results in a relevant and user-friendly way
+  - [ ] Ensure all deep research features are working as expected
   - [ ] Ensure other Clinical Academy features are working as expected
     - [ ] Raciocinio Diagnostico 
     - [ ] Diagnostico Diferencial
@@ -112,7 +111,8 @@
     - [ ] Metacognição
     - [ ] SNAAPS
 - [ ] Finalize Analysis and Insights features in 'frontend/src/app/analysis' and other related files
-- [ ] Develop doctor dashboard and patients page
+- [ ] Develop doctor dashboard with patients page
+- [ ] Implement safety measures for all API flows
 - [ ] Implement DB, Vectors and KG storage
 - [ ] Migrate core AI frameworks to Langroid and Marker (see README)
 - [ ] Implement autonomous agent for research module with access to all research features
@@ -124,4 +124,5 @@
 - [ ] Add Deep Research storage/mapping/retrieval to KG, DB and Vectors
 - [ ] Implement Gamification features
 ## Current Goal
-Finalize Deep Research and Clinical Academy features, ensure robust translation across all platform features
+Finalize Clinical Academy features, ensure robust translation across all platform features
+Finalize Analysis and Insights features

@@ -35,13 +35,10 @@ import {
 
 // Interfaces
 interface ReasoningCritiqueOutput {
-  metacognitive_analysis: string;
-  reasoning_strengths: string[];
-  cognitive_biases_identified: string[];
-  areas_for_improvement: string[];
-  specific_recommendations: string[];
-  self_correction_strategies: string[];
-  disclaimer: string;
+  identified_reasoning_pattern: string;
+  bias_reflection_points: string[];
+  devils_advocate_challenge: string[];
+  suggested_next_reflective_action: string[];
 }
 
 interface ReflectionTemplate {
@@ -279,10 +276,16 @@ export default function SelfReflectionComponent({
       final_reasoning_process = selectedExample.reasoningDescription;
     }
 
-    if (useContextualCase && !final_case_context.trim()) {
-      setError('O contexto do caso é obrigatório quando a opção "Usar Contexto do Caso" está habilitada.');
-      setIsLoading(false);
-      return;
+    // Garantir que o contexto do caso nunca esteja vazio
+    if (!final_case_context.trim()) {
+      if (useContextualCase) {
+        setError('O contexto do caso é obrigatório quando a opção "Usar Contexto do Caso" está habilitada.');
+        setIsLoading(false);
+        return;
+      } else {
+        // Fornecer um valor padrão quando não há contexto
+        final_case_context = 'Contexto não especificado';
+      }
     }
 
     if (!final_reasoning_process.trim()) {
@@ -299,18 +302,18 @@ export default function SelfReflectionComponent({
     }
 
     const payload = {
-      reasoning_process: final_reasoning_process,
       case_context: final_case_context,
+      reasoning_process: final_reasoning_process,
+      identified_bias: initialBiasName || '',
       reflection_metadata: {
         mode: reflectionMode,
-        template_id: selectedTemplate?.id,
-        example_id: selectedExample?.id,
-        bias_context: initialBiasName
+        template: selectedTemplate?.name || '',
+        example: selectedExample?.title || ''
       }
     };
 
     try {
-      const response = await fetch('/api/clinical-assistant/assist-self-reflection-reasoning-translated', {
+      const response = await fetch('/api/clinical-assistant/provide-self-reflection-feedback-translated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -331,14 +334,24 @@ export default function SelfReflectionComponent({
       }
 
       const data: ReasoningCritiqueOutput = await response.json();
-      setAnalysis(data);
+      
+      // Adaptar resposta para o formato esperado pelos componentes de UI
+      const adaptedData: ReasoningCritiqueOutput = {
+        // Only use fields that actually exist in the API response
+        identified_reasoning_pattern: data.identified_reasoning_pattern || '',
+        bias_reflection_points: data.bias_reflection_points || [],
+        devils_advocate_challenge: data.devils_advocate_challenge || [],
+        suggested_next_reflective_action: data.suggested_next_reflective_action || []
+      };
+      
+      setAnalysis(adaptedData);
       
       // Notificar componente pai
       if (onInsightsGenerated) {
         onInsightsGenerated({
-          strengths: data.reasoning_strengths,
-          biases: data.cognitive_biases_identified,
-          improvements: data.areas_for_improvement
+          strengths: adaptedData.bias_reflection_points,
+          biases: adaptedData.devils_advocate_challenge,
+          improvements: adaptedData.suggested_next_reflective_action
         });
       }
       
@@ -551,7 +564,7 @@ export default function SelfReflectionComponent({
                   <h4 className="font-semibold text-gray-900">{selectedTemplate.name}</h4>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     onClick={copyTemplateToClipboard}
                   >
                     <Copy className="h-3 w-3 mr-1" />
@@ -725,39 +738,39 @@ export default function SelfReflectionComponent({
             <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
               <div className="flex items-center mb-3">
                 <Brain className="h-6 w-6 text-blue-600 mr-2" />
-                <h4 className="font-semibold text-blue-800">Análise Metacognitiva</h4>
+                <h4 className="font-semibold text-blue-800">Padrão de Raciocínio Identificado</h4>
               </div>
-              <p className="text-blue-700 leading-relaxed">{analysis.metacognitive_analysis}</p>
+              <p className="text-blue-700 leading-relaxed">{analysis.identified_reasoning_pattern || ''}</p>
             </div>
 
             {/* Pontos Fortes do Raciocínio */}
             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
               <h4 className="font-semibold text-green-800 mb-3 flex items-center">
                 <CheckCircle className="h-4 w-4 mr-2" />
-                Pontos Fortes do seu Raciocínio
+                Pontos para Reflexão
               </h4>
               <ul className="space-y-2">
-                {analysis.reasoning_strengths.map((strength, index) => (
+                {(analysis.bias_reflection_points || []).map((point: string, index: number) => (
                   <li key={index} className="text-green-700 flex items-start">
                     <span className="text-green-500 mr-2 mt-1">✓</span>
-                    <span>{strength}</span>
+                    <span>{point}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Vieses Cognitivos Identificados */}
-            {analysis.cognitive_biases_identified.length > 0 && (
+            {(analysis.devils_advocate_challenge || []).length > 0 && (
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
                 <h4 className="font-semibold text-orange-800 mb-3 flex items-center">
                   <AlertTriangle className="h-4 w-4 mr-2" />
-                  Vieses Cognitivos Identificados
+                  Desafios de Raciocínio
                 </h4>
                 <ul className="space-y-2">
-                  {analysis.cognitive_biases_identified.map((bias, index) => (
+                  {(analysis.devils_advocate_challenge || []).map((challenge: string, index: number) => (
                     <li key={index} className="text-orange-700 flex items-start">
                       <span className="text-orange-500 mr-2 mt-1">⚠</span>
-                      <span>{bias}</span>
+                      <span>{challenge}</span>
                     </li>
                   ))}
                 </ul>
@@ -768,45 +781,29 @@ export default function SelfReflectionComponent({
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Áreas para Desenvolvimento
+                Ações Reflexivas Recomendadas
               </h4>
               <ul className="space-y-2">
-                {analysis.areas_for_improvement.map((area, index) => (
+                {(analysis.suggested_next_reflective_action || []).map((action: string, index: number) => (
                   <li key={index} className="text-blue-700 flex items-start">
                     <ArrowRight className="h-4 w-4 mr-2 mt-0.5 text-blue-500 flex-shrink-0" />
-                    <span>{area}</span>
+                    <span>{action}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* Recomendações Específicas */}
-            <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-              <h4 className="font-semibold text-purple-800 mb-3 flex items-center">
-                <Target className="h-4 w-4 mr-2" />
-                Recomendações Específicas
-              </h4>
-              <ul className="space-y-2">
-                {analysis.specific_recommendations.map((recommendation, index) => (
-                  <li key={index} className="text-purple-700 flex items-start">
-                    <span className="text-purple-500 mr-2 mt-1">🎯</span>
-                    <span>{recommendation}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Estratégias de Auto-Correção */}
+            {/* Estratégias de Auto-Correção - Adding this back but using bias_reflection_points in a different way */}
             <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
               <h4 className="font-semibold text-emerald-800 mb-3 flex items-center">
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Estratégias de Auto-Correção
+                Estratégias de Metacognição
               </h4>
               <ul className="space-y-2">
-                {analysis.self_correction_strategies.map((strategy, index) => (
+                {(analysis.bias_reflection_points || []).map((point: string, index: number) => (
                   <li key={index} className="text-emerald-700 flex items-start">
                     <span className="text-emerald-500 mr-2 mt-1">🔄</span>
-                    <span>{strategy}</span>
+                    <span>{point}</span>
                   </li>
                 ))}
               </ul>
@@ -815,8 +812,8 @@ export default function SelfReflectionComponent({
             {/* Ações de Transferência */}
             <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
               <Button 
-                onClick={() => onTransferToTimeout?.(caseContext, analysis.specific_recommendations)}
-                variant="outline"
+                onClick={() => onTransferToTimeout?.(caseContext, analysis.suggested_next_reflective_action)}
+                variant="default"
                 className="flex items-center"
               >
                 <Clock className="mr-2 h-4 w-4" />
@@ -826,7 +823,7 @@ export default function SelfReflectionComponent({
 
             {/* Disclaimer */}
             <div className="text-xs italic text-muted-foreground p-3 bg-gray-50 rounded-md">
-              {analysis.disclaimer}
+              Esta análise é um apoio ao raciocínio clínico e não substitui o julgamento profissional.
             </div>
           </div>
         )}

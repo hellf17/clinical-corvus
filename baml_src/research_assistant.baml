@@ -114,7 +114,6 @@ class SynthesizedResearchOutput {
   relevant_references RawSearchResultItem[] @description("Most relevant references found")
   research_metrics ResearchMetrics? @description("Detailed metrics about the research process for transparency")
   search_duration_seconds float? @description("Total duration of the search process in seconds")
-
 }
 
 // --- PDF Analysis Classes for Evidence Appraisal ---
@@ -541,194 +540,156 @@ function SynthesizeDeepResearch(original_query: string, search_results: RawSearc
   "#
 }
 
-// -------- Enhanced Evidence Appraisal System --------
+// Enhanced Evidence Analysis Pipeline for Dr. Corvus
 
-// Input for Enhanced Evidence Appraisal
-class EvidenceAppraisalInput {
-  clinical_question_PICO string @description("Clinical question in PICO format")
-  evidence_summary_or_abstract string @description("Evidence summary or abstract for evaluation")
-  study_type_if_known string? @description("Study type if known")
+// --- Enums and Core Classes ---
+
+enum StudyDesignType {
+  RCT @description("Randomized Controlled Trial")
+  COHORT @description("Cohort Study")
+  CASE_CONTROL @description("Case-Control Study")
+  CROSS_SECTIONAL @description("Cross-Sectional Study")
+  SYSTEMATIC_REVIEW @description("Systematic Review")
+  META_ANALYSIS @description("Meta-analysis")
+  CASE_REPORT @description("Case Report")
+  REVIEW_ARTICLE @description("Review Article")
+  OTHER @description("Other type of study")
 }
 
-// Bias Assessment Details
-class BiasAssessment {
-  bias_type string @description("Type of bias (e.g., Selection, Information, Confounding)")
-  risk_level string @description("High, Moderate, Low, Unclear")
-  explanation string @description("Explanation of the bias assessment")
-  mitigation_strategies string[] @description("Suggested strategies to address this bias")
+class PopulationInfo {
+  sample_size int @description("Total sample size.")
+  key_demographics string @description("Demographic description of participants (age, sex, etc.).")
+  inclusion_criteria string[] @description("Inclusion criteria for participants.")
+  exclusion_criteria string[] @description("Exclusion criteria for participants.")
 }
 
-// Statistical Analysis Assessment
-class StatisticalAssessment {
-  sample_size_adequacy string @description("Assessment of sample size adequacy")
-  statistical_methods_appropriateness string @description("Appropriateness of statistical methods")
-  effect_size_interpretation string @description("Clinical significance of effect size")
-  confidence_intervals_assessment string @description("Assessment of confidence intervals")
-  p_value_interpretation string @description("Interpretation of p-values and statistical significance")
-  multiple_comparisons_concern string? @description("Concerns about multiple comparisons if applicable")
+class InterventionInfo {
+  intervention_details string @description("Details of the intervention group.")
+  comparator_details string @description("Details of the comparator group.")
 }
 
-// Quality Assessment using established frameworks
-class QualityAssessment {
-  overall_quality_grade string @description("Overall quality grade (A, B, C, D or High, Moderate, Low, Very Low)")
-  methodological_rigor_score string @description("Assessment of methodological rigor")
-  risk_of_bias_summary string @description("Summary of risk of bias assessment")
-  applicability_concerns string[] @description("Concerns about applicability to target population")
-  reporting_quality string @description("Quality of reporting according to guidelines (CONSORT, STROBE, etc.)")
+class KeyResult {
+  finding_description string @description("Description of the primary finding.")
+  reported_values string @description("Numeric, statistical values, and confidence intervals reported (e.g., 'OR 1.5, 95% CI 1.2-1.8, p<0.05').")
 }
 
-// Clinical Application Assessment
-class ClinicalApplicationAssessment {
-  clinical_relevance string @description("Assessment of clinical relevance")
-  patient_population_match string @description("How well the study population matches your clinical question")
-  outcome_relevance string @description("Relevance of study outcomes to clinical practice")
-  practical_feasibility string @description("Feasibility of implementing findings in practice")
-  cost_effectiveness_considerations string? @description("Cost-effectiveness considerations if mentioned")
-  ethical_considerations string[] @description("Ethical considerations relevant to application")
+// A classe de output da nossa função extratora
+class EvidenceAnalysisData {
+  study_objective string @description("The main objective of the study, as declared by the authors.")
+  study_design StudyDesignType @description("The study design classification based on the methodology described.")
+  population PopulationInfo @description("Structured information about the study population.")
+  interventions InterventionInfo @description("Information about the intervention and comparator.")
+  primary_outcomes string[] @description("List of primary outcomes measured in the study.")
+  key_results KeyResult[] @description("Structured list of the most important study results.")
+  authors_conclusions string[] @description("Main conclusions, as declared by the authors.")
+  authors_acknowledged_limitations string[] @description("Limitations explicitly acknowledged by the authors in the text.")
 }
 
-// Enhanced Evidence Appraisal Output
-class EnhancedAppraisalOutput {
-  // Basic Study Information
-  identified_study_type string @description("Identified or confirmed study type")
-  study_design_appropriateness string @description("Appropriateness of study design for the research question")
-  
-  // Comprehensive Quality Assessment
-  quality_assessment QualityAssessment @description("Comprehensive quality assessment")
-  
-  // Detailed Strengths and Limitations
-  methodological_strengths string[] @description("Key methodological strengths")
-  methodological_limitations string[] @description("Key methodological limitations")
-  
-  // Bias Assessment
-  bias_assessments BiasAssessment[] @description("Detailed bias assessments")
-  overall_bias_risk string @description("Overall risk of bias assessment")
-  
-  // Statistical Assessment
-  statistical_assessment StatisticalAssessment @description("Comprehensive statistical assessment")
-  
-  // Clinical Application
-  clinical_application ClinicalApplicationAssessment @description("Clinical application assessment")
-  
-  // PICO Alignment
-  pico_alignment_assessment string @description("How well the study aligns with the PICO question")
-  population_match_percentage string @description("Estimated percentage match with target population")
-  intervention_comparability string @description("Comparability of intervention to clinical question")
-  outcome_relevance_score string @description("Relevance of outcomes to clinical question")
-  
-  // Evidence Integration
-  strength_of_recommendation string @description("Strength of recommendation based on this evidence")
-  level_of_evidence string @description("Level of evidence according to established hierarchies")
-  confidence_in_findings string @description("Confidence in the study findings")
-  
-  // Practical Recommendations
-  recommendations_for_practice string[] @description("Specific recommendations for clinical practice")
-  areas_requiring_more_research string[] @description("Areas where more research is needed")
-  next_steps_for_evidence_evaluation string[] @description("Suggested next steps for further evidence evaluation")
-  
-  // Critical Considerations
-  key_clinical_considerations string[] @description("Key considerations for clinical application")
-  potential_harms_or_risks string[] @description("Potential harms or risks to consider")
-  patient_preference_factors string[] @description("Factors that might influence patient preferences")
-  
-  // Context and Limitations
-  generalizability_assessment string @description("Assessment of generalizability to broader populations")
-  external_validity_concerns string[] @description("Concerns about external validity")
-  study_limitations_impact string @description("How study limitations might impact clinical application")
-  
-  // Professional Development
-  learning_points string[] @description("Key learning points for evidence evaluation skills")
-  critical_appraisal_checklist string[] @description("Checklist items for future evidence appraisal")
-  
-  // Meta Information
-  evidence_synthesis_date string @description("Date of evidence synthesis")
+// --- Classes de Estrutura de Dados para o Dashboard Final ---
 
+enum GradeLevel {
+  ALTA @description("High quality of evidence")
+  MODERADA @description("Moderate quality of evidence")
+  BAIXA @description("Low quality of evidence")
+  MUITO_BAIXA @description("Very low quality of evidence")
 }
 
-// Enhanced Evidence Appraisal Function
-function AssistEvidenceAppraisal(input: EvidenceAppraisalInput) -> EnhancedAppraisalOutput {
+enum RecommendationStrength {
+  FORTE @description("Forte recomendação para a prática clínica")
+  FRACA @description("Fraca recomendação para a prática clínica")
+}
+
+enum AssessmentValue {
+  POSITIVO @description("Positive assessment of the factor")
+  NEUTRO @description("Neutral assessment of the factor")
+  NEGATIVO @description("Negative assessment of the factor")
+}
+
+class QualityFactor {
+  factor_name string @description("Name of the quality factor, e.g: 'Study Design'.")
+  assessment AssessmentValue @description("Avaliação do fator (POSITIVO, NEUTRO, NEGATIVO).")
+  justification string @description("Brief justification for the assessment.")
+}
+
+class BiasAnalysis {
+  selection_bias string @description("Analysis of the risk of selection bias.")
+  performance_bias string @description("Analysis of the risk of performance/bias.")
+  reporting_bias string @description("Analysis of the risk of reporting bias.")
+  confirmation_bias string @description("Analysis of the risk of confirmation bias.")
+}
+
+// A classe de output final para a UI
+class EvidenceAppraisalOutput {
+  overall_quality GradeLevel @description("The overall quality of the evidence, based on the GRADE framework.")
+  quality_reasoning string @description("Justification for the overall quality assessment.")
+  recommendation_strength RecommendationStrength @description("The strength of the recommendation for clinical practice.")
+  strength_reasoning string @description("Justification for the strength of the recommendation.")
+  quality_factors QualityFactor[] @description("Detailed analysis of the factors that influence the quality of the evidence.")
+  bias_analysis BiasAnalysis @description("Structured analysis of the main types of bias.")
+  practice_recommendations string[] @description("Practical recommendations and actionable insights for the clinician.")
+}
+
+// --- Função BAML de Extração ---
+
+function AnalyzeMedicalPaper(paper_full_text: string, clinical_question_PICO: string | null) -> EvidenceAnalysisData {
   client DrCorvusLLM
-  prompt #"
-    {{ GetProfessionalIntroduction() }}
-    I am Dr. Corvus, an expert in Evidence-Based Medicine, critical literature evaluation, and clinical research methodology. I will provide you with a comprehensive, structured evidence appraisal that leverages advanced evaluation frameworks.
+  prompt #"""
+    You are Dr. Corvus, an AI assistant highly precise, specialized in **extracting and structuring information** from medical scientific articles.
 
-    **CLINICAL QUESTION (PICO FORMAT):**
-    {{ input.clinical_question_PICO }}
+    **Your sole task is to read the complete article text provided and fill the output JSON object with maximum precision, based solely on the text.**
 
-    **EVIDENCE SUMMARY/ABSTRACT FOR EVALUATION:**
-    {{ input.evidence_summary_or_abstract }}
+    - **DO NOT EVALUATE, DO NOT INTERPRET, DO NOT MAKE INFERENCES.** Just extract the facts.
+    - If a specific piece of information is not found in the text, fill the corresponding field with "Not found in text" or an appropriate null/empty value.
 
-    {% if input.study_type_if_known %}
-    **STUDY TYPE (PROVIDED):** {{ input.study_type_if_known }}
+    {% if clinical_question_PICO %}
+    **Clinical Question Focus (to guide relevance extraction):**
+    {{ clinical_question_PICO }}
     {% endif %}
 
-    **COMPREHENSIVE EVIDENCE APPRAISAL PROCESS:**
+    **Complete Article Text for Analysis:**
+    ---
+    {{ paper_full_text }}
+    ---
 
-    1. **Study Design and Methodology Analysis:**
-      - Identify study type and assess design appropriateness
-      - Evaluate methodological rigor using established frameworks
-      - Assess adherence to reporting guidelines (CONSORT, STROBE, PRISMA, etc.)
-
-    2. **Risk of Bias Assessment:**
-      - Systematic evaluation using domain-based approaches
-      - Assessment of selection, performance, detection, attrition, and reporting biases
-      - Consider bias mitigation strategies employed
-
-    3. **Statistical Analysis Evaluation:**
-      - Sample size and power considerations
-      - Appropriateness of statistical methods
-      - Effect size interpretation and clinical significance
-      - Confidence interval assessment and p-value interpretation
-
-    4. **Clinical Relevance and Applicability:**
-      - PICO alignment analysis
-      - Population comparability assessment
-      - Outcome relevance evaluation
-      - Practical implementation considerations
-
-    5. **Quality Grading and Evidence Level:**
-      - Overall quality assessment using GRADE or similar frameworks
-      - Evidence level determination
-      - Confidence in effect estimates
-
-    6. **Practice Integration Analysis:**
-      - Clinical application recommendations
-      - Risk-benefit assessment
-      - Patient preference considerations
-      - Implementation barriers and facilitators
-
-    7. **Critical Evaluation Skills Development:**
-      - Key learning points for evidence evaluation
-      - Future appraisal considerations
-      - Areas for additional research
-
-    **CRITICAL EVALUATION FRAMEWORKS TO CONSIDER:**
-    - GRADE (Grading of Recommendations Assessment, Development and Evaluation)
-    - Cochrane Risk of Bias tools
-    - CASP (Critical Appraisal Skills Programme) checklists
-    - Newcastle-Ottawa Scale for observational studies
-    - AMSTAR for systematic reviews
-
-    **STATISTICAL CONSIDERATIONS:**
-    - Clinical vs. statistical significance
-    - Number needed to treat (NNT) or harm (NNH) if applicable
-    - Absolute vs. relative risk measures
-    - Confidence interval interpretation
-    - Heterogeneity assessment for meta-analyses
-
-    **CLINICAL APPLICATION FACTORS:**
-    - Patient population characteristics
-    - Healthcare setting considerations
-    - Resource requirements
-    - Cost-effectiveness implications
-    - Ethical considerations
-
-    **RESPONSE STRUCTURE REQUIREMENTS:**
-    Provide a comprehensive, structured analysis that helps develop critical evaluation skills while offering practical guidance for evidence application. Use Portuguese for all narrative content, maintaining scientific precision and clarity.
-    Your final response must be IN PORTUGUESE AND MATCHING THE OUTPUT FORMAT.
+    Fill all the fields of the output JSON object ('EvidenceAnalysisData') based on the instructions above.
+    **Your output MUST be in English.**
 
     {{ ctx.output_format }}
-  "#
+  """#
+}
+
+// --- Função BAML de Avaliação ---
+
+function GenerateEvidenceAppraisal(extracted_data: EvidenceAnalysisData) -> EvidenceAppraisalOutput {
+  client DrCorvusLLM
+  prompt #"""
+    You are Dr. Corvus, an expert in Evidence-Based Medicine. Your task is to **critically evaluate the extracted data** from a scientific article to generate a final evaluation panel.
+
+    **EXTRACTED DATA FOR YOUR EVALUATION:**
+    {{ extracted_data | json_string }}
+
+    **EVALUATION PROCESS (GRADE Framework):**
+
+    1.  **Initial Quality:** Start with a baseline. If the `study_design` is `RCT`, the initial quality is HIGH. If it is a `SYSTEMATIC_REVIEW` of RCTs, it is HIGH. If it is `COHORT` or `CASE_CONTROL`, it is LOW.
+
+    2.  **Downgrade (Reduce Quality):** Analyze the following factors to reduce quality:
+        - **Risk of Bias:** Based on the `study_design` and `authors_acknowledged_limitations`, evaluate the risk of bias. If it is high, reduce 1 or 2 levels in quality.
+        - **Inconsistency:** (Usually requires comparison with other studies, but can be inferred if the `key_results` are contradictory).
+        - **Indirectness:** Is the population, intervention, or outcomes (`population`, `interventions`, `primary_outcomes`) of the study very different from the general clinical question? If so, reduce 1 level.
+        - **Imprecisão:** The `key_results` show very wide confidence intervals? The `sample_size` is very small? If so, reduce 1 level.
+
+    3.  **Upgrade (Aumentar a Qualidade, raro):** The study shows a large effect size or a strong dose-response relationship? If so, it can increase 1 level.
+
+    4.  **Força da Recomendação:** Based on the `overall_quality` final, evaluate the strength of the recommendation.
+        - **FORTE:** High or moderate quality, with clear benefits outweighing risks.
+        - **FRACA:** Low or very low quality, or when benefits and risks are balanced or uncertain.
+
+    5.  **Bias Analysis and Recommendations:** Fill the bias analysis and formulate practical recommendations for the clinician.
+
+    Based on your analysis, fill the `EvidenceAppraisalOutput` object.
+
+    {{ ctx.output_format }}
+  """#
 }
 
 // --- PICO Question Formulation ---

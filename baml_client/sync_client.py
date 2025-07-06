@@ -152,6 +152,33 @@ class BamlSyncClient:
       )
       return cast(types.DifferentialAnalysisOutputModel, raw.cast_to(types, types, partial_types, False))
     
+    def AnalyzeMedicalPaper(
+        self,
+        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        baml_options: BamlCallOptions = {},
+    ) -> types.EvidenceAnalysisData:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "AnalyzeMedicalPaper",
+        {
+          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.EvidenceAnalysisData, raw.cast_to(types, types, partial_types, False))
+    
     def AnalyzePDFDocument(
         self,
         input: types.PDFAnalysisInput,
@@ -205,33 +232,6 @@ class BamlSyncClient:
         collectors,
       )
       return cast(types.ProbeResponseOutputModel, raw.cast_to(types, types, partial_types, False))
-    
-    def AssistEvidenceAppraisal(
-        self,
-        input: types.EvidenceAppraisalInput,
-        baml_options: BamlCallOptions = {},
-    ) -> types.EnhancedAppraisalOutput:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.call_function_sync(
-        "AssistEvidenceAppraisal",
-        {
-          "input": input,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-      return cast(types.EnhancedAppraisalOutput, raw.cast_to(types, types, partial_types, False))
     
     def AssistInIdentifyingCognitiveBiases(
         self,
@@ -557,6 +557,33 @@ class BamlSyncClient:
       )
       return cast(types.LabInsightsOutput, raw.cast_to(types, types, partial_types, False))
     
+    def GenerateEvidenceAppraisal(
+        self,
+        extracted_data: types.EvidenceAnalysisData,
+        baml_options: BamlCallOptions = {},
+    ) -> types.EvidenceAppraisalOutput:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "GenerateEvidenceAppraisal",
+        {
+          "extracted_data": extracted_data,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.EvidenceAppraisalOutput, raw.cast_to(types, types, partial_types, False))
+    
     def GenerateIllnessScript(
         self,
         input: types.IllnessScriptInput,
@@ -664,6 +691,33 @@ class BamlSyncClient:
         collectors,
       )
       return cast(types.ProblemRepresentationFeedbackOutputModel, raw.cast_to(types, types, partial_types, False))
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        input: types.SelfReflectionInput,
+        baml_options: BamlCallOptions = {},
+    ) -> types.SelfReflectionFeedbackOutput:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "ProvideSelfReflectionFeedback",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.SelfReflectionFeedbackOutput, raw.cast_to(types, types, partial_types, False))
     
     def ProvideSessionSummary_SNAPPS(
         self,
@@ -989,6 +1043,41 @@ class BamlStreamClient:
         self.__ctx_manager.get(),
       )
     
+    def AnalyzeMedicalPaper(
+        self,
+        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.EvidenceAnalysisData, types.EvidenceAnalysisData]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "AnalyzeMedicalPaper",
+        {
+          "paper_full_text": paper_full_text,
+          "clinical_question_PICO": clinical_question_PICO,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.EvidenceAnalysisData, types.EvidenceAnalysisData](
+        raw,
+        lambda x: cast(partial_types.EvidenceAnalysisData, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.EvidenceAnalysisData, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
     def AnalyzePDFDocument(
         self,
         input: types.PDFAnalysisInput,
@@ -1054,40 +1143,6 @@ class BamlStreamClient:
         raw,
         lambda x: cast(partial_types.ProbeResponseOutputModel, x.cast_to(types, types, partial_types, True)),
         lambda x: cast(types.ProbeResponseOutputModel, x.cast_to(types, types, partial_types, False)),
-        self.__ctx_manager.get(),
-      )
-    
-    def AssistEvidenceAppraisal(
-        self,
-        input: types.EvidenceAppraisalInput,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlSyncStream[partial_types.EnhancedAppraisalOutput, types.EnhancedAppraisalOutput]:
-      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
-      __tb__ = options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = options.get("client_registry", None)
-      collector = options.get("collector", None)
-      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
-
-      raw = self.__runtime.stream_function_sync(
-        "AssistEvidenceAppraisal",
-        {
-          "input": input,
-        },
-        None,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        collectors,
-      )
-
-      return baml_py.BamlSyncStream[partial_types.EnhancedAppraisalOutput, types.EnhancedAppraisalOutput](
-        raw,
-        lambda x: cast(partial_types.EnhancedAppraisalOutput, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.EnhancedAppraisalOutput, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     
@@ -1499,6 +1554,40 @@ class BamlStreamClient:
         self.__ctx_manager.get(),
       )
     
+    def GenerateEvidenceAppraisal(
+        self,
+        extracted_data: types.EvidenceAnalysisData,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.EvidenceAppraisalOutput, types.EvidenceAppraisalOutput]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "GenerateEvidenceAppraisal",
+        {
+          "extracted_data": extracted_data,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.EvidenceAppraisalOutput, types.EvidenceAppraisalOutput](
+        raw,
+        lambda x: cast(partial_types.EvidenceAppraisalOutput, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.EvidenceAppraisalOutput, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
     def GenerateIllnessScript(
         self,
         input: types.IllnessScriptInput,
@@ -1633,6 +1722,40 @@ class BamlStreamClient:
         raw,
         lambda x: cast(partial_types.ProblemRepresentationFeedbackOutputModel, x.cast_to(types, types, partial_types, True)),
         lambda x: cast(types.ProblemRepresentationFeedbackOutputModel, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        input: types.SelfReflectionInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.SelfReflectionFeedbackOutput, types.SelfReflectionFeedbackOutput]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "ProvideSelfReflectionFeedback",
+        {
+          "input": input,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.SelfReflectionFeedbackOutput, types.SelfReflectionFeedbackOutput](
+        raw,
+        lambda x: cast(partial_types.SelfReflectionFeedbackOutput, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.SelfReflectionFeedbackOutput, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

@@ -13,9 +13,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     
-    const targetUrl = `${FASTAPI_URL}/api/deep-research/appraise-evidence-translated`;
+    const targetUrl = `${FASTAPI_URL}/api/research/appraise-evidence-translated`;
 
-    console.log(`Forwarding POST request from /api/research-assistant/appraise-evidence-translated to ${targetUrl}`);
+    console.log(`Forwarding POST request from /api/research/appraise-evidence-translated to ${targetUrl}`);
 
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',

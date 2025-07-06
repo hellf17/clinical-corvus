@@ -10,16 +10,16 @@ interface SimulationHeaderProps {
 
 export function SimulationHeader({ title, description, showReset = false, onReset }: SimulationHeaderProps) {
   return (
-    <section className="relative text-center py-10 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
-      <div className="flex flex-col items-center justify-center">
-        <div className="flex items-center justify-center mb-4">
+    <section className="relative text-center py-10 academy-gradient-header rounded-xl border border-primary/20 shadow-lg overflow-hidden">
+      <div className="flex flex-col items-center justify-center px-4">
+        <div className="flex items-center justify-center mb-4 flex-wrap">
           <Users className="h-12 w-12 md:h-16 md:w-16 mr-4 text-white" />
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+          <h1 className="text-2xl md:text-4xl font-bold tracking-tight text-white">
             {title}
           </h1>
         </div>
-        <p className="mt-2 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
-          {description}
+        <p className="mt-2 text-lg md:text-xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+          {description.replace(/\s*-\s*/g, '\n• ')}
         </p>
       </div>
       {showReset && (

@@ -78,6 +78,10 @@ export interface SynthesizedResearchOutput {
   professional_detailed_reasoning_cot: string;
 }
 
+// For server-to-server communication within Docker, use the service name.
+const BACKEND_API_URL = 'http://backend-api:8000';
+
+
 /**
  * API proxy route for quick search with translation.
  * Forwards requests to the backend endpoint that handles quick search
@@ -90,9 +94,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Adjust the backend URL and endpoint as per your actual backend setup
-    // Example: /api/v1/research/quick-search-translated or similar
-    const backendUrl = 'http://backend-api:8000/api/deep-research/quick-search-translated';
+    const backendUrl = `${BACKEND_API_URL}/api/research/quick-search-translated`;
     const body = await request.json();
 
     console.log(`Forwarding POST request to quick-search-translated backend: ${backendUrl}`);

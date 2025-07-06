@@ -372,13 +372,25 @@ export default function FundamentalDiagnosticReasoningPage() {
         throw new Error('Autenticação necessária. Por favor, faça login.');
       }
 
+      // Format initial_findings as an array of ClinicalFindingModel objects
+      const formattedFindings = initialFindingsCD 
+        ? (Array.isArray(initialFindingsCD) ? initialFindingsCD : [initialFindingsCD])
+            .filter(Boolean)
+            .map(finding => ({
+              finding_name: typeof finding === 'string' ? finding : 'Finding',
+              details: typeof finding === 'string' ? finding : '',
+              onset_duration_pattern: '',
+              severity_level: ''
+            }))
+        : [];
+
       const response = await fetch('/api/clinical-assistant/teach-question-prioritization-translated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           chief_complaint: mainComplaintCD,
-          demographics: demographicsCD,
-          initial_findings: initialFindingsCD,
+          patient_demographics: demographicsCD,
+          initial_findings: formattedFindings,
         }),
       });
 
@@ -405,7 +417,20 @@ export default function FundamentalDiagnosticReasoningPage() {
   ];
 
   return (
-  <div className="container mx-auto p-4 md:p-6 lg:p-8">
+    <div className="container mx-auto p-4 md:p-6 lg:p-8">
+      {/* Updated Header Section */}
+      <section className="text-center py-10 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
+        <div className="mx-auto max-w-4xl">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white flex items-center justify-center mb-4">
+            <Brain className="h-10 w-10 md:h-12 md:w-12 mr-3 text-white" />
+            Raciocínio Diagnóstico Fundamental
+            </h1>
+            <p className="mt-2 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
+              Desenvolva autoconsciência sobre seu processo de pensamento e aprenda a mitigar vieses cognitivos com Dr. Corvus.
+            </p>
+        </div>
+      </section>
+
       <div className="mb-12"> {/* Wrapper for spacing */}
         <IntegratedWorkflowCard
           title="Raciocínio Diagnóstico Fundamental"
@@ -419,7 +444,6 @@ export default function FundamentalDiagnosticReasoningPage() {
           totalSteps={fdrWorkflowSteps.length}
         />
       </div>
-
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 bg-blue-50 p-1 rounded-lg border border-blue-200">
         <TabsTrigger value="reasoning-types" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:hover:bg-blue-100 data-[state=inactive]:text-blue-700 rounded-md px-3 py-2 text-sm font-medium transition-all">

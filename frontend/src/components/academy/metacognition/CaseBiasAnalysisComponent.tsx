@@ -235,17 +235,14 @@ export default function CaseBiasAnalysisComponent({
       return;
     }
 
-    const payload = {
+    // Montar payload conforme esperado pelo backend
+    const biasPayload = {
       scenario_description: scenario,
-      user_bias_identification: userIdentifiedBias.trim() || undefined,
-      case_metadata: selectedVignette ? {
-        case_id: selectedVignette.id,
-        target_bias: selectedVignette.targetBias,
-        complexity: selectedVignette.complexity,
-        specialty: selectedVignette.specialty,
-        hints_used: hintsUsed
-      } : undefined
+      additional_context: selectedVignette ? `Especialidade: ${selectedVignette.specialty}. Complexidade: ${selectedVignette.complexity}. Dicas usadas: ${hintsUsed}.` : undefined,
+      user_identified_bias_optional: userIdentifiedBias.trim() || undefined
     };
+    // Payload final para o backend
+    const payload = biasPayload;
 
     try {
       const response = await fetch('/api/clinical-assistant/assist-identifying-cognitive-biases-scenario-translated', {

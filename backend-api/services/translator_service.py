@@ -14,7 +14,7 @@ BAML_TRANSLATOR_URL = os.getenv("BAML_TRANSLATOR_URL", "http://localhost:8000/ap
 
 async def translate(text: Union[str, List[str]], target_lang: Literal["EN", "PT"] = "EN", field_name: str = None) -> Union[str, List[str]]:
     """    
-    Translate text using DeepL as primary, fall back to BAML if DeepL fails.
+    Translate text using BAML as primary, fall back to DeepL if BAML fails.
     Can handle either a single string or a list of strings.
     target_lang: "EN" for English, "PT" for Portuguese (Brazilian)
     field_name: Optional name of the field being translated (for better logging)
@@ -26,27 +26,15 @@ async def translate(text: Union[str, List[str]], target_lang: Literal["EN", "PT"
         
     # Single text translation
     """
-    Translate text using DeepL as primary, fall back to BAML if DeepL fails.
+    Translate text using BAML as primary, fall back to DeepL if BAML fails.
     target_lang: "EN" for English, "PT" for Portuguese (Brazilian)
     field_name: Optional name of the field being translated (for better logging)
     Returns translated text, or raises Exception if all fail.
     """
-    deepl_target = "EN-US" if target_lang == "EN" else "PT-BR"
     # Truncate text for logging purposes
     log_text = text[:50] + "..." if text and len(text) > 50 else text
     
-    # 1. Try DeepL
-    try:
-        translated = await translate_text_deepl(text, target_lang=deepl_target)
-        if translated:
-            field_info = f" field: {field_name}" if field_name else ""
-            logger.info(f"DeepL translation succeeded: {target_lang}{field_info} | Text: {log_text}")
-            return translated
-        logger.warning(f"DeepL returned None for {field_name or 'unknown field'}, will try BAML fallback.")
-    except Exception as e:
-        logger.warning(f"DeepL translation failed: {e}, will try BAML fallback.")
-
-    # 2. Fallback to BAML
+    # 1. Try BAML
     try:
         baml_func = "TranslateToEnglish" if target_lang == "EN" else "TranslateToPortuguese"
         async with httpx.AsyncClient() as client:
@@ -59,26 +47,39 @@ async def translate(text: Union[str, List[str]], target_lang: Literal["EN", "PT"
             data = response.json()
             translated = data.get("translated_text") or data.get("result", {}).get("translated_text")
             if not translated:
-                raise Exception(f"BAML fallback did not return translated_text: {data}")
+                raise Exception(f"BAML translation did not return translated_text: {data}")
             field_info = f" field: {field_name}" if field_name else ""
-            logger.info(f"BAML fallback translation succeeded: {target_lang}{field_info} | Text: {log_text}")
+            logger.info(f"BAML translation succeeded: {target_lang}{field_info} | Text: {log_text}")
             return translated
     except Exception as e:
-        logger.error(f"Both DeepL and BAML translation failed: {e}")
+        logger.warning(f"BAML translation failed: {e}, will try DeepL fallback.")
+
+    # 2. Fallback to DeepL
+    try:
+        deepl_target = "EN-US" if target_lang == "EN" else "PT-BR"
+        translated = await translate_text_deepl(text, target_lang=deepl_target)
+        if translated:
+            field_info = f" field: {field_name}" if field_name else ""
+            logger.info(f"DeepL fallback translation succeeded: {target_lang}{field_info} | Text: {log_text}")
+            return translated
+        logger.error(f"DeepL returned None for {field_name or 'unknown field'}, all translation methods failed.")
+        raise Exception("All translation methods failed")
+    except Exception as e:
+        logger.error(f"Both BAML and DeepL translation failed: {e}")
         raise Exception(f"Translation failed for target_lang={target_lang}: {e}")
 
 
 async def translate_batch(texts: List[str], target_lang: Literal["EN", "PT"] = "EN", field_name: str = None) -> List[str]:
     """
     Translate a batch of texts, handling each text individually to ensure reliability.
-    This is more robust than sending the entire batch at once to DeepL.
+    This is more robust than sending the entire batch at once.
     """
     if not texts:
         return []
         
-    # Process each text individually to avoid DeepL API limitations
+    # Process each text individually to avoid API limitations
     tasks = [translate(text, target_lang, f"{field_name}[{i}]" if field_name else None) 
-             for i, text in enumerate(texts)]
+            for i, text in enumerate(texts)]
     
     # Wait for all translations to complete
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -93,3 +94,4 @@ async def translate_batch(texts: List[str], target_lang: Literal["EN", "PT"] = "
             raise result
 
     return results
+

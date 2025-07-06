@@ -15,6 +15,42 @@ client DrCorvusLLM {
   }
 }
 
+// Define the translator client
+client Translator {
+  provider fallback
+  options {
+    strategy [
+      TranslatorPrimary,
+      TranslatorSecondary,
+      OpenRouterPrimary,
+      OpenRouterSecondary
+    ]
+  }
+}
+
+// Define specialized translation models
+client TranslatorPrimary {
+  provider openai-generic
+  options {
+    model "google/gemini-2.0-flash-exp:free"
+    temperature 0.2  // Lower temperature for more accurate translations
+    max_tokens 4000
+    base_url "https://openrouter.ai/api/v1"
+    api_key env.OPENROUTER_API_KEY
+  }
+}
+
+client TranslatorSecondary {
+  provider openai-generic
+  options {
+    model "qwen/qwen3-14b:free"  // Good for multilingual translation
+    temperature 0.2  // Lower temperature for more accurate translations
+    max_tokens 4000
+    base_url "https://openrouter.ai/api/v1"
+    api_key env.OPENROUTER_API_KEY
+  }
+}
+
 // Define the OpenRouter client
 client OpenRouterPrimary {
   provider openai-generic

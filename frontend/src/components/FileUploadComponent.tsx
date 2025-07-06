@@ -178,7 +178,9 @@ export const FileUploadComponent: React.FC<FileUploadComponentProps> = ({
     formData.append('analysis_type', 'pdf_upload');
     
     try {
-      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://backend-api:8000'}/api/lab-analysis/guest`;
+      // Use the proper API URL configuration from config.ts
+      const baseUrl = window.location.origin; // Use relative URL to current origin
+      const apiUrl = `${baseUrl}/api/lab-analysis/guest`;
       
       const response = await fetch(apiUrl, {
         method: 'POST',

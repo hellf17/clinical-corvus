@@ -54,10 +54,7 @@ export const WorkflowStepper: React.FC<WorkflowStepperProps> = ({
                     <span className="text-xs text-gray-500 hidden lg:block">{step.description}</span>
                   </span>
                 </div>
-                {/* Connector Line */}
-                {stepIdx !== steps.length - 1 ? (
-                  <div className="absolute top-6 left-1/2 w-full h-0.5 bg-gray-200 -translate-x-1/2 md:translate-x-0 md:left-0 md:top-6" aria-hidden="true" />
-                ) : null}
+                {/* Connector Line removed as requested */}
               </li>
             );
           })}

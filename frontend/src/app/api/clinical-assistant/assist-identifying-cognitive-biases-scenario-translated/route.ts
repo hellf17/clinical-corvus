@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
 
     // Obter dados da requisição
     const body = await request.json();
-
+    
     // Validar dados obrigatórios
     if (!body.scenario_description) {
       return NextResponse.json(
@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fazer chamada para o backend
+    // Montar payload estritamente conforme esperado pelo backend
+    const payload: { scenario_description: string; user_identified_bias_optional?: string } = {
+      scenario_description: body.scenario_description,
+      ...(body.user_identified_bias_optional ? { user_identified_bias_optional: body.user_identified_bias_optional } : {})
+    };
+
     const apiUrl = getAPIUrl();
     const response = await fetch(`${apiUrl}/api/clinical/assist-identifying-cognitive-biases-scenario-translated`, {
       method: 'POST',
@@ -39,7 +44,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

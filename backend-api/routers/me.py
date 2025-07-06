@@ -15,9 +15,7 @@ from crud import crud_health_diary
 from crud import crud_lab_result
 
 router = APIRouter(
-    prefix="/me",
     tags=["Me - Current User Data"],
-    # dependencies=[Depends(get_current_user_required)], # Apply auth to all routes in this router
     responses={404: {"description": "Not found"}},
 )
 

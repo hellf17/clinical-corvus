@@ -483,7 +483,7 @@ export default function DiagnosticTimeoutComponent({
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Configuração do Timeout</h3>
               <Button
-                variant="outline"
+                variant="default"
                 size="sm"
                 onClick={() => setShowGuide(!showGuide)}
               >
@@ -676,7 +676,7 @@ export default function DiagnosticTimeoutComponent({
                 <div className="flex space-x-2">
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     onClick={handlePauseResume}
                     disabled={timeRemaining === 0}
                   >
@@ -684,7 +684,7 @@ export default function DiagnosticTimeoutComponent({
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant="default"
                     onClick={handleStopTimeout}
                     disabled={timeRemaining === 0}
                   >
@@ -762,7 +762,7 @@ export default function DiagnosticTimeoutComponent({
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
                 onClick={handleSubmitAnalysis}
-                disabled={isLoading || Object.keys(sessionResponses).length === 0}
+                disabled={isLoading || !currentSession || !currentSession.template.prompts.every((_, idx) => sessionResponses[idx] && sessionResponses[idx].trim().length > 0)}
                 className="flex-1"
               >
                 {isLoading ? (

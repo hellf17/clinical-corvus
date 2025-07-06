@@ -17,7 +17,6 @@ from crud import is_doctor_assigned_to_patient
 # from ..crud import crud_patients # Likely unused
 
 router = APIRouter(
-    prefix="/alerts",
     tags=["alerts"],
     responses={404: {"description": "Not found"}},
 )

@@ -5,7 +5,6 @@ from baml_client.types import (
     CognitiveBiasInput as BAMLCognitiveBiasInput,
     DdxQuestioningInput as BAMLDdxQuestioningInput,
     ExpandDifferentialDiagnosisInput as BAMLExpandDifferentialDiagnosisInput,
-    EvidenceAppraisalInput as BAMLEvidenceAppraisalInput,
     CompareContrastExerciseInput as BAMLCompareContrastExerciseInput,
     PatientFollowUpInput as BAMLPatientFollowUpInput,
     ClinicalScenarioInput as BAMLClinicalScenarioInput,
@@ -23,9 +22,6 @@ from baml_client.types import (
 # Import SNAPPS-related types from clinical_simulation module
 from baml_client.types import (
     AnalyzeDifferentialDiagnosesSNAPPSInput as BAMLAnalyzeDifferentialDiagnosesSNAPPSInput,
-
-
-
 
 )
 
@@ -50,7 +46,7 @@ from services.translator_service import translate
 logger = logging.getLogger(__name__)
 
 # Create the router
-router = APIRouter(prefix="/clinical", tags=["Clinical Assistant"])
+router = APIRouter(tags=["Clinical Assistant"])
 
 # Utility function for setting up Dr. Corvus client registry
 def setup_corvus_client_registry():
@@ -157,29 +153,15 @@ class CognitiveBiasCaseAnalysisOutputModel(BaseModel): # Matches frontend Cognit
 )
 async def assist_identifying_cognitive_biases_scenario(payload: CognitiveBiasScenarioInputModel):
     try:
-        # This assumes the BAML function AssistInIdentifyingCognitiveBiases can be called in a "scenario mode"
-        # or there's a dedicated BAML function for this that takes BAMLCognitiveBiasScenarioInput.
-        # The BAML client import for BAMLCognitiveBiasScenarioInput has been added optimistically.
-        baml_input = BAMLCognitiveBiasScenarioInput(
-    scenario_description=payload.scenario_description,
-    additional_context=getattr(payload, 'additional_context', None),
-    user_attempted_bias_name=getattr(payload, 'user_identified_bias_optional', None)
-)
-        # If AssistInIdentifyingCognitiveBiases is polymorphic or needs a mode flag:
-        # raw_baml_response = await b.AssistInIdentifyingCognitiveBiases(baml_input, mode="scenario_analysis")
-        # For now, assuming a distinct input type implies distinct handling or a dedicated BAML function variant.
-        raw_baml_response = await b.AssistInIdentifyingCognitiveBiases(input=baml_input)
-
-        # The BAML function's output for this mode must align with CognitiveBiasCaseAnalysisOutputModel.
-        # This requires the BAML function to return fields like identified_bias_by_expert, explanation_of_bias_in_case, etc.
-        # Placeholder mapping if BAML output is different:
-        # return CognitiveBiasCaseAnalysisOutputModel(
-        #     identified_bias_by_expert=getattr(raw_baml_response, 'expert_identified_bias', 'Default Bias (BAML Update Needed)'),
-        #     explanation_of_bias_in_case=getattr(raw_baml_response, 'explanation', 'Explanation (BAML Update Needed)'),
-        #     how_bias_impacted_decision=getattr(raw_baml_response, 'impact_description', 'Impact (BAML Update Needed)'),
-        #     strategies_to_mitigate_bias=getattr(raw_baml_response, 'mitigation_strategies', []),
-        #     feedback_on_user_identification=getattr(raw_baml_response, 'user_feedback', None),
-        # )
+        # Prepare proper input dictionary for BAML
+        input_dict = {
+            "scenario_description": payload.scenario_description,
+            "additional_context": getattr(payload, 'additional_context', None),
+            "user_attempted_bias_name": getattr(payload, 'user_identified_bias_optional', None)
+        }
+        
+        # Use the proper input parameter format
+        raw_baml_response = await b.AssistInIdentifyingCognitiveBiases(input=input_dict)
         
         # Assuming direct compatibility or that .dict() handles it, given BAML function is updated for this mode:
         return CognitiveBiasCaseAnalysisOutputModel(**raw_baml_response.dict())
@@ -187,7 +169,7 @@ async def assist_identifying_cognitive_biases_scenario(payload: CognitiveBiasSce
         logger.error(f"BAML function for Cognitive Bias Scenario Analysis or its input type might be missing: {str(ae)}", exc_info=True)
         raise HTTPException(status_code=501, detail=f"BAML function for Cognitive Bias Scenario Analysis not implemented/misconfigured: {str(ae)}")
     except Exception as e:
-        # logger.error(f"Error in AssistInIdentifyingCognitiveBiases (Scenario Mode): {str(e)}", exc_info=True)
+        logger.error(f"Error in AssistInIdentifyingCognitiveBiases (Scenario Mode): {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error calling BAML for Cognitive Bias Scenario: {str(e)}")
 
 # --- Pydantic Models for Dr. Corvus Lab Insights (mirroring BAML) ---
@@ -216,7 +198,6 @@ class DrCorvusLabInsightsOutput(BaseModel): #
     patient_friendly_summary: Optional[str] = None
     potential_health_implications_patient: Optional[List[str]] = None
     lifestyle_tips_patient: Optional[List[str]] = None
-    
     questions_to_ask_doctor_patient: Optional[List[str]] = None
     key_abnormalities_professional: Optional[List[str]] = None
     key_normal_results_with_context: Optional[List[str]] = None
@@ -252,7 +233,7 @@ async def generate_dr_corvus_lab_insights(payload: DrCorvusLabAnalysisInput):
         )
         if not payload.lab_results:
             raise ValueError("No lab results provided")
-        client_lab_results = [ClientLabTestResult(**lr.dict()) for lr in payload.lab_results]
+        client_lab_results = [ClientLabTestResult(**lr.model_dump()) for lr in payload.lab_results]
         client_baml_input = ClientLabAnalysisInput(
             lab_results=client_lab_results,
             user_role=ClientUserRole(payload.user_role.value),
@@ -269,23 +250,7 @@ async def generate_dr_corvus_lab_insights(payload: DrCorvusLabAnalysisInput):
             baml_response_obj = await b.GenerateDrCorvusInsights(client_baml_input)
         if not baml_response_obj:
             raise ValueError("Empty response from BAML function")
-        response = DrCorvusLabInsightsOutput(**baml_response_obj.dict())
-        # --- TRANSLATION LOGIC ---
-        # Patient-facing fields
-        response.patient_friendly_summary = await translate_text_to_portuguese(response.patient_friendly_summary)
-        response.potential_health_implications_patient = [await translate_text_to_portuguese(x) for x in (response.potential_health_implications_patient or [])]
-        response.lifestyle_tips_patient = [await translate_text_to_portuguese(x) for x in (response.lifestyle_tips_patient or [])]
-        response.questions_to_ask_doctor_patient = [await translate_text_to_portuguese(x) for x in (response.questions_to_ask_doctor_patient or [])]
-        response.important_results_to_discuss_with_doctor = [await translate_text_to_portuguese(x) for x in (response.important_results_to_discuss_with_doctor or [])]
-        # Professional-facing fields
-        response.key_abnormalities_professional = [await translate_text_to_portuguese(x) for x in (response.key_abnormalities_professional or [])]
-        response.key_normal_results_with_context = [await translate_text_to_portuguese(x) for x in (response.key_normal_results_with_context or [])]
-        response.potential_patterns_and_correlations = [await translate_text_to_portuguese(x) for x in (response.potential_patterns_and_correlations or [])]
-        response.differential_considerations_professional = [await translate_text_to_portuguese(x) for x in (response.differential_considerations_professional or [])]
-        response.suggested_next_steps_professional = [await translate_text_to_portuguese(x) for x in (response.suggested_next_steps_professional or [])]
-        # Detailed reasoning COT
-        if response.professional_detailed_reasoning_cot:
-            response.professional_detailed_reasoning_cot = await translate_text_to_portuguese(response.professional_detailed_reasoning_cot)
+        response = DrCorvusLabInsightsOutput(**baml_response_obj.model_dump())
         return response
     except ValueError as ve:
         logger.error(f"Validation Error in Lab Insights: {str(ve)}")
@@ -786,14 +751,42 @@ class SelfReflectionReasoningInputModel(BaseModel):
     identified_bias: Optional[str] = Field(None, description="Any cognitive bias already identified by the user")
     reflection_metadata: Optional[Dict[str, Any]] = Field(None, description="Metadata about the reflection session, e.g., mode, template used.")
 
-class SelfReflectionReasoningOutputModel(BaseModel):
-    metacognitive_analysis: str = Field(..., description="Analysis of the clinical reasoning process")
-    reasoning_strengths: List[str] = Field(..., description="Strengths identified in the reasoning process")
-    cognitive_biases_identified: List[str] = Field(..., description="Cognitive biases identified in the reasoning")
-    areas_for_improvement: List[str] = Field(..., description="Areas where reasoning could be improved")
-    specific_recommendations: List[str] = Field(..., description="Specific recommendations for improvement")
-    self_correction_strategies: List[str] = Field(..., description="Strategies for self-correction")
-    disclaimer: str = Field(..., description="Educational disclaimer")
+class SelfReflectionFeedbackOutputModel(BaseModel):
+    identified_reasoning_pattern: str = Field(..., description="Analysis of the clinical reasoning process")
+    bias_reflection_points: List[str] = Field(..., description="Strengths identified in the reasoning process")
+    devils_advocate_challenge: List[str] = Field(..., description="Cognitive biases identified in the reasoning")
+    suggested_next_reflective_action: List[str] = Field(..., description="Areas where reasoning could be improved")
+
+@router.post(
+    "/provide-self-reflection-feedback",
+    response_model=SelfReflectionFeedbackOutputModel,
+    summary="Provide Self-Reflection Feedback",
+    description="Provides metacognitive analysis of clinical reasoning process to improve diagnostic thinking."
+)
+async def provide_self_reflection_feedback(payload: SelfReflectionReasoningInputModel):
+    try:
+        # Prepare BAML input for the ProvideSelfReflectionFeedback function
+        baml_input = {
+            "clinical_scenario": payload.case_context,
+            "user_hypothesis": payload.reasoning_process,  # Using reasoning_process as hypothesis
+            "user_reasoning_summary": payload.reasoning_process
+        }
+        
+        # Use the available function that's actually in our BAML file
+        bias_analysis = await b.ProvideSelfReflectionFeedback(baml_input)
+        
+        # Map the response to our output model
+        response = SelfReflectionFeedbackOutputModel(
+            identified_reasoning_pattern=getattr(bias_analysis, "identified_reasoning_pattern", "") or "",
+            bias_reflection_points=[str(point) for point in getattr(bias_analysis, "bias_reflection_points", []) or []],
+            devils_advocate_challenge=[getattr(bias_analysis, "devils_advocate_challenge", "") or ""],
+            suggested_next_reflective_action=[getattr(bias_analysis, "suggested_next_reflective_action", "") or ""]
+        )
+        
+        return response
+    except Exception as e:
+        logger.error(f"Error in assist_self_reflection_reasoning: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error analyzing clinical reasoning: {str(e)}")
 
 @router.post(
     "/generate-diagnostic-timeout",
@@ -814,6 +807,64 @@ async def generate_diagnostic_timeout(payload: DiagnosticTimeoutInputModel):
     except Exception as e:
         logger.error(f"Error in GenerateDiagnosticTimeout: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error calling BAML (GenerateDiagnosticTimeout): {str(e)}")
+
+async def _translate_generate_clinical_workflow_questions_output(response: ClinicalWorkflowQuestionsOutputModel, target_lang: str = "PT") -> ClinicalWorkflowQuestionsOutputModel:
+    """
+    Batch translates user-facing fields of the ClinicalWorkflowQuestionsOutputModel, including nested QuestionCategoryModel fields, to minimize DeepL API calls.
+    """
+    if not response:
+        return response
+    try:
+        translated_response = response.copy(deep=True)
+        # 1. Gather all translatable strings in order
+        texts_to_translate = []
+        lengths = []  # To reconstruct lists
+        # Question categories
+        for cat in response.question_categories:
+            texts_to_translate.append(cat.category_name or "")
+            lengths.append(('category_name', 1))
+            questions = cat.questions or []
+            texts_to_translate.extend(questions)
+            lengths.append(('questions', len(questions)))
+            texts_to_translate.append(cat.category_rationale or "")
+            lengths.append(('category_rationale', 1))
+        # Red flag questions
+        red_flag_questions = response.red_flag_questions or []
+        texts_to_translate.extend(red_flag_questions)
+        lengths.append(('red_flag_questions', len(red_flag_questions)))
+        # Overall rationale
+        texts_to_translate.append(response.overall_rationale or "")
+        lengths.append(('overall_rationale', 1))
+
+        # 2. Perform batch translation
+        translated_texts = await translate(texts_to_translate, target_lang=target_lang, field_name="clinical_workflow_questions_output")
+        ptr = 0
+        # 3. Map back to model
+        translated_categories = []
+        for cat in response.question_categories:
+            translated_cat = cat.copy(deep=True)
+            # category_name
+            translated_cat.category_name = translated_texts[ptr]
+            ptr += 1
+            # questions
+            n_q = len(cat.questions or [])
+            translated_cat.questions = translated_texts[ptr:ptr+n_q]
+            ptr += n_q
+            # category_rationale
+            translated_cat.category_rationale = translated_texts[ptr]
+            ptr += 1
+            translated_categories.append(translated_cat)
+        translated_response.question_categories = translated_categories
+        # red_flag_questions
+        n_rf = len(response.red_flag_questions or [])
+        translated_response.red_flag_questions = translated_texts[ptr:ptr+n_rf]
+        ptr += n_rf
+        # overall_rationale
+        translated_response.overall_rationale = translated_texts[ptr] if ptr < len(translated_texts) else response.overall_rationale
+        return translated_response
+    except Exception as e:
+        logger.error(f"Error translating ClinicalWorkflowQuestionsOutputModel: {str(e)}", exc_info=True)
+        return response
 
 # === TRANSLATED ENDPOINTS ===
 
@@ -887,139 +938,337 @@ async def _translate_expanded_ddx_output(output: ExpandedDdxOutputModel, target_
     return output
 
 async def _translate_problem_representation_feedback_output(response: ProblemRepresentationFeedbackOutputModel, target_lang: str) -> ProblemRepresentationFeedbackOutputModel:
-    """Translates user-facing fields of the ProblemRepresentationFeedbackOutputModel."""
+    """
+    Batch translates user-facing fields of the ProblemRepresentationFeedbackOutputModel to minimize API calls.
+    Uses BAML as primary translation service with DeepL fallback.
+    """
     if not response:
         return response
 
-    logger.info(f"🌐 Starting translation of ProblemRepresentationFeedbackOutputModel to {target_lang}")
-
-    # 1. Collect all text fields and lists of strings for batch translation
-    texts_to_translate = []
-    
-    # Handle single string fields
-    texts_to_translate.append(response.overall_assessment or "")
-    texts_to_translate.append(response.next_step_guidance or "")
-
-    # Handle lists of strings and keep track of their lengths
-    feedback_strengths = response.feedback_strengths or []
-    feedback_improvements = response.feedback_improvements or []
-    missing_elements = response.missing_elements or []
-    socratic_questions = response.socratic_questions or []
-
-    len_strengths = len(feedback_strengths)
-    len_improvements = len(feedback_improvements)
-    len_missing = len(missing_elements)
-    len_socratic = len(socratic_questions)
-
-    texts_to_translate.extend(feedback_strengths)
-    texts_to_translate.extend(feedback_improvements)
-    texts_to_translate.extend(missing_elements)
-    texts_to_translate.extend(socratic_questions)
-
-    # 2. Check if there's anything to translate
-    if not any(t.strip() for t in texts_to_translate if t):
-        logger.info("No text found to translate in ProblemRepresentationFeedbackOutputModel.")
+    logger.info(f"🌐 Starting batch translation of ProblemRepresentationFeedbackOutputModel to {target_lang}")
+    try:
+        texts_to_translate = []
+        # Collect all string and list fields in order
+        texts_to_translate.append(response.overall_assessment or "")
+        texts_to_translate.append(response.next_step_guidance or "")
+        feedback_strengths = response.feedback_strengths or []
+        feedback_improvements = response.feedback_improvements or []
+        missing_elements = response.missing_elements or []
+        socratic_questions = response.socratic_questions or []
+        texts_to_translate.extend(feedback_strengths)
+        texts_to_translate.extend(feedback_improvements)
+        texts_to_translate.extend(missing_elements)
+        texts_to_translate.extend(socratic_questions)
+        len_strengths = len(feedback_strengths)
+        len_improvements = len(feedback_improvements)
+        len_missing = len(missing_elements)
+        len_socratic = len(socratic_questions)
+        
+        if not any(t.strip() for t in texts_to_translate if t):
+            logger.info("No text found to translate in ProblemRepresentationFeedbackOutputModel.")
+            return response
+            
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            
+            # Verify we got the expected number of translations
+            if not translated_texts or len(translated_texts) != len(texts_to_translate):
+                logger.warning(f"Translation returned incomplete results: got {len(translated_texts) if translated_texts else 0} items, expected {len(texts_to_translate)}")
+                return response
+                
+        except Exception as e:
+            logger.error(f"Batch translation failed for ProblemRepresentationFeedbackOutputModel: {e}", exc_info=True)
+            return response
+            
+        ptr = 0
+        translated_overall_assessment = translated_texts[ptr]; ptr += 1
+        translated_next_step_guidance = translated_texts[ptr]; ptr += 1
+        translated_strengths = translated_texts[ptr : ptr + len_strengths]; ptr += len_strengths
+        translated_improvements = translated_texts[ptr : ptr + len_improvements]; ptr += len_improvements
+        translated_missing = translated_texts[ptr : ptr + len_missing]; ptr += len_missing
+        translated_socratic = translated_texts[ptr : ptr + len_socratic]
+        
+        # Verify translation was successful
+        if translated_overall_assessment == response.overall_assessment and target_lang == "PT":
+            logger.warning("Translation may have failed - overall_assessment unchanged")
+            # Try direct translation of overall_assessment as fallback
+            try:
+                if response.overall_assessment:
+                    direct_translation = await translate(response.overall_assessment, target_lang=target_lang)
+                    if direct_translation and direct_translation != response.overall_assessment:
+                        translated_overall_assessment = direct_translation
+                        logger.info("Direct translation of overall_assessment succeeded as fallback")
+            except Exception as retry_error:
+                logger.error(f"Direct translation fallback also failed: {retry_error}")
+        
+        logger.info(f"✅ Problem representation feedback translation completed successfully")
+        
+        return ProblemRepresentationFeedbackOutputModel(
+            feedback_strengths=translated_strengths,
+            feedback_improvements=translated_improvements,
+            missing_elements=translated_missing,
+            overall_assessment=translated_overall_assessment,
+            next_step_guidance=translated_next_step_guidance,
+            socratic_questions=translated_socratic,
+        )
+    except Exception as e:
+        logger.error(f"Error batch translating ProblemRepresentationFeedbackOutputModel: {str(e)}", exc_info=True)
         return response
 
-    # 3. Perform the translation in a single batch call
-    try:
-        translated_texts = await translate(texts_to_translate, target_lang=target_lang)
-    except Exception as e:
-        logger.error(f"Batch translation failed for ProblemRepresentationFeedbackOutputModel: {e}", exc_info=True)
-        return response # Fallback to original on translation error
-
-    # 4. Create a new model with the translated texts
-    ptr = 0
-    translated_overall_assessment = translated_texts[ptr]; ptr += 1
-    translated_next_step_guidance = translated_texts[ptr]; ptr += 1
-    
-    translated_strengths = translated_texts[ptr : ptr + len_strengths]; ptr += len_strengths
-    translated_improvements = translated_texts[ptr : ptr + len_improvements]; ptr += len_improvements
-    translated_missing = translated_texts[ptr : ptr + len_missing]; ptr += len_missing
-    translated_socratic = translated_texts[ptr : ptr + len_socratic]
-
-    return ProblemRepresentationFeedbackOutputModel(
-        feedback_strengths=translated_strengths,
-        feedback_improvements=translated_improvements,
-        missing_elements=translated_missing,
-        overall_assessment=translated_overall_assessment,
-        next_step_guidance=translated_next_step_guidance,
-        socratic_questions=translated_socratic,
-    )
 
 async def _translate_illness_script_output(response: IllnessScriptOutputModel, target_lang: str) -> IllnessScriptOutputModel:
-    translated_response = response.copy(deep=True)
+    """
+    Batch translates user-facing fields of the IllnessScriptOutputModel to minimize API calls.
+    Uses BAML as primary translation service with DeepL fallback.
+    """
+    if not response:
+        return response
+        
+    logger.info(f"🌐 Starting batch translation of IllnessScriptOutputModel to {target_lang}")
     
-    # 1. Collect all text fields to be translated
-    texts_to_translate = [
-        response.disease_name or "",
-        response.pathophysiology_summary or "",
-    ]
+    # Maximum number of retry attempts
+    max_retries = 2
+    retry_delay = 1.0  # Initial delay in seconds
     
-    # Handle lists of strings
+    # Prepare the text to translate
+    texts_to_translate = []
+    texts_to_translate.append(response.disease_name or "")
+    texts_to_translate.append(response.pathophysiology_summary or "")
     predisposing_conditions = response.predisposing_conditions or []
     key_symptoms_and_signs = response.key_symptoms_and_signs or []
     relevant_diagnostics = response.relevant_diagnostics or []
-    
-    len_predisposing = len(predisposing_conditions)
     texts_to_translate.extend(predisposing_conditions)
-    
-    len_symptoms = len(key_symptoms_and_signs)
     texts_to_translate.extend(key_symptoms_and_signs)
-    
-    len_diagnostics = len(relevant_diagnostics)
     texts_to_translate.extend(relevant_diagnostics)
-
-    # 2. Check if there's anything to translate
+    
+    # Store lengths for reconstruction
+    len_predisposing = len(predisposing_conditions)
+    len_symptoms = len(key_symptoms_and_signs)
+    len_diagnostics = len(relevant_diagnostics)
+    
+    # Skip if no text to translate
     if not any(t.strip() for t in texts_to_translate if t):
         return response
-        
-    # 3. Perform the translation in a single batch call
-    translated_texts = await translate(texts_to_translate, target_lang=target_lang)
     
-    # 4. Re-assign the translated texts back to the model
-    ptr = 0
-    translated_response.disease_name = translated_texts[ptr]; ptr += 1
-    translated_response.pathophysiology_summary = translated_texts[ptr]; ptr += 1
+    # Attempt translation with retries
+    for attempt in range(max_retries + 1):
+        try:
+            # Add a small delay between retries to avoid rate limiting
+            if attempt > 0:
+                wait_time = min(retry_delay * (2 ** (attempt - 1)), 10)  # Exponential backoff, max 10s
+                logger.info(f"Retry attempt {attempt}/{max_retries} after {wait_time:.1f}s...")
+                await asyncio.sleep(wait_time)
+                
+            # Attempt the translation
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            
+            # If we get here, translation was successful
+            ptr = 0
+            disease_name = translated_texts[ptr]; ptr += 1
+            pathophysiology_summary = translated_texts[ptr]; ptr += 1
+            predisposing_conditions_trans = translated_texts[ptr:ptr+len_predisposing]; ptr += len_predisposing
+            key_symptoms_and_signs_trans = translated_texts[ptr:ptr+len_symptoms]; ptr += len_symptoms
+            relevant_diagnostics_trans = translated_texts[ptr:ptr+len_diagnostics]; ptr += len_diagnostics
+            
+            # Verify translation was successful by checking key fields
+            if disease_name == response.disease_name and target_lang == "PT":
+                logger.warning(f"Translation may have failed - disease_name unchanged on attempt {attempt+1}")
+                if attempt == max_retries:  # Last attempt
+                    logger.warning("Max retries reached with unsuccessful translation")
+                continue  # Try next attempt
+                
+            logger.info(f"✅ Illness script translation completed successfully on attempt {attempt+1}")
+            
+            return IllnessScriptOutputModel(
+                disease_name=disease_name,
+                pathophysiology_summary=pathophysiology_summary,
+                predisposing_conditions=predisposing_conditions_trans,
+                key_symptoms_and_signs=key_symptoms_and_signs_trans,
+                relevant_diagnostics=relevant_diagnostics_trans,
+            )
+            
+        except Exception as e:
+            # Log the error with attempt number
+            logger.warning(
+                f"Attempt {attempt + 1}/{max_retries + 1} failed for IllnessScriptOutputModel: {str(e)}",
+                exc_info=attempt == max_retries  # Only log full traceback on final attempt
+            )
+            
+            # If we've hit the max retries, return the original response
+            if attempt == max_retries:
+                logger.error("Max retries reached, returning original response without translation")
+                return response
     
-    translated_response.predisposing_conditions = translated_texts[ptr : ptr + len_predisposing]; ptr += len_predisposing
-    translated_response.key_symptoms_and_signs = translated_texts[ptr : ptr + len_symptoms]; ptr += len_symptoms
-    translated_response.relevant_diagnostics = translated_texts[ptr : ptr + len_diagnostics]
-    
-    return translated_response
+    # This should never be reached due to the return in the loop, but just in case
+    return response
 
 async def _translate_generate_lab_insights_output(response: DrCorvusLabInsightsOutput, target_lang: str = "PT") -> DrCorvusLabInsightsOutput:
     """
-    Translates user-facing fields of the IllnessScriptOutputModel.
+    Batch translates user-facing fields of the DrCorvusLabInsightsOutput to minimize API calls.
+    Uses BAML as primary translation service with DeepL fallback.
     """
     if not response:
         return response
+    logger.info(f"🌐 Starting batch translation of DrCorvusLabInsightsOutput to {target_lang}")
+    try:
+        output = response.copy(deep=True)
+        texts_to_translate = []
+        # Collect all string and list fields in order
+        texts_to_translate.append(output.patient_friendly_summary or "")
+        potential_health = output.potential_health_implications_patient or []
+        lifestyle_tips = output.lifestyle_tips_patient or []
+        key_abnormalities = output.key_abnormalities_professional or []
+        key_normal = output.key_normal_results_with_context or []
+        patterns = output.potential_patterns_and_correlations or []
+        differential = output.differential_considerations_professional or []
+        suggested_next = output.suggested_next_steps_professional or []
+        texts_to_translate.extend(potential_health)
+        texts_to_translate.extend(lifestyle_tips)
+        texts_to_translate.append(output.professional_detailed_reasoning_cot or "")
+        texts_to_translate.extend(key_abnormalities)
+        texts_to_translate.extend(key_normal)
+        texts_to_translate.extend(patterns)
+        texts_to_translate.extend(differential)
+        texts_to_translate.extend(suggested_next)
+        
+        # Track lengths for reconstruction
+        len_potential_health = len(potential_health)
+        len_lifestyle_tips = len(lifestyle_tips)
+        len_key_abnormalities = len(key_abnormalities)
+        len_key_normal = len(key_normal)
+        len_patterns = len(patterns)
+        len_differential = len(differential)
+        len_suggested_next = len(suggested_next)
+        
+        if not any(t.strip() for t in texts_to_translate if t):
+            return response
+            
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            
+            # Verify we got the expected number of translations
+            if not translated_texts or len(translated_texts) != len(texts_to_translate):
+                logger.warning(f"Translation returned incomplete results: got {len(translated_texts) if translated_texts else 0} items, expected {len(texts_to_translate)}")
+                return response
+                
+        except Exception as e:
+            logger.error(f"Batch translation failed for DrCorvusLabInsightsOutput: {e}", exc_info=True)
+            return response
+            
+        ptr = 0
+        patient_friendly_summary = translated_texts[ptr]; ptr += 1
+        potential_health_trans = translated_texts[ptr:ptr+len_potential_health]; ptr += len_potential_health
+        lifestyle_tips_trans = translated_texts[ptr:ptr+len_lifestyle_tips]; ptr += len_lifestyle_tips
+        professional_detailed_reasoning_cot = translated_texts[ptr]; ptr += 1
+        key_abnormalities_trans = translated_texts[ptr:ptr+len_key_abnormalities]; ptr += len_key_abnormalities
+        key_normal_trans = translated_texts[ptr:ptr+len_key_normal]; ptr += len_key_normal
+        patterns_trans = translated_texts[ptr:ptr+len_patterns]; ptr += len_patterns
+        differential_trans = translated_texts[ptr:ptr+len_differential]; ptr += len_differential
+        suggested_next_trans = translated_texts[ptr:ptr+len_suggested_next]; ptr += len_suggested_next
+        
+        # Verify translation was successful
+        if patient_friendly_summary == response.patient_friendly_summary and target_lang == "PT":
+            logger.warning("Translation may have failed - patient_friendly_summary unchanged")
+            # Try direct translation of patient_friendly_summary as fallback
+            try:
+                if response.patient_friendly_summary:
+                    direct_translation = await translate(response.patient_friendly_summary, target_lang=target_lang)
+                    if direct_translation and direct_translation != response.patient_friendly_summary:
+                        patient_friendly_summary = direct_translation
+                        logger.info("Direct translation of patient_friendly_summary succeeded as fallback")
+            except Exception as retry_error:
+                logger.error(f"Direct translation fallback also failed: {retry_error}")
+                
+        logger.info(f"✅ Lab insights translation completed successfully")
+        
+        return DrCorvusLabInsightsOutput(
+            patient_friendly_summary=patient_friendly_summary,
+            potential_health_implications_patient=potential_health_trans,
+            lifestyle_tips_patient=lifestyle_tips_trans,
+            professional_detailed_reasoning_cot=professional_detailed_reasoning_cot,
+            key_abnormalities_professional=key_abnormalities_trans,
+            key_normal_results_with_context=key_normal_trans,
+            potential_patterns_and_correlations=patterns_trans,
+            differential_considerations_professional=differential_trans,
+            suggested_next_steps_professional=suggested_next_trans,
+            important_results_to_discuss_with_doctor=output.important_results_to_discuss_with_doctor
+        )
+    except Exception as e:
+        logger.error(f"Error batch translating DrCorvusLabInsightsOutput: {str(e)}", exc_info=True)
+        return response
 
-    logger.info(f"🌐 Starting translation of IllnessScriptOutputModel to {target_lang}")
-
-    output.disease_name = await _translate_field(output.disease_name, target_lang, "disease_name")
-    output.predisposing_conditions = await _translate_field(output.predisposing_conditions, target_lang, "predisposing_conditions")
-    output.pathophysiology_summary = await _translate_field(output.pathophysiology_summary, target_lang, "pathophysiology_summary")
-    output.key_symptoms_and_signs = await _translate_field(output.key_symptoms_and_signs, target_lang, "key_symptoms_and_signs")
-    output.relevant_diagnostics = await _translate_field(output.relevant_diagnostics, target_lang, "relevant_diagnostics")
-
-    return output
 
 async def _translate_compare_contrast_output(output: CompareContrastFeedbackOutputModel, target_lang="PT") -> CompareContrastFeedbackOutputModel:
     """
-    Translates user-facing fields of the CompareContrastFeedbackOutputModel.
+    Batch translates user-facing fields of the CompareContrastFeedbackOutputModel to minimize DeepL API calls.
     """
     if not output:
         return output
 
-    logger.info(f"🌐 Starting translation of CompareContrastFeedbackOutputModel to {target_lang}")
+    logger.info(f"🌐 Starting batch translation of CompareContrastFeedbackOutputModel to {target_lang}")
+    try:
+        translated_output = output.copy(deep=True)
+        texts_to_translate = []
+        # Track lengths for reconstruction
+        # Top-level fields
+        texts_to_translate.append(output.overall_feedback or "")
+        texts_to_translate.append(output.suggested_learning_focus or "")
+        # detailed_feedback_per_hypothesis
+        detailed = output.detailed_feedback_per_hypothesis or []
+        n_hypotheses = len(detailed)
+        # Each HypothesisComparisonFeedbackModel has:
+        # hypothesis_name (str), feedback_on_supporting_findings (str), feedback_on_refuting_findings (str), feedback_on_discriminators (str), expert_comparison_points (List[str])
+        for item in detailed:
+            texts_to_translate.append(item.hypothesis_name or "")
+            texts_to_translate.append(item.feedback_on_supporting_findings or "")
+            texts_to_translate.append(item.feedback_on_refuting_findings or "")
+            texts_to_translate.append(item.feedback_on_discriminators or "")
+            # expert_comparison_points is a list
+            if item.expert_comparison_points:
+                texts_to_translate.extend(item.expert_comparison_points)
+            else:
+                # Always extend with empty list to preserve order
+                pass
+        # For reconstructing expert_comparison_points
+        expert_points_lens = [len(item.expert_comparison_points or []) for item in detailed]
+        if not any(t.strip() for t in texts_to_translate if t):
+            return output
+        # Batch translate
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+        except Exception as e:
+            logger.error(f"Batch translation failed for CompareContrastFeedbackOutputModel: {e}", exc_info=True)
+            return output
+        # Rebuild output
+        ptr = 0
+        translated_overall_feedback = translated_texts[ptr]; ptr += 1
+        translated_suggested_learning_focus = translated_texts[ptr]; ptr += 1
+        translated_details = []
+        for idx, item in enumerate(detailed):
+            hypothesis_name = translated_texts[ptr]; ptr += 1
+            feedback_on_supporting_findings = translated_texts[ptr]; ptr += 1
+            feedback_on_refuting_findings = translated_texts[ptr]; ptr += 1
+            feedback_on_discriminators = translated_texts[ptr]; ptr += 1
+            n_expert = expert_points_lens[idx]
+            expert_comparison_points = translated_texts[ptr:ptr+n_expert] if n_expert > 0 else []
+            ptr += n_expert
+            translated_details.append(
+                type(item)(
+                    hypothesis_name=hypothesis_name,
+                    feedback_on_supporting_findings=feedback_on_supporting_findings,
+                    feedback_on_refuting_findings=feedback_on_refuting_findings,
+                    feedback_on_discriminators=feedback_on_discriminators,
+                    expert_comparison_points=expert_comparison_points
+                )
+            )
+        translated_output.overall_feedback = translated_overall_feedback
+        translated_output.suggested_learning_focus = translated_suggested_learning_focus
+        translated_output.detailed_feedback_per_hypothesis = translated_details
+        return translated_output
+    except Exception as e:
+        logger.error(f"Error batch translating CompareContrastFeedbackOutputModel: {str(e)}", exc_info=True)
+        return output
 
-    output.feedback_on_strengths = await _translate_field(output.feedback_on_strengths, target_lang, "feedback_on_strengths")
-    output.feedback_on_weaknesses = await _translate_field(output.feedback_on_weaknesses, target_lang, "feedback_on_weaknesses")
-    output.suggestions_for_improvement = await _translate_field(output.suggestions_for_improvement, target_lang, "suggestions_for_improvement")
-    output.expert_comparison_and_reasoning = await _translate_field(output.expert_comparison_and_reasoning, target_lang, "expert_comparison_and_reasoning")
-
-    return output
 
 @router.post(
     "/expand-differential-diagnosis-translated",
@@ -1112,28 +1361,6 @@ async def provide_feedback_on_problem_representation_translated(payload: Problem
         raise HTTPException(status_code=500, detail=f"Error processing translated provide feedback on problem representation request: {str(e)}")
 
 @router.post(
-    "/generate-illness-script-translated",
-    response_model=IllnessScriptOutputModel,
-    summary="[PT] Generate Illness Script",
-    description="Generates a structured illness script for a given disease, returning the result in Portuguese."
-)
-async def generate_illness_script_translated(payload: IllnessScriptInputModel):
-    try:
-        # Call the original English endpoint
-        original_response = await generate_illness_script(payload)
-        
-        # Translate the response
-        translated_response = await _translate_illness_script_output(original_response, target_lang="PT")
-        
-        return translated_response
-    except HTTPException as he:
-        # Re-raise HTTP exceptions from the original endpoint
-        raise he
-    except Exception as e:
-        logger.error(f"Error in translated generate_illness_script endpoint: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing translated illness script request: {str(e)}")    
-
-@router.post(
     "/assist-identifying-cognitive-biases-scenario-translated",
     response_model=CognitiveBiasCaseAnalysisOutputModel,
     summary="[PT] Assist Identifying Cognitive Biases Scenario",
@@ -1155,20 +1382,91 @@ async def assist_identifying_cognitive_biases_scenario_translated(payload: Cogni
         logger.error(f"Error in translated assist_identifying_cognitive_biases_scenario endpoint: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error processing translated assist identifying cognitive biases scenario request: {str(e)}")
 
+# Translation helper for teach question prioritization output
+async def _translate_teach_question_prioritization_output(response: TeachQuestionPrioritizationOutputModel, target_lang: str = "PT") -> TeachQuestionPrioritizationOutputModel:
+    """
+    Batch translates user-facing fields of the TeachQuestionPrioritizationOutputModel to minimize DeepL API calls.
+    """
+    if not response:
+        return response
+    try:
+        translated_response = response.copy(deep=True)
+        # 1. Gather all translatable strings in order
+        texts_to_translate = []
+        len_prioritized = len(response.prioritized_questions or [])
+        len_complementary = len(response.complementary_questions or [])
+        len_systems = len(response.potential_systems_to_explore or [])
+        
+        # Add in order
+        texts_to_translate.extend(response.prioritized_questions or [])
+        texts_to_translate.extend(response.complementary_questions or [])
+        texts_to_translate.append(response.questioning_rationale or "")
+        texts_to_translate.extend(response.potential_systems_to_explore or [])
+        
+        if not any(t.strip() for t in texts_to_translate if t):
+            return response
+        
+        # 2. Batch translate
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+        except Exception as e:
+            logger.error(f"Batch translation failed for TeachQuestionPrioritizationOutputModel: {e}", exc_info=True)
+            return response
+        
+        # 3. Map translated results back
+        ptr = 0
+        translated_prioritized = translated_texts[ptr:ptr+len_prioritized]; ptr += len_prioritized
+        translated_complementary = translated_texts[ptr:ptr+len_complementary]; ptr += len_complementary
+        translated_rationale = translated_texts[ptr] if ptr < len(translated_texts) else response.questioning_rationale; ptr += 1
+        translated_systems = translated_texts[ptr:ptr+len_systems]
+        
+        return TeachQuestionPrioritizationOutputModel(
+            prioritized_questions=translated_prioritized,
+            complementary_questions=translated_complementary,
+            questioning_rationale=translated_rationale,
+            potential_systems_to_explore=translated_systems
+        )
+    except Exception as e:
+        logger.error(f"Error translating TeachQuestionPrioritizationOutputModel: {str(e)}", exc_info=True)
+        return response
+
 # Translation helper function for cognitive bias scenario output
 async def _translate_assist_identifying_cognitive_biases_scenario_output(response: CognitiveBiasCaseAnalysisOutputModel, target_lang: str) -> CognitiveBiasCaseAnalysisOutputModel:
-    """Translate cognitive bias scenario output to the target language"""
+    """
+    Batch translates user-facing fields of the CognitiveBiasCaseAnalysisOutputModel to minimize DeepL API calls.
+    """
+    if not response:
+        return response
     try:
-        # Translate detected biases
+        texts_to_translate = []
+        detected_biases = response.detected_biases or []
+        # Flatten all fields in all biases
+        for bias in detected_biases:
+            texts_to_translate.append(bias.bias_name or "")
+            texts_to_translate.append(bias.description or "")
+            texts_to_translate.append(bias.evidence_in_scenario or "")
+            texts_to_translate.append(bias.potential_impact or "")
+            texts_to_translate.append(bias.mitigation_strategy or "")
+        # Top-level strings
+        texts_to_translate.append(response.overall_analysis or "")
+        texts_to_translate.append(response.educational_insights or "")
+        texts_to_translate.append(response.disclaimer or "")
+        n_biases = len(detected_biases)
+        if not any(t.strip() for t in texts_to_translate if t):
+            return response
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+        except Exception as e:
+            logger.error(f"Batch translation failed for CognitiveBiasCaseAnalysisOutputModel: {e}", exc_info=True)
+            return response
+        ptr = 0
         translated_biases = []
-        for bias in response.detected_biases:
-            # Translate each field in the bias
-            bias_name = await translate(bias.bias_name, target_lang=target_lang, field_name="bias_name")
-            description = await translate(bias.description, target_lang=target_lang, field_name="description")
-            evidence = await translate(bias.evidence_in_scenario, target_lang=target_lang, field_name="evidence_in_scenario")
-            impact = await translate(bias.potential_impact, target_lang=target_lang, field_name="potential_impact")
-            mitigation = await translate(bias.mitigation_strategy, target_lang=target_lang, field_name="mitigation_strategy")
-            
+        for _ in range(n_biases):
+            bias_name = translated_texts[ptr]; ptr += 1
+            description = translated_texts[ptr]; ptr += 1
+            evidence = translated_texts[ptr]; ptr += 1
+            impact = translated_texts[ptr]; ptr += 1
+            mitigation = translated_texts[ptr]; ptr += 1
             translated_biases.append(DetectedCognitiveBiasModel(
                 bias_name=bias_name,
                 description=description,
@@ -1176,13 +1474,9 @@ async def _translate_assist_identifying_cognitive_biases_scenario_output(respons
                 potential_impact=impact,
                 mitigation_strategy=mitigation
             ))
-        
-        # Translate string fields
-        overall_analysis = await translate(response.overall_analysis, target_lang=target_lang, field_name="overall_analysis")
-        educational_insights = await translate(response.educational_insights, target_lang=target_lang, field_name="educational_insights")
-        disclaimer = await translate(response.disclaimer, target_lang=target_lang, field_name="disclaimer")
-        
-        # Return translated model
+        overall_analysis = translated_texts[ptr]; ptr += 1
+        educational_insights = translated_texts[ptr]; ptr += 1
+        disclaimer = translated_texts[ptr]
         return CognitiveBiasCaseAnalysisOutputModel(
             detected_biases=translated_biases,
             overall_analysis=overall_analysis,
@@ -1190,8 +1484,9 @@ async def _translate_assist_identifying_cognitive_biases_scenario_output(respons
             disclaimer=disclaimer
         )
     except Exception as e:
-        logger.error(f"Error translating cognitive bias scenario output: {str(e)}", exc_info=True)
-        raise e
+        logger.error(f"Error batch translating CognitiveBiasCaseAnalysisOutputModel: {str(e)}", exc_info=True)
+        return response
+
     
 @router.post(
     "/critique-reasoning-path-translated",
@@ -1238,115 +1533,122 @@ async def generate_diagnostic_timeout_translated(payload: DiagnosticTimeoutInput
 
 # Translation helper function for diagnostic timeout output
 async def _translate_generate_diagnostic_timeout_output(response: DiagnosticTimeoutOutputModel, target_lang: str) -> DiagnosticTimeoutOutputModel:
-    """Translate diagnostic timeout output to the target language"""
+    """
+    Batch translates user-facing fields of the DiagnosticTimeoutOutputModel to minimize DeepL API calls.
+    """
+    if not response:
+        return response
     try:
-        # Translate list fields
-        alternative_diagnoses = await translate(response.alternative_diagnoses_to_consider, target_lang=target_lang, field_name="alternative_diagnoses_to_consider")
-        key_questions = await translate(response.key_questions_to_ask, target_lang=target_lang, field_name="key_questions_to_ask")
-        red_flags = await translate(response.red_flags_to_check, target_lang=target_lang, field_name="red_flags_to_check")
-        next_steps = await translate(response.next_steps_suggested, target_lang=target_lang, field_name="next_steps_suggested")
-        cognitive_checks = await translate(response.cognitive_checks, target_lang=target_lang, field_name="cognitive_checks")
-        
-        # Translate string fields
-        timeout_recommendation = await translate(response.timeout_recommendation, target_lang=target_lang, field_name="timeout_recommendation")
-        
-        # Return translated model
+        texts_to_translate = []
+        texts_to_translate.append(response.timeout_recommendation or "")
+        alternative_diagnoses = response.alternative_diagnoses_to_consider or []
+        texts_to_translate.extend(alternative_diagnoses)
+        key_questions = response.key_questions_to_ask or []
+        texts_to_translate.extend(key_questions)
+        red_flags = response.red_flags_to_check or []
+        texts_to_translate.extend(red_flags)
+        next_steps = response.next_steps_suggested or []
+        texts_to_translate.extend(next_steps)
+        cognitive_checks = response.cognitive_checks or []
+        texts_to_translate.extend(cognitive_checks)
+        len_alternative = len(alternative_diagnoses)
+        len_key_questions = len(key_questions)
+        len_red_flags = len(red_flags)
+        len_next_steps = len(next_steps)
+        len_cognitive_checks = len(cognitive_checks)
+        if not any(t.strip() for t in texts_to_translate if t):
+            return response
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+        except Exception as e:
+            logger.error(f"Batch translation failed for DiagnosticTimeoutOutputModel: {e}", exc_info=True)
+            return response
+        ptr = 0
+        timeout_recommendation = translated_texts[ptr]; ptr += 1
+        alternative_diagnoses_trans = translated_texts[ptr:ptr+len_alternative]; ptr += len_alternative
+        key_questions_trans = translated_texts[ptr:ptr+len_key_questions]; ptr += len_key_questions
+        red_flags_trans = translated_texts[ptr:ptr+len_red_flags]; ptr += len_red_flags
+        next_steps_trans = translated_texts[ptr:ptr+len_next_steps]; ptr += len_next_steps
+        cognitive_checks_trans = translated_texts[ptr:ptr+len_cognitive_checks]; ptr += len_cognitive_checks
         return DiagnosticTimeoutOutputModel(
             timeout_recommendation=timeout_recommendation,
-            alternative_diagnoses_to_consider=alternative_diagnoses,
-            key_questions_to_ask=key_questions,
-            red_flags_to_check=red_flags,
-            next_steps_suggested=next_steps,
-            cognitive_checks=cognitive_checks
+            alternative_diagnoses_to_consider=alternative_diagnoses_trans,
+            key_questions_to_ask=key_questions_trans,
+            red_flags_to_check=red_flags_trans,
+            next_steps_suggested=next_steps_trans,
+            cognitive_checks=cognitive_checks_trans
         )
     except Exception as e:
-        logger.error(f"Error translating diagnostic timeout output: {str(e)}", exc_info=True)
-        raise e
-
-@router.post(
-    "/assist-self-reflection-reasoning",
-    response_model=SelfReflectionReasoningOutputModel,
-    summary="Assist Self-Reflection Reasoning",
-    description="Provides metacognitive analysis of clinical reasoning process to improve diagnostic thinking."
-)
-async def assist_self_reflection_reasoning(payload: SelfReflectionReasoningInputModel):
-    try:
-        # Prepare BAML input
-        baml_input = {
-            "case_context": payload.case_context,
-            "reasoning_process": payload.reasoning_process,
-            "identified_bias": payload.identified_bias if payload.identified_bias else ""
-        }
-        
-        # Call BAML function
-        baml_response = await b.ClinicalAssistant.analyze_clinical_reasoning_metacognition(baml_input)
-        
-        # Map BAML response to our output model
-        response = SelfReflectionReasoningOutputModel(
-            metacognitive_analysis=baml_response.metacognitive_analysis,
-            reasoning_strengths=baml_response.reasoning_strengths,
-            cognitive_biases_identified=baml_response.cognitive_biases_identified,
-            areas_for_improvement=baml_response.areas_for_improvement,
-            specific_recommendations=baml_response.specific_recommendations,
-            self_correction_strategies=baml_response.self_correction_strategies,
-            disclaimer=baml_response.disclaimer
-        )
-        
+        logger.error(f"Error batch translating DiagnosticTimeoutOutputModel: {str(e)}", exc_info=True)
         return response
-    except Exception as e:
-        logger.error(f"Error in assist_self_reflection_reasoning: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error analyzing clinical reasoning: {str(e)}")
 
 @router.post(
-    "/assist-self-reflection-reasoning-translated",
-    response_model=SelfReflectionReasoningOutputModel,
-    summary="[PT] Assist Self-Reflection Reasoning",
+    "/provide-self-reflection-feedback-translated", 
+    response_model=SelfReflectionFeedbackOutputModel,
+    summary="[PT] Provide Self-Reflection Feedback",    
     description="Provides metacognitive analysis of clinical reasoning process in Portuguese."
 )
-async def assist_self_reflection_reasoning_translated(payload: SelfReflectionReasoningInputModel):
+async def provide_self_reflection_feedback_translated(payload: SelfReflectionReasoningInputModel):
     try:
         # Call the original English endpoint
-        original_response = await assist_self_reflection_reasoning(payload)
+        original_response = await provide_self_reflection_feedback(payload)
         
         # Translate the response
-        translated_response = await _translate_assist_self_reflection_reasoning_output(original_response, target_lang="PT")
+        translated_response = await _translate_provide_self_reflection_feedback_output(original_response, target_lang="PT")
         
         return translated_response
     except HTTPException as he:
         # Re-raise HTTP exceptions from the original endpoint
         raise he
     except Exception as e:
-        logger.error(f"Error in translated assist_self_reflection_reasoning endpoint: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error processing translated self-reflection reasoning request: {str(e)}")
+        logger.error(f"Error in translated provide_self_reflection_feedback endpoint: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error processing translated self-reflection feedback request: {str(e)}")
 
 # Translation helper function for self-reflection reasoning output
-async def _translate_assist_self_reflection_reasoning_output(response: SelfReflectionReasoningOutputModel, target_lang: str) -> SelfReflectionReasoningOutputModel:
-    """Translate self-reflection reasoning output to the target language"""
+async def _translate_provide_self_reflection_feedback_output(response: SelfReflectionFeedbackOutputModel, target_lang: str) -> SelfReflectionFeedbackOutputModel:
+    """
+    Batch translates user-facing fields of the SelfReflectionFeedbackOutputModel to minimize API calls.
+    Now uses BAML as primary translation service.
+    """
+    if not response:
+        return response
     try:
-        # Translate list fields
-        reasoning_strengths = await translate(response.reasoning_strengths, target_lang=target_lang, field_name="reasoning_strengths")
-        cognitive_biases = await translate(response.cognitive_biases_identified, target_lang=target_lang, field_name="cognitive_biases_identified")
-        areas_for_improvement = await translate(response.areas_for_improvement, target_lang=target_lang, field_name="areas_for_improvement")
-        specific_recommendations = await translate(response.specific_recommendations, target_lang=target_lang, field_name="specific_recommendations")
-        self_correction_strategies = await translate(response.self_correction_strategies, target_lang=target_lang, field_name="self_correction_strategies")
-        
-        # Translate string fields
-        metacognitive_analysis = await translate(response.metacognitive_analysis, target_lang=target_lang, field_name="metacognitive_analysis")
-        disclaimer = await translate(response.disclaimer, target_lang=target_lang, field_name="disclaimer")
-        
-        # Return translated model
-        return SelfReflectionReasoningOutputModel(
-            metacognitive_analysis=metacognitive_analysis,
-            reasoning_strengths=reasoning_strengths,
-            cognitive_biases_identified=cognitive_biases,
-            areas_for_improvement=areas_for_improvement,
-            specific_recommendations=specific_recommendations,
-            self_correction_strategies=self_correction_strategies,
-            disclaimer=disclaimer
+        texts_to_translate = []
+        texts_to_translate.append(response.identified_reasoning_pattern or "")
+        bias_reflection_points = response.bias_reflection_points or []
+        texts_to_translate.extend(bias_reflection_points)
+        devils_advocate_challenge = response.devils_advocate_challenge or []
+        texts_to_translate.extend(devils_advocate_challenge)
+        suggested_next_reflective_action = response.suggested_next_reflective_action or []
+        texts_to_translate.extend(suggested_next_reflective_action)
+        len_bias_reflection_points = len(bias_reflection_points)
+        len_devils_advocate_challenge = len(devils_advocate_challenge)
+        len_suggested_next_reflective_action = len(suggested_next_reflective_action)
+        if not any(t.strip() for t in texts_to_translate if t):
+            return response
+        try:
+            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            if not translated_texts:
+                logger.warning("Translation returned empty results for SelfReflectionFeedbackOutputModel")
+                return response
+        except Exception as e:
+            logger.error(f"Batch translation failed for SelfReflectionReasoningOutputModel: {e}", exc_info=True)
+            return response
+        ptr = 0
+        identified_reasoning_pattern = translated_texts[ptr]; ptr += 1
+        bias_reflection_points_trans = translated_texts[ptr:ptr+len_bias_reflection_points]; ptr += len_bias_reflection_points
+        devils_advocate_challenge_trans = translated_texts[ptr:ptr+len_devils_advocate_challenge]; ptr += len_devils_advocate_challenge
+        suggested_next_reflective_action_trans = translated_texts[ptr:ptr+len_suggested_next_reflective_action]; ptr += len_suggested_next_reflective_action
+        return SelfReflectionFeedbackOutputModel(
+            identified_reasoning_pattern=identified_reasoning_pattern,
+            bias_reflection_points=bias_reflection_points_trans,
+            devils_advocate_challenge=devils_advocate_challenge_trans,
+            suggested_next_reflective_action=suggested_next_reflective_action_trans,
         )
     except Exception as e:
-        logger.error(f"Error translating self-reflection reasoning output: {str(e)}", exc_info=True)
-        raise e
+        logger.error(f"Error batch translating SelfReflectionReasoningOutputModel: {str(e)}", exc_info=True)
+        return response
+
 
 @router.post(
     "/generate-lab-insights-translated",
@@ -1380,6 +1682,7 @@ async def explain_medical_concept_patient_translated(payload: PatientExplanation
         original_response = await explain_medical_concept_patient(payload)
         
         # Translate the response
+        
         translated_response = await _translate_explain_medical_concept_patient_output(original_response, target_lang="PT")
         
         return translated_response

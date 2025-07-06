@@ -34,6 +34,7 @@ import {
   Globe
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip';
+import ReactMarkdown from "react-markdown";
 
 // Interfaces para tipos de dados
 // MIGRATION NOTE: Backend now returns 'structured_pico_question' (not 'pico_components')
@@ -403,7 +404,7 @@ export default function PICOFormulationComponent({
             {results && !isLoading && (
               <Button 
                 type="button" 
-                variant="outline" 
+                variant="default" 
                 onClick={handleTransferToResearch}
                 className="flex items-center border-[#44154a] text-[#44154a] hover:bg-[#44154a] hover:text-white"
               >
@@ -457,9 +458,6 @@ export default function PICOFormulationComponent({
                     <Copy className="h-4 w-4" />
                   </Button>
                 </div>
-                <p className="text-sm text-green-700 leading-relaxed font-medium">
-                  "{results.structured_question}"
-                </p>
               </div>
 
               {/* Componentes PICO Detalhados - MIGRATION: use structured_pico_question */}
@@ -520,7 +518,9 @@ export default function PICOFormulationComponent({
                   <MessageSquare className="h-5 w-5 text-blue-600 mr-2" />
                   <h4 className="font-semibold text-blue-800">Raciocínio Detalhado (Chain-of-Thought)</h4>
                 </div>
-                <p className="text-sm text-blue-700 leading-relaxed">{results.pico_derivation_reasoning}</p>
+                <div className="text-sm text-blue-700 leading-relaxed">
+                  <ReactMarkdown>{results.pico_derivation_reasoning}</ReactMarkdown>
+                </div>
               </div>
 
               {/* Explicação da Formulação */}
@@ -529,7 +529,9 @@ export default function PICOFormulationComponent({
                   <Lightbulb className="h-5 w-5 text-blue-600 mr-2" />
                   <h4 className="font-semibold text-blue-800">Explicação da Formulação</h4>
                 </div>
-                <p className="text-sm text-blue-700 leading-relaxed">{results.explanation}</p>
+                <div className="text-sm text-blue-700 leading-relaxed">
+                  <ReactMarkdown>{results.explanation}</ReactMarkdown>
+                </div>
               </div>
 
               {/* Estratégia de Busca */}
@@ -581,7 +583,7 @@ export default function PICOFormulationComponent({
                 <Collapsible open={alternativesExpanded} onOpenChange={setAlternativesExpanded}>
                   <CollapsibleTrigger asChild>
                     <Button 
-                      variant="outline" 
+                      variant="default" 
                       className="w-full justify-between"
                     >
                       <span className="flex items-center">

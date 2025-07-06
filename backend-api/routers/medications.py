@@ -17,7 +17,6 @@ from routers.vital_signs import check_patient_access, check_modify_permission
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
-    prefix="/api",
     tags=["Medications"]
 )
 

@@ -61,6 +61,49 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
       setError(null);
     }
   };
+  
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleFileSelect(e);
+  };
+  
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Add visual feedback for drag over
+    const target = e.currentTarget;
+    target.classList.add('border-blue-500', 'bg-blue-50');
+  };
+  
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Remove visual feedback
+    const target = e.currentTarget;
+    target.classList.remove('border-blue-500', 'bg-blue-50');
+  };
+  
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Remove visual feedback
+    const target = e.currentTarget;
+    target.classList.remove('border-blue-500', 'bg-blue-50');
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type !== 'application/pdf') {
+        setError('Por favor, selecione apenas arquivos PDF.');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        setError('O arquivo deve ter no máximo 10MB.');
+        return;
+      }
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
@@ -84,6 +127,8 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     setIsLoading(true);
     setError(null);
     setResults(null);
@@ -91,7 +136,7 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
     if (!selectedFile) {
       setError('Por favor, selecione um arquivo PDF.');
       setIsLoading(false);
-      return;
+      return false;
     }
 
     try {
@@ -110,7 +155,7 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
         formData.append('clinical_question', clinicalQuestion);
       }
 
-      const response = await fetch('/api/research-assistant/analyze-pdf-translated', {
+      const response = await fetch('/api/research-assistant/analyze-pdf', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -155,29 +200,37 @@ export default function PDFAnalysisComponent({ className }: PDFAnalysisComponent
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSubmit(e);
+        }} className="space-y-6">
           <div 
-            className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-colors duration-200 bg-gray-50"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              const files = e.dataTransfer.files;
-              if (files && files.length > 0) {
-                handleFileSelect({ target: { files } } as any);
-              }
-            }}
+            className="relative flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 transition-all duration-200 bg-gray-50"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
           >
             <Upload className="w-10 h-10 text-gray-400 mb-2" />
-            <p className="text-sm text-gray-600">
-              <span 
-                className="font-semibold text-blue-600 cursor-pointer hover:underline"
-                onClick={() => fileInputRef.current?.click()}
-              >
+            <p className="text-sm text-gray-600 text-center">
+              <span className="font-semibold text-blue-600 hover:underline">
                 Clique para selecionar
-              </span> ou arraste e solte o arquivo PDF aqui.
+              </span>{' '}
+              <span className="text-gray-500">ou arraste e solte o arquivo PDF aqui.</span>
             </p>
             <p className="text-xs text-gray-500 mt-1">Tamanho máximo: 10MB</p>
-            <Input ref={fileInputRef} type="file" className="sr-only" accept=".pdf" onChange={handleFileSelect} id="pdf-upload"/>
+            <Input 
+              ref={fileInputRef} 
+              type="file" 
+              className="hidden" 
+              accept=".pdf" 
+              onChange={handleFileInputChange} 
+              id="pdf-upload"
+            />
           </div>
 
           {selectedFile && (

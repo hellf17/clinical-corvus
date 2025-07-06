@@ -476,7 +476,7 @@ export default function AnalysisPage() {
         lab_results: labResultsPayload
       };
 
-      const apiUrl = `${getAPIUrl()}/api/clinical-assistant/guest-analysis`; // TODO: implement the guest API in frontend and backend
+      const apiUrl = `${getAPIUrl()}/api/lab-analysis/guest`; // TODO: implement different endpoint for guest and logged in users  
 
       // Create FormData
       const formData = new FormData();
@@ -702,7 +702,7 @@ export default function AnalysisPage() {
         description: `Processando ${preparedLabResults.length} resultado(s)` 
       });
 
-      const response = await fetch('/api/clinical-assistant/insights-translated', {
+      const response = await fetch('/api/clinical-assistant/generate-lab-insights-translated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

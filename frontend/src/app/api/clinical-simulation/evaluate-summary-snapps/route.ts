@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/clinical-simulation/evaluate-summary-snapps`, {
+    const response = await fetch(`${apiUrl}/api/simulation/evaluate-summary-snapps`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

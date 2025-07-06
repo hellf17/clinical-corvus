@@ -82,12 +82,12 @@ interface SimulationContainerProps {
 }
 
 const snappsWorkflowSteps = [
-  { id: 'summary', title: 'S - Sumarizar', description: 'Resuma o caso clínico.', icon: Search },
-  { id: 'differentials', title: 'N - Afunilar DDx', description: 'Liste seus diagnósticos.', icon: Brain },
-  { id: 'analysis', title: 'A - Analisar DDx', description: 'Compare e contraste seu DDx.', icon: TrendingUp },
-  { id: 'probe', title: 'P - Sondar Preceptor', description: 'Faça perguntas ao preceptor.', icon: Library },
-  { id: 'plan', title: 'P - Planejar Manejo', description: 'Descreva seu plano.', icon: Target },
-  { id: 'learningTopic', title: 'S - Selecionar Tópico', description: 'Escolha um tópico para estudar.', icon: Library },
+  { id: 'summary', title: 'Sumarizar (S)', description: 'Resuma o caso clínico.', icon: Search },
+  { id: 'differentials', title: 'Afunilar DDx (N)', description: 'Liste seus diagnósticos.', icon: Brain },
+  { id: 'analysis', title: 'Analisar DDx (A)', description: 'Compare e contraste seu DDx.', icon: TrendingUp },
+  { id: 'probe', title: 'Sondar Preceptor (P)', description: 'Faça perguntas ao preceptor.', icon: Library },
+  { id: 'plan', title: 'Planejar Manejo (P)', description: 'Descreva seu plano.', icon: Target },
+  { id: 'learningTopic', title: 'Selecionar Tópico (S)', description: 'Escolha um tópico para estudar.', icon: Library },
 ];
 
 // Helper to format the final feedback object into a markdown string
@@ -173,7 +173,7 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
 
     try {
       const callSnappsApi = async (endpoint: string, payload: any) => {
-        const response = await fetch(`/api/clinical-assistant/${endpoint}`, {
+        const response = await fetch(`/api/clinical-simulation/${endpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -191,14 +191,10 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
 
       // Step 1: Summarize
       const summaryPayload = {
-        case_description: `${selectedCase.fullDescription} ${selectedCase.presentingHistory}`,
-        student_summary: snappsInputs.summary,
-        case_context: {
-          demographics: selectedCase.demographics,
-          chief_complaint: selectedCase.chiefComplaint,
-          physical_exam: selectedCase.physicalExam,
-          vital_signs: selectedCase.vitalSigns,
-        },
+        summary: snappsInputs.summary,
+        case_context: selectedCase.presentingHistory
+          ? `${selectedCase.fullDescription} ${selectedCase.presentingHistory}`
+          : selectedCase.fullDescription,
       };
       accumulatedFeedback.summary = await callSnappsApi('evaluate-summary-snapps', summaryPayload);
       sessionContext.summary = snappsInputs.summary;
@@ -283,7 +279,7 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
                 <Button onClick={resetSimulation} variant="outline">
                     Reiniciar Simulação
                 </Button>
-                 <Button onClick={onExit} variant="secondary">
+                <Button onClick={onExit} variant="secondary">
                     Sair para Academia
                 </Button>
             </div>

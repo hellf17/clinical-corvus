@@ -55,6 +55,8 @@ export default function EvidenceAppraisalComponent({ className }: EvidenceApprai
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event bubbling
+    
     setIsLoading(true);
     setError(null);
     setResults(null);
@@ -77,7 +79,7 @@ export default function EvidenceAppraisalComponent({ className }: EvidenceApprai
         study_type_if_known: studyType || undefined
       };
 
-      const response = await fetch('/api/research-assistant/appraise-evidence', {
+      const response = await fetch('/api/research-assistant/appraise-evidence-translated', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,7 +143,7 @@ export default function EvidenceAppraisalComponent({ className }: EvidenceApprai
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
             {/* Pergunta clínica PICO */}
             <div>
               <label className="text-sm font-medium mb-2 block">

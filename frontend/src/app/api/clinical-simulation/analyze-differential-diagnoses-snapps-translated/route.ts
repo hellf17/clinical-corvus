@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/clinical-simulation/analyze-differential-diagnoses-snapps-translated`, {
+    const response = await fetch(`${apiUrl}/api/simulation/analyze-differential-diagnoses-snapps-translated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

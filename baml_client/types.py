@@ -40,6 +40,32 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 
 
 
+class AssessmentValue(str, Enum):
+    
+    POSITIVO = "POSITIVO"
+    NEUTRO = "NEUTRO"
+    NEGATIVO = "NEGATIVO"
+
+class GradeLevel(str, Enum):
+    
+    ALTA = "ALTA"
+    MODERADA = "MODERADA"
+    BAIXA = "BAIXA"
+    MUITO_BAIXA = "MUITO_BAIXA"
+
+class PossibleCognitiveBias(str, Enum):
+    
+    ANCHORING = "ANCHORING"
+    CONFIRMATION_BIAS = "CONFIRMATION_BIAS"
+    PREMATURE_CLOSURE = "PREMATURE_CLOSURE"
+    AVAILABILITY_HEURISTIC = "AVAILABILITY_HEURISTIC"
+    REPRESENTATIVENESS_HEURISTIC = "REPRESENTATIVENESS_HEURISTIC"
+
+class RecommendationStrength(str, Enum):
+    
+    FORTE = "FORTE"
+    FRACA = "FRACA"
+
 class ResearchSourceType(str, Enum):
     
     PUBMED = "PUBMED"
@@ -54,6 +80,18 @@ class ResearchSourceType(str, Enum):
     ACADEMIC_DATABASE_GENERAL = "ACADEMIC_DATABASE_GENERAL"
     GUIDELINE_RESOURCE = "GUIDELINE_RESOURCE"
     PREPRINT = "PREPRINT"
+
+class StudyDesignType(str, Enum):
+    
+    RCT = "RCT"
+    COHORT = "COHORT"
+    CASE_CONTROL = "CASE_CONTROL"
+    CROSS_SECTIONAL = "CROSS_SECTIONAL"
+    SYSTEMATIC_REVIEW = "SYSTEMATIC_REVIEW"
+    META_ANALYSIS = "META_ANALYSIS"
+    CASE_REPORT = "CASE_REPORT"
+    REVIEW_ARTICLE = "REVIEW_ARTICLE"
+    OTHER = "OTHER"
 
 class StudyTypeFilter(str, Enum):
     
@@ -96,11 +134,15 @@ class BenchmarkComparison(BaseModel):
     benchmark_insights: List[str]
     improvement_targets: List[str]
 
-class BiasAssessment(BaseModel):
-    bias_type: str
-    risk_level: str
-    explanation: str
-    mitigation_strategies: List[str]
+class BiasAnalysis(BaseModel):
+    selection_bias: str
+    performance_bias: str
+    reporting_bias: str
+    confirmation_bias: str
+
+class BiasReflectionPoint(BaseModel):
+    bias_type: "PossibleCognitiveBias"
+    reflection_question: str
 
 class CaseContext(BaseModel):
     demographics: str
@@ -161,14 +203,6 @@ class CiteSourceReportOutput(BaseModel):
     benchmark_comparison: "BenchmarkComparison"
     visual_data_summary: Optional["VisualDataSummary"] = None
     disclaimer: str
-
-class ClinicalApplicationAssessment(BaseModel):
-    clinical_relevance: str
-    patient_population_match: str
-    outcome_relevance: str
-    practical_feasibility: str
-    cost_effectiveness_considerations: Optional[str] = None
-    ethical_considerations: List[str]
 
 class ClinicalDataInput(BaseModel):
     patient_story: str
@@ -263,36 +297,6 @@ class DifferentialAnalysisOutputModel(BaseModel):
     socratic_questions: List[str]
     next_step_guidance: str
 
-class EnhancedAppraisalOutput(BaseModel):
-    identified_study_type: str
-    study_design_appropriateness: str
-    quality_assessment: "QualityAssessment"
-    methodological_strengths: List[str]
-    methodological_limitations: List[str]
-    bias_assessments: List["BiasAssessment"]
-    overall_bias_risk: str
-    statistical_assessment: "StatisticalAssessment"
-    clinical_application: "ClinicalApplicationAssessment"
-    pico_alignment_assessment: str
-    population_match_percentage: str
-    intervention_comparability: str
-    outcome_relevance_score: str
-    strength_of_recommendation: str
-    level_of_evidence: str
-    confidence_in_findings: str
-    recommendations_for_practice: List[str]
-    areas_requiring_more_research: List[str]
-    next_steps_for_evidence_evaluation: List[str]
-    key_clinical_considerations: List[str]
-    potential_harms_or_risks: List[str]
-    patient_preference_factors: List[str]
-    generalizability_assessment: str
-    external_validity_concerns: List[str]
-    study_limitations_impact: str
-    learning_points: List[str]
-    critical_appraisal_checklist: List[str]
-    evidence_synthesis_date: str
-
 class EvaluateManagementPlanSNAPPSInputModel(BaseModel):
     session_context: str
     student_plan: str
@@ -302,10 +306,24 @@ class EvaluateSummarySNAPPSInputModel(BaseModel):
     student_summary: str
     case_description: str
 
-class EvidenceAppraisalInput(BaseModel):
-    clinical_question_PICO: str
-    evidence_summary_or_abstract: str
-    study_type_if_known: Optional[str] = None
+class EvidenceAnalysisData(BaseModel):
+    study_objective: str
+    study_design: "StudyDesignType"
+    population: "PopulationInfo"
+    interventions: "InterventionInfo"
+    primary_outcomes: List[str]
+    key_results: List["KeyResult"]
+    authors_conclusions: List[str]
+    authors_acknowledged_limitations: List[str]
+
+class EvidenceAppraisalOutput(BaseModel):
+    overall_quality: "GradeLevel"
+    quality_reasoning: str
+    recommendation_strength: "RecommendationStrength"
+    strength_reasoning: str
+    quality_factors: List["QualityFactor"]
+    bias_analysis: "BiasAnalysis"
+    practice_recommendations: List[str]
 
 class EvidenceTheme(BaseModel):
     theme_name: str
@@ -362,6 +380,14 @@ class IllnessScriptOutput(BaseModel):
     key_symptoms_and_signs: List[str]
     relevant_diagnostics: Optional[List[str]] = None
 
+class InterventionInfo(BaseModel):
+    intervention_details: str
+    comparator_details: str
+
+class KeyResult(BaseModel):
+    finding_description: str
+    reported_values: str
+
 class LabAnalysisInput(BaseModel):
     lab_results: List["LabTestResult"]
     user_role: "UserRole"
@@ -372,7 +398,6 @@ class LabInsightsOutput(BaseModel):
     patient_friendly_summary: Optional[str] = None
     potential_health_implications_patient: Optional[List[str]] = None
     lifestyle_tips_patient: Optional[List[str]] = None
-    questions_to_ask_doctor_patient: Optional[List[str]] = None
     important_results_to_discuss_with_doctor: Optional[List[str]] = None
     professional_detailed_reasoning_cot: Optional[str] = None
     key_abnormalities_professional: Optional[List[str]] = None
@@ -441,6 +466,12 @@ class PlanEvaluationOutputModel(BaseModel):
     guidelines_alignment: str
     next_step_guidance: str
 
+class PopulationInfo(BaseModel):
+    sample_size: int
+    key_demographics: str
+    inclusion_criteria: List[str]
+    exclusion_criteria: List[str]
+
 class ProbeResponseOutputModel(BaseModel):
     answers_to_questions: List["AnsweredQuestion"]
     additional_considerations: List[str]
@@ -467,12 +498,10 @@ class ProvideSessionSummarySNAPPSInputModel(BaseModel):
     case_context: str
     student_selected_topic: Optional[str] = None
 
-class QualityAssessment(BaseModel):
-    overall_quality_grade: str
-    methodological_rigor_score: str
-    risk_of_bias_summary: str
-    applicability_concerns: List[str]
-    reporting_quality: str
+class QualityFactor(BaseModel):
+    factor_name: str
+    assessment: "AssessmentValue"
+    justification: str
 
 class QualityScores(BaseModel):
     overall_score: float
@@ -534,6 +563,17 @@ class SearchParameters(BaseModel):
     language_filter: Optional[str] = None
     rationale: Optional[str] = None
 
+class SelfReflectionFeedbackOutput(BaseModel):
+    identified_reasoning_pattern: str
+    bias_reflection_points: List["BiasReflectionPoint"]
+    devils_advocate_challenge: str
+    suggested_next_reflective_action: str
+
+class SelfReflectionInput(BaseModel):
+    clinical_scenario: str
+    user_hypothesis: str
+    user_reasoning_summary: str
+
 class SessionSummaryOutputModel(BaseModel):
     overall_performance: str
     key_strengths: List[str]
@@ -560,14 +600,6 @@ class SourcePerformanceMetrics(BaseModel):
     response_time_ms: float
     recent_publications_count: int
     high_impact_count: int
-
-class StatisticalAssessment(BaseModel):
-    sample_size_adequacy: str
-    statistical_methods_appropriateness: str
-    effect_size_interpretation: str
-    confidence_intervals_assessment: str
-    p_value_interpretation: str
-    multiple_comparisons_concern: Optional[str] = None
 
 class StructuredSummaryOutput(BaseModel):
     one_sentence_summary: str

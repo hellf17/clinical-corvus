@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/clinical-simulation/facilitate-ddx-analysis-snapps-translated`, {
+    const response = await fetch(`${apiUrl}/api/simulation/facilitate-ddx-analysis-snapps-translated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -13,9 +13,9 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     
-    const targetUrl = `${FASTAPI_URL}/api/deep-research/analyze-pdf-translated`; 
+    const targetUrl = `${FASTAPI_URL}/api/research/analyze-pdf-translated`; 
 
-    console.log(`Forwarding POST request from /api/research-assistant/analyze-pdf-translated to ${targetUrl}`);
+    console.log(`Forwarding POST request from /api/research/analyze-pdf-translated to ${targetUrl}`);
 
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',

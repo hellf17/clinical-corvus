@@ -6,6 +6,28 @@ Clinical Corvus is a digital platform for clinical data analysis, decision suppo
 
 **Current Status:** The platform is functional, featuring *patient management, contextual AI chat, clinical data visualizations, clinical notes with a rich text editor*, a fully modernized Analysis page (`/analysis`) with redesigned UI, complete interface translation to Portuguese, advanced Dr. Corvus Insights system, elegant loading states, and robust error handling for both PDF exam uploads and manual data entry with backend abnormality checks. The "Clinical Academy" section (`/academy`) for clinical reasoning training uses dedicated BAML functions, with ALL 15 educational APIs 100% translated to Portuguese, eliminating language barriers. The scientific research system (`/academy/evidence-based-medicine`) has been expanded with new sources (Europe PMC, Lens.org) and a powerful quality and deduplication analysis system (CiteSource), operating on a unified bibliometric API architecture that provides rich, detailed metrics. Modern technologies include Next.js App Router, Clerk, Shadcn/UI, FastAPI, and Docker. The system features advanced exam processing via PDF upload, automatic extraction and enrichment of lab results, and expanded graphical and tabular data visualizations. We are migrating internal AI frameworks (ElizaOS > Langroid, LlamaParse > Marker) and advancing the implementation of the AI core (KG, AL).
 
+## API Routing and Proxy Pattern
+
+### Backend Routing
+- All backend API endpoints are exposed under the `/api/*` prefix, with routers included in `main.py` (e.g., `/api/research`, `/api/clinical`).
+- No internal prefixes are set in router files; all prefixing is handled centrally in `main.py` for consistency.
+- Example backend endpoints:
+  - `/api/research/formulate-pico-translated`
+  - `/api/research/quick-search-translated`
+  - `/api/clinical/differential-diagnosis`
+
+### Frontend Proxy
+- All `/api/*` routes in the frontend act as proxies, forwarding requests to the backend at the same path.
+- No translation or business logic is handled in the frontend API routes; they only proxy requests and responses.
+- Example proxy route:
+  - `frontend/src/app/api/research-assistant/formulate-pico-translated/route.ts` → proxies to `/api/research/formulate-pico-translated` on the backend.
+
+### Routing Summary
+- This design eliminates route duplication and ensures seamless integration between frontend and backend.
+- For new endpoints, always add the router in `main.py` with the desired `/api/<domain>` prefix, and create a matching proxy route in the frontend if needed.
+
+---
+
 ## Implemented Features
 
 ### Authentication and User Management

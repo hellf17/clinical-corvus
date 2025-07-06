@@ -83,6 +83,29 @@ class HttpRequest:
         False,
       )
     
+    def AnalyzeMedicalPaper(
+        self,
+        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeMedicalPaper",
+        {
+          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def AnalyzePDFDocument(
         self,
         input: types.PDFAnalysisInput,
@@ -120,29 +143,6 @@ class HttpRequest:
 
       return self.__runtime.build_request_sync(
         "AnswerProbeQuestions_SNAPPS",
-        {
-          "input": input,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        False,
-      )
-    
-    def AssistEvidenceAppraisal(
-        self,
-        input: types.EvidenceAppraisalInput,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "AssistEvidenceAppraisal",
         {
           "input": input,
         },
@@ -428,6 +428,29 @@ class HttpRequest:
         False,
       )
     
+    def GenerateEvidenceAppraisal(
+        self,
+        extracted_data: types.EvidenceAnalysisData,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "GenerateEvidenceAppraisal",
+        {
+          "extracted_data": extracted_data,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def GenerateIllnessScript(
         self,
         input: types.IllnessScriptInput,
@@ -511,6 +534,29 @@ class HttpRequest:
 
       return self.__runtime.build_request_sync(
         "ProvideFeedbackOnProblemRepresentation",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        input: types.SelfReflectionInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ProvideSelfReflectionFeedback",
         {
           "input": input,
         },
@@ -784,6 +830,29 @@ class HttpStreamRequest:
         True,
       )
     
+    def AnalyzeMedicalPaper(
+        self,
+        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeMedicalPaper",
+        {
+          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def AnalyzePDFDocument(
         self,
         input: types.PDFAnalysisInput,
@@ -821,29 +890,6 @@ class HttpStreamRequest:
 
       return self.__runtime.build_request_sync(
         "AnswerProbeQuestions_SNAPPS",
-        {
-          "input": input,
-        },
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-        True,
-      )
-    
-    def AssistEvidenceAppraisal(
-        self,
-        input: types.EvidenceAppraisalInput,
-        baml_options: BamlCallOptions = {},
-    ) -> baml_py.HTTPRequest:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      return self.__runtime.build_request_sync(
-        "AssistEvidenceAppraisal",
         {
           "input": input,
         },
@@ -1129,6 +1175,29 @@ class HttpStreamRequest:
         True,
       )
     
+    def GenerateEvidenceAppraisal(
+        self,
+        extracted_data: types.EvidenceAnalysisData,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "GenerateEvidenceAppraisal",
+        {
+          "extracted_data": extracted_data,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def GenerateIllnessScript(
         self,
         input: types.IllnessScriptInput,
@@ -1212,6 +1281,29 @@ class HttpStreamRequest:
 
       return self.__runtime.build_request_sync(
         "ProvideFeedbackOnProblemRepresentation",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        input: types.SelfReflectionInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ProvideSelfReflectionFeedback",
         {
           "input": input,
         },

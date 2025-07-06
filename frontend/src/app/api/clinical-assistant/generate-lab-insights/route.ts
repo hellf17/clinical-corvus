@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     // Use the getAPIUrl function to determine the proper backend URL
     // This will return 'http://backend:8000' when running in serverless functions (Next.js API routes)
     const backendUrl = getAPIUrl();
-    const fastApiUrl = `${backendUrl}/api/clinical/generate-lab-insights`;
+    const fastApiUrl = `${backendUrl}/clinical/generate-lab-insights`;
     
     console.log(`API Route /api/clinical/generate-lab-insights: Forwarding request to FastAPI: ${fastApiUrl}`);
 

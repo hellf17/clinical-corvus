@@ -1,42 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-// Interfaces defining the data structure for PICO formulation requests and responses.
-// These ensure type safety and clarity for the API contract.
+// For server-to-server communication within Docker, use the service name.
+const BACKEND_API_URL = 'http://backend-api:8000';
 
-interface PICOFormulationInput {
-  clinical_question_description: string;
-  patient_population?: string;
-  clinical_context?: string;
-  research_question_type?: 'therapy' | 'diagnosis' | 'prognosis' | 'etiology' | 'prevention';
-  specific_concerns?: string[];
-}
-
-interface PICOComponent {
-  component_type: 'P' | 'I' | 'C' | 'O';
-  component_name: string;
-  component_description: string;
-  specific_terms: string[];
-  search_keywords: string[];
-}
-
-interface PICOFormulationOutput {
-  structured_pico_question: string;
-  pico_components: PICOComponent[];
-  search_strategy_recommendations: string;
-  potential_databases: string[];
-  keywords_and_mesh_terms: string[];
-  study_design_recommendations: string[];
-  educational_notes: string;
-  disclaimer: string;
-}
-
-/**
- * POST handler for formulating a PICO question. This endpoint is a proxy to the backend.
- */
-function getAPIUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-}
 
 export async function POST(request: NextRequest) {
   const { getToken } = await auth();
@@ -46,7 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const backendUrl = `${getAPIUrl()}/api/research/formulate-pico`;
+  const backendUrl = `${BACKEND_API_URL}/api/research/formulate-pico-translated`;
 
   try {
     const body = await request.json();

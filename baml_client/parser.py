@@ -89,6 +89,32 @@ class LlmResponseParser:
 
       return cast(types.DifferentialAnalysisOutputModel, parsed)
     
+    def AnalyzeMedicalPaper(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.EvidenceAnalysisData:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "AnalyzeMedicalPaper",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        False,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(types.EvidenceAnalysisData, parsed)
+    
     def AnalyzePDFDocument(
         self,
         llm_response: str,
@@ -140,32 +166,6 @@ class LlmResponseParser:
       )
 
       return cast(types.ProbeResponseOutputModel, parsed)
-    
-    def AssistEvidenceAppraisal(
-        self,
-        llm_response: str,
-        baml_options: BamlCallOptions = {},
-    ) -> types.EnhancedAppraisalOutput:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      parsed = self.__runtime.parse_llm_response(
-        "AssistEvidenceAppraisal",
-        llm_response,
-        types,
-        types,
-        partial_types,
-        False,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-      )
-
-      return cast(types.EnhancedAppraisalOutput, parsed)
     
     def AssistInIdentifyingCognitiveBiases(
         self,
@@ -479,6 +479,32 @@ class LlmResponseParser:
 
       return cast(types.LabInsightsOutput, parsed)
     
+    def GenerateEvidenceAppraisal(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.EvidenceAppraisalOutput:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "GenerateEvidenceAppraisal",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        False,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(types.EvidenceAppraisalOutput, parsed)
+    
     def GenerateIllnessScript(
         self,
         llm_response: str,
@@ -582,6 +608,32 @@ class LlmResponseParser:
       )
 
       return cast(types.ProblemRepresentationFeedbackOutputModel, parsed)
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.SelfReflectionFeedbackOutput:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "ProvideSelfReflectionFeedback",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        False,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(types.SelfReflectionFeedbackOutput, parsed)
     
     def ProvideSessionSummary_SNAPPS(
         self,
@@ -880,6 +932,32 @@ class LlmStreamParser:
 
       return cast(partial_types.DifferentialAnalysisOutputModel, parsed)
     
+    def AnalyzeMedicalPaper(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> partial_types.EvidenceAnalysisData:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "AnalyzeMedicalPaper",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        True,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(partial_types.EvidenceAnalysisData, parsed)
+    
     def AnalyzePDFDocument(
         self,
         llm_response: str,
@@ -931,32 +1009,6 @@ class LlmStreamParser:
       )
 
       return cast(partial_types.ProbeResponseOutputModel, parsed)
-    
-    def AssistEvidenceAppraisal(
-        self,
-        llm_response: str,
-        baml_options: BamlCallOptions = {},
-    ) -> partial_types.EnhancedAppraisalOutput:
-      __tb__ = baml_options.get("tb", None)
-      if __tb__ is not None:
-        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
-      else:
-        tb = None
-      __cr__ = baml_options.get("client_registry", None)
-
-      parsed = self.__runtime.parse_llm_response(
-        "AssistEvidenceAppraisal",
-        llm_response,
-        types,
-        types,
-        partial_types,
-        True,
-        self.__ctx_manager.get(),
-        tb,
-        __cr__,
-      )
-
-      return cast(partial_types.EnhancedAppraisalOutput, parsed)
     
     def AssistInIdentifyingCognitiveBiases(
         self,
@@ -1270,6 +1322,32 @@ class LlmStreamParser:
 
       return cast(partial_types.LabInsightsOutput, parsed)
     
+    def GenerateEvidenceAppraisal(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> partial_types.EvidenceAppraisalOutput:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "GenerateEvidenceAppraisal",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        True,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(partial_types.EvidenceAppraisalOutput, parsed)
+    
     def GenerateIllnessScript(
         self,
         llm_response: str,
@@ -1373,6 +1451,32 @@ class LlmStreamParser:
       )
 
       return cast(partial_types.ProblemRepresentationFeedbackOutputModel, parsed)
+    
+    def ProvideSelfReflectionFeedback(
+        self,
+        llm_response: str,
+        baml_options: BamlCallOptions = {},
+    ) -> partial_types.SelfReflectionFeedbackOutput:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      parsed = self.__runtime.parse_llm_response(
+        "ProvideSelfReflectionFeedback",
+        llm_response,
+        types,
+        types,
+        partial_types,
+        True,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+      )
+
+      return cast(partial_types.SelfReflectionFeedbackOutput, parsed)
     
     def ProvideSessionSummary_SNAPPS(
         self,

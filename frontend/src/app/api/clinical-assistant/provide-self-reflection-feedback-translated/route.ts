@@ -23,16 +23,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validar dados obrigatórios
-    if (!body.questions || !body.student_answers) {
+    if (!body.case_context || !body.reasoning_process) {
       return NextResponse.json(
-        { detail: 'Missing required fields: questions and student_answers' },
+        { detail: 'Missing required fields: case_context and reasoning_process' },
         { status: 400 }
       );
     }
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/simulation/answer-probe-questions-snapps`, {
+    const response = await fetch(`${apiUrl}/api/clinical/provide-self-reflection-feedback`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Error in answer probe questions SNAPPS API route:', error);
+    console.error('Error in provide self-reflection feedback translated API route:', error);
     return NextResponse.json(
       { detail: 'Internal server error' },
       { status: 500 }
     );
   }
-} 
+}

@@ -8,10 +8,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // O endpoint correto do FastAPI é /api/deep-research/quick-search
-    const targetUrl = `${BACKEND_API_URL}/api/deep-research/quick-search`; 
+    const targetUrl = `${BACKEND_API_URL}/api/research/quick-search`; 
 
-    console.log(`Forwarding POST request from /api/deep-research/quick-search to ${targetUrl}`);
+    console.log(`Forwarding POST request from /api/research/quick-search to ${targetUrl}`);
 
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',
@@ -32,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(responseData, { status: backendResponse.status });
   } catch (error: any) {
-    console.error('Error in Next.js API route /api/deep-research/quick-search:', error);
+    console.error('Error in Next.js API route /api/research-assistant/quick-search:', error);
     return NextResponse.json(
       { message: 'Internal Server Error in Next.js API proxy', details: error.message },
       { status: 500 }

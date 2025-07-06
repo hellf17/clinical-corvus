@@ -32,8 +32,8 @@ async def lifespan(app: FastAPI):
         await mcp_client_instance.close()
 
 app = FastAPI(
-    title="Clinical Helper API",
-    description="API for Clinical Helper application, managing patients, lab results, AI interactions, and clinical analyses.",
+    title="Clinical Corvus API",
+    description="API for Clinical Corvus application, managing patients, lab results, AI interactions, and clinical analyses.",
     version="0.1.0",
     lifespan=lifespan
 )
@@ -59,15 +59,15 @@ app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(stored_analyses.router, prefix="/api/stored-analyses", tags=["Stored Analyses"])  # CLEAR: CRUD for analyses
 app.include_router(vital_signs.router, prefix="/api/vital-signs", tags=["Vital Signs"])
 app.include_router(scores.router, prefix="/api/scores", tags=["Scores"])
-app.include_router(clinical_assistant.router, prefix="/api", tags=["Clinical Assistant"]) # Simplified prefix
-app.include_router(research_assistant_router.router, prefix="/api/deep-research", tags=["Deep Research"])
-app.include_router(translator_router.router, prefix="/api", tags=["Translation"])
-app.include_router(clinical_simulation_router.router, prefix="/api", tags=["Clinical Simulation"])
+app.include_router(clinical_assistant.router, prefix="/api/clinical", tags=["Clinical Assistant"]) # Simplified prefix
+app.include_router(research_assistant_router.router, prefix="/api/research", tags=["Research with Dr. Corvus"])
+app.include_router(translator_router.router, prefix="/api/translate", tags=["Translation"])
+app.include_router(clinical_simulation_router.router, prefix="/api/simulation", tags=["Clinical Simulation"])
 
 # Root endpoint
 @app.get("/", tags=["Root"])
 async def read_root():
-    return {"message": "Welcome to the Clinical Helper API"}
+    return {"message": "Welcome to the Clinical Corvus API"}
 
 # Health check endpoint
 @app.get("/health", tags=["Health Check"])
