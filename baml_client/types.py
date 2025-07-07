@@ -467,7 +467,7 @@ class PlanEvaluationOutputModel(BaseModel):
     next_step_guidance: str
 
 class PopulationInfo(BaseModel):
-    sample_size: int
+    sample_size: Optional[int] = None
     key_demographics: str
     inclusion_criteria: List[str]
     exclusion_criteria: List[str]
