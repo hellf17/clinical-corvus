@@ -5,6 +5,7 @@ import logging
 import time
 from typing import List, Optional, Union
 from dataclasses import dataclass
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +14,15 @@ if not DEEPL_API_KEY:
     logger.warning("DEEPL_API_KEY not found in environment variables. DeepL translation will fail.")
 
 # Default to the pro API endpoint, switch to free if the key indicates it.
-DEEPL_API_URL = "https://api.deepl.com/v2/translate"
+DEEPL_API_URL = "https://api-free.deepl.com/v2/translate"
 if DEEPL_API_KEY and ":fx" in DEEPL_API_KEY:
     DEEPL_API_URL = "https://api-free.deepl.com/v2/translate"
 
-# Rate limiting configuration
-RATE_LIMIT_REQUESTS = 20  # Max requests per RATE_LIMIT_WINDOW seconds
-RATE_LIMIT_WINDOW = 60  # seconds
+# Rate limiting parameters
+MAX_REQUESTS_PER_MINUTE = 5  # Conservative limit for free tier
+REQUEST_TIMESTAMPS = []
+RETRY_DELAY_BASE = 5  # Base delay in seconds
+MAX_RETRIES = 3
 
 # Track rate limit state
 rate_limit_queue = []
@@ -31,20 +34,20 @@ class RateLimitState:
     
     def add_request(self):
         now = time.time()
-        self.requests = [ts for ts in self.requests if now - ts < RATE_LIMIT_WINDOW]
+        self.requests = [ts for ts in self.requests if now - ts < 60]
         self.requests.append(now)
         
     def should_wait(self) -> bool:
         now = time.time()
-        self.requests = [ts for ts in self.requests if now - ts < RATE_LIMIT_WINDOW]
-        return len(self.requests) >= RATE_LIMIT_REQUESTS
+        self.requests = [ts for ts in self.requests if now - ts < 60]
+        return len(self.requests) >= MAX_REQUESTS_PER_MINUTE
     
     def get_wait_time(self) -> float:
         if not self.requests:
             return 0.0
         now = time.time()
         oldest = min(self.requests)
-        return max(0.0, (oldest + RATE_LIMIT_WINDOW) - now)
+        return max(0.0, (oldest + 60) - now)
 
 # Global rate limit state
 rate_limit_state = RateLimitState(requests=[])
@@ -62,101 +65,116 @@ async def _rate_limit():
 async def translate_text_deepl(
     text: Union[str, List[str]], 
     target_lang: str = "EN-US",
-    max_retries: int = 3,
-    initial_delay: float = 1.0,
-    max_delay: float = 30.0
-) -> Union[str, List[str], None]:
+    source_lang: Optional[str] = None,
+    max_retries: int = MAX_RETRIES
+) -> Union[str, List[str]]:
     """
-    Translates text to the target language using the DeepL API with retry logic.
-
+    Translates text using DeepL API with rate limiting and retry logic.
+    
     Args:
-        text: The text or list of texts to translate.
-        target_lang: The target language code (e.g., 'PT' for Portuguese).
-        max_retries: Maximum number of retry attempts.
-        initial_delay: Initial delay between retries in seconds.
-        max_delay: Maximum delay between retries in seconds.
-
+        text: Single string or list of strings to translate
+        target_lang: Target language code (e.g., "EN-US", "PT-BR")
+        source_lang: Source language code (optional)
+        max_retries: Maximum number of retry attempts
+    
     Returns:
-        The translated text(s), or None if translation fails.
+        Translated text (string or list of strings)
+    
+    Raises:
+        Exception: If translation fails after all retries
     """
     if not DEEPL_API_KEY:
-        logger.error("Cannot translate with DeepL: DEEPL_API_KEY is not set.")
-        return None
-
-    is_batch = isinstance(text, list)
-    if not is_batch:
-        text = [text]
+        raise ValueError("DeepL API key not configured. Please set DEEPL_API_KEY environment variable.")
     
-    if not text:
-        return [] if is_batch else None
-
+    # Check if we need to wait due to rate limiting
+    await _respect_rate_limit()
+    
+    # Prepare the request payload
+    payload = {
+        "text": text if isinstance(text, list) else [text],
+        "target_lang": target_lang,
+    }
+    if source_lang:
+        payload["source_lang"] = source_lang
+    
     headers = {
         "Authorization": f"DeepL-Auth-Key {DEEPL_API_KEY}",
         "Content-Type": "application/json",
     }
-
-    data = {
-        "text": text,
-        "target_lang": target_lang,
-        "preserve_formatting": True,
-        "formality": "prefer_less"  # More natural translations
-    }
-
-    delay = initial_delay
-    last_exception = None
-
+    
+    # Attempt translation with retries
     for attempt in range(max_retries + 1):
         try:
-            # Enforce rate limiting before making the request
-            await _rate_limit()
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    DEEPL_API_URL, 
-                    headers=headers, 
-                    json=data,
-                    timeout=aiohttp.ClientTimeout(total=30)  # 30-second timeout
-                ) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        translations = [t["text"] for t in result.get("translations", [])]
-                        
-                        if len(translations) == len(text):
-                            if is_batch:
-                                return translations
-                            return translations[0] if translations else None
-                        
-                        logger.warning("Mismatch in number of translations returned")
-                        return None
-                    
-                    # Handle rate limiting
-                    elif response.status == 429:
-                        retry_after = float(response.headers.get('Retry-After', delay))
-                        logger.warning(f"Rate limited. Retrying after {retry_after} seconds...")
-                        await asyncio.sleep(min(retry_after, max_delay))
-                        continue
-                        
-                    # Handle other errors
-                    error_text = await response.text()
-                    logger.error(f"DeepL API error: {response.status} - {error_text}")
-                    
-                    # If it's a client error (4xx), don't retry
-                    if 400 <= response.status < 500 and response.status != 429:
-                        break
-                        
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            last_exception = e
-            logger.warning(f"Attempt {attempt + 1} failed: {str(e)}")
-            
-            # Don't retry on client errors
-            if isinstance(e, aiohttp.ClientResponseError) and 400 <= e.status < 500:
-                break
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    DEEPL_API_URL,
+                    json=payload,
+                    headers=headers,
+                    timeout=30
+                )
                 
-        # Exponential backoff
-        if attempt < max_retries:
-            sleep_time = min(delay * (2 ** attempt), max_delay)
-            logger.info(f"Retrying in {sleep_time:.2f} seconds... (attempt {attempt + 1}/{max_retries})")
-            await asyncio.sleep(sleep_time)
+                # Record this request for rate limiting
+                _record_request()
+                
+                # Handle response
+                if response.status_code == 429:  # Too Many Requests
+                    retry_after = int(response.headers.get("Retry-After", RETRY_DELAY_BASE * (2 ** attempt)))
+                    logger.warning(f"Rate limit reached. Waiting {retry_after} seconds...")
+                    await asyncio.sleep(retry_after)
+                    continue
+                    
+                response.raise_for_status()
+                data = response.json()
+                
+                translations = [item["text"] for item in data.get("translations", [])]
+                
+                # Return result in the same format as input
+                if isinstance(text, list):
+                    return translations
+                else:
+                    return translations[0] if translations else ""
+                    
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error during DeepL translation: {e.response.status_code} - {e.response.text}")
+            if attempt < max_retries:
+                wait_time = RETRY_DELAY_BASE * (2 ** attempt)
+                logger.info(f"Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(wait_time)
+            else:
+                raise Exception(f"DeepL translation failed after {max_retries} retries: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error during DeepL translation: {str(e)}")
+            if attempt < max_retries:
+                wait_time = RETRY_DELAY_BASE * (2 ** attempt)
+                logger.info(f"Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})")
+                await asyncio.sleep(wait_time)
+            else:
+                raise Exception(f"DeepL translation failed after {max_retries} retries: {str(e)}")
+
+def _record_request():
+    """Record a timestamp for rate limiting purposes"""
+    global REQUEST_TIMESTAMPS
+    now = time.time()
+    REQUEST_TIMESTAMPS.append(now)
     
-    logger.error(f"All {max_retries + 1} attempts failed. Last error: {str(last_exception) if last_exception else 'Unknown'}")
-    return None if not is_batch else [None] * len(text)
+    # Remove timestamps older than 1 minute
+    REQUEST_TIMESTAMPS = [ts for ts in REQUEST_TIMESTAMPS if now - ts < 60]
+
+async def _respect_rate_limit():
+    """Wait if necessary to respect the rate limit"""
+    global REQUEST_TIMESTAMPS
+    now = time.time()
+    
+    # Clean up old timestamps
+    REQUEST_TIMESTAMPS = [ts for ts in REQUEST_TIMESTAMPS if now - ts < 60]
+    
+    # Check if we're at the limit
+    if len(REQUEST_TIMESTAMPS) >= MAX_REQUESTS_PER_MINUTE:
+        # Calculate how long to wait
+        oldest = min(REQUEST_TIMESTAMPS) if REQUEST_TIMESTAMPS else now
+        wait_time = max(0, 60 - (now - oldest))
+        
+        if wait_time > 0:
+            logger.info(f"Rate limiting: Waiting {wait_time:.2f} seconds before next DeepL request")
+            await asyncio.sleep(wait_time)

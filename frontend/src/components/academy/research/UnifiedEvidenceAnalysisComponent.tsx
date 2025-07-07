@@ -89,7 +89,6 @@ export default function UnifiedEvidenceAnalysisComponent({
 
   // PDF State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [pdfResults, setPdfResults] = useState<PDFAnalysisOutput | null>(null);
 
   // Text State
   const [evidenceText, setEvidenceText] = useState(initialContent);
@@ -128,7 +127,6 @@ export default function UnifiedEvidenceAnalysisComponent({
   };
 
   const clearResults = () => {
-    setPdfResults(null);
     setUnifiedResults(null);
     setError(null);
   };
@@ -159,7 +157,7 @@ export default function UnifiedEvidenceAnalysisComponent({
         clinical_question_PICO: clinicalQuestion.trim(),
       };
 
-      const response = await fetch('/api/research-assistant/unified-evidence-analysis', {
+      const response = await fetch('/api/research-assistant/unified-evidence-analysis-translated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify(payload),
@@ -207,28 +205,6 @@ export default function UnifiedEvidenceAnalysisComponent({
         return 'destructive';
     }
   };
-
-  const renderPDFResults = () => pdfResults && (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader><CardTitle className="flex items-center"><Target className="mr-2 h-5 w-5 text-blue-600" />Resumo Estruturado</CardTitle></CardHeader>
-        <CardContent><p className="text-muted-foreground whitespace-pre-line">{pdfResults.structured_summary}</p></CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle className="flex items-center"><BookOpen className="mr-2 h-5 w-5 text-purple-600" />Principais Achados</CardTitle></CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
-            {pdfResults.key_findings.map((finding, index) => (
-              <li key={index} className="flex items-start">
-                <CheckCircle className="h-5 w-5 mr-3 mt-1 text-blue-500 flex-shrink-0" />
-                <span className="text-muted-foreground">{finding}</span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
-    </div>
-  );
 
   const getAssessmentColor = (assessment: string) => {
     switch (assessment) {
@@ -402,7 +378,7 @@ export default function UnifiedEvidenceAnalysisComponent({
     
     setIsLoading(true);
     setError(null);
-    setPdfResults(null);
+    setUnifiedResults(null); // Use the unified state
 
     try {
       const token = await getToken();
@@ -415,7 +391,8 @@ export default function UnifiedEvidenceAnalysisComponent({
         formData.append('clinical_question', clinicalQuestion.trim());
       }
 
-      const response = await fetch('/api/research-assistant/analyze-pdf', {
+      // Call the new unified PDF endpoint
+      const response = await fetch('/api/research-assistant/unified-evidence-analysis-from-pdf-translated', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -428,8 +405,8 @@ export default function UnifiedEvidenceAnalysisComponent({
         throw new Error(errorData.detail || `Falha na análise do PDF (status: ${response.status}).`);
       }
 
-      const data: PDFAnalysisOutput = await response.json();
-      setPdfResults(data);
+      const data: GradeEvidenceAppraisalOutput = await response.json();
+      setUnifiedResults(data); // Set the unified results
     } catch (err: any) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido ao processar sua solicitação.');
       console.error("Error in PDF analysis:", err);
@@ -559,62 +536,24 @@ export default function UnifiedEvidenceAnalysisComponent({
         </CardContent>
       </Card>
 
-    {/* Análise de Viés */}
-    {unifiedResults && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Scale className="mr-2 h-5 w-5 text-blue-600" />
-            Análise de Viés
-          </CardTitle>
-          <CardDescription>Avaliação dos principais tipos de viés no estudo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium mb-2">Viés de Seleção</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.selection_bias}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Performance</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.performance_bias}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Relato</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.reporting_bias}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Confirmação</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults?.bias_analysis.confirmation_bias}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+    {/* Display unified results regardless of source */}
+    {unifiedResults && renderUnifiedResults()}
+    
+    {/* Remove the dedicated PDF results rendering */}
+    {/* {renderPDFResults()} */}
+
+    {isLoading && (
+      <div className="flex justify-center items-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <p className="ml-4 text-muted-foreground">Analisando... um momento.</p>
+      </div>
     )}
 
-    {/* Recomendações para Prática */}
-    {unifiedResults && (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <CheckSquare className="mr-2 h-5 w-5 text-blue-600" />
-            Recomendações para Prática Clínica
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert className="bg-blue-50">
-            <CheckCircle className="h-4 w-4 text-blue-600" />
-            <AlertTitle>Aplicação Clínica</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc list-inside space-y-2 mt-2">
-                {unifiedResults?.practice_recommendations.map((rec, index) => (
-                  <li key={index} className="text-muted-foreground">{rec}</li>
-                ))}
-              </ul>
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+    {error && (
+      <Alert variant="destructive" className="mt-6">
+        <AlertTitle>Erro</AlertTitle>
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
     )}
   </div>
 );

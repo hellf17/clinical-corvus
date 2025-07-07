@@ -1,6 +1,6 @@
 # backend-api/routers/research.py
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from services.translator_service import translate
+from services.translator_service import translate_with_fallback
 from typing import List, Optional, Dict, Any, Tuple
 import logging
 from pydantic import BaseModel
@@ -402,45 +402,6 @@ async def formulate_search_strategy(
         logger.error(f"Erro ao formular estratégia: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao formular estratégia: {str(e)}")
 
-@router.post("/analyze-pdf", response_model=PDFAnalysisOutput)
-async def analyze_pdf_document(
-    file: UploadFile = File(...),
-    analysis_focus: Optional[str] = Form(None),
-    clinical_question: Optional[str] = Form(None),
-    extraction_mode: Optional[str] = Form("balanced")
-):
-    """
-    Analyzes a PDF document and returns the results.
-    """
-    try:
-        logger.info(f"📄 Analyzing PDF: {file.filename}")
-        
-        # Read the PDF content
-        pdf_content = await file.read()
-        
-        # Use pdf_service to extract text from the PDF
-        extracted_text = await pdf_service.extract_text_from_pdf(pdf_content)
-        
-        if not extracted_text:
-            raise HTTPException(status_code=400, detail="Could not extract text from the PDF.")
-        
-        # Create the input for the BAML function
-        pdf_analysis_input = PDFAnalysisInput(
-            pdf_content=extracted_text,
-            analysis_focus=analysis_focus,
-            clinical_question=clinical_question
-        )
-        
-        # Call the BAML function
-        logger.info(f"🧠 Processing PDF analysis with mode: {extraction_mode}")
-        analysis_result = await b.AnalyzePDFDocument(pdf_analysis_input)
-        
-        logger.info(f"✅ PDF analysis completed for: {file.filename}")
-        return analysis_result
-        
-    except Exception as e:
-        logger.error(f"❌ Error in PDF analysis: {e}")
-        raise HTTPException(status_code=500, detail=f"Error in PDF analysis: {str(e)}")
 
 # === TRANSLATION HELPERS FOR RESEARCH OUTPUTS ===
 async def _translate_pdf_analysis_output(output: PDFAnalysisOutput, target_lang="PT") -> PDFAnalysisOutput:
@@ -504,7 +465,7 @@ async def _translate_pico_formulation_output(output: PICOFormulationOutput, targ
                 # Try direct translation of formulated_question as fallback
                 try:
                     if output.formulated_question:
-                        translated_question = await translate(output.formulated_question, target_lang=target_lang)
+                        translated_question = await translate_with_fallback(output.formulated_question, target_lang=target_lang)
                         if translated_question:
                             translated_output.formulated_question = translated_question
                 except Exception as retry_error:
@@ -610,7 +571,7 @@ async def _translate_field(field, target_lang="PT", field_name=None):
             
         # Batch translate with better error handling
         try:
-            translated = await translate(list(strings), target_lang)
+            translated = await translate_with_fallback(list(strings), target_lang)
             if not translated or len(translated) != len(strings):
                 logger.warning(f"Translation returned incomplete results for field: {field_name}")
                 return field
@@ -685,7 +646,7 @@ async def _translate_synthesized_output(output: SynthesizedResearchOutput, targe
                 logger.info("Attempting translation with smaller batches")
                 # Translate executive_summary separately
                 if 'executive_summary' in output_dict and output_dict['executive_summary']:
-                    translated_summary = await translate(output_dict['executive_summary'], target_lang=target_lang)
+                    translated_summary = await translate_with_fallback(output_dict['executive_summary'], target_lang=target_lang)
                     if translated_summary:
                         translated_output['executive_summary'] = translated_summary
             except Exception as retry_error:
@@ -733,53 +694,6 @@ async def perform_quick_research_translated(request: DeepResearchRequest):
         logger.error(f"❌ Error during research via /quick-search-translated (mode: {service_mode}) for query '{request.user_original_query}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during the translated research process: {str(e)}")
 
-@router.post("/analyze-pdf-translated", response_model=PDFAnalysisOutput)
-async def analyze_pdf_document_translated(
-    file: UploadFile = File(...),
-    analysis_focus: Optional[str] = Form(None),
-    clinical_question: Optional[str] = Form(None),
-    extraction_mode: Optional[str] = Form("balanced")
-):
-    """
-    Analyzes a PDF document and returns the results translated to Portuguese.
-    """
-    try:
-        # To call the original function, we must avoid consuming the file stream.
-        # Read the content into memory and create a new UploadFile-like object for the original function call.
-        file_content = await file.read()
-        
-        from io import BytesIO
-        from starlette.datastructures import UploadFile as StarletteUploadFile
-        
-        temp_file = StarletteUploadFile(
-            filename=file.filename,
-            file=BytesIO(file_content)
-        )
-
-        analysis_output = await analyze_pdf_document(
-            file=temp_file,
-            analysis_focus=analysis_focus,
-            clinical_question=clinical_question,
-            extraction_mode=extraction_mode
-        )
-
-        # Now, translate the user-facing fields
-        logger.info(f"Translating PDF analysis for: {file.filename}")
-        translated_output = await _translate_pdf_analysis_output(analysis_output, target_lang="PT")
-        logger.info(f"✅ Translation of PDF analysis complete for: {file.filename}")
-
-        return translated_output
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error in translated PDF analysis endpoint: {e}")
-        raise HTTPException(status_code=500, detail=f"Error in translated PDF analysis: {str(e)}")
-
-
-# Deprecated route removed - replaced by unified-evidence-analysis-translated endpoint
-
-
 @router.post("/formulate-pico-translated", response_model=PICOFormulationOutput)
 async def formulate_pico_question_translated(request: PICOFormulationRequest):
     """
@@ -796,6 +710,7 @@ async def formulate_pico_question_translated(request: PICOFormulationRequest):
     except Exception as e:
         logger.error(f"Erro na formulação PICO traduzida: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na formulação PICO traduzida: {str(e)}")
+
 
 @router.post("/unified-evidence-analysis-translated", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis_translated(request: UnifiedEvidenceAnalysisRequest):
@@ -817,6 +732,7 @@ async def unified_evidence_analysis_translated(request: UnifiedEvidenceAnalysisR
     except Exception as e:
         logger.error(f"❌ Erro na análise unificada de evidências traduzida: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na análise unificada de evidências traduzida: {str(e)}")
+
 
 @router.get("/health")
 async def health_check():
@@ -1107,6 +1023,7 @@ async def cite_source_analysis(request: CiteSourceAnalysisRequest):
         logger.error(f"❌ Erro na análise CiteSource: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na análise CiteSource: {str(e)}")
 
+
 @router.post("/unified-evidence-analysis", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis(request: UnifiedEvidenceAnalysisRequest):
     """
@@ -1143,6 +1060,50 @@ async def unified_evidence_analysis(request: UnifiedEvidenceAnalysisRequest):
     except Exception as e:
         logger.error(f"❌ Erro na análise unificada de evidências: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+
+
+@router.post("/unified-evidence-analysis-from-pdf", response_model=GradeEvidenceAppraisalOutput)
+async def unified_evidence_analysis_from_pdf(
+    file: UploadFile = File(...),
+    clinical_question: Optional[str] = Form(None),
+    extraction_mode: Optional[str] = Form("balanced")
+):
+    """
+    Analyzes a PDF document by extracting its text and running it through the
+    unified evidence analysis pipeline.
+    """
+    try:
+        logger.info(f"📄 Analyzing PDF and appraising: {file.filename}")
+
+        # 1. Extract text from PDF
+        file_content = await file.read()
+        extraction_result = await pdf_service.extract_text_from_pdf(
+            file_content,
+            filename=file.filename,
+            extraction_mode=extraction_mode
+        )
+        extracted_text = extraction_result.get("text")
+
+        if not extracted_text:
+            raise HTTPException(status_code=400, detail="Could not extract text from the PDF to perform analysis.")
+
+        # 2. Call the unified evidence analysis logic with the extracted text
+        logger.info(f"🔬 Passing extracted text to unified analysis pipeline.")
+        analysis_request = UnifiedEvidenceAnalysisRequest(
+            paper_full_text=extracted_text,
+            clinical_question_PICO=clinical_question
+        )
+
+        # Call the existing function for text-based analysis
+        appraisal_result = await unified_evidence_analysis(analysis_request)
+
+        logger.info(f"✅ PDF analysis and appraisal completed for: {file.filename}")
+        return appraisal_result
+
+    except Exception as e:
+        logger.error(f"❌ Error in PDF analysis and appraisal pipeline: {e}")
+        raise HTTPException(status_code=500, detail=f"Error in PDF analysis pipeline: {str(e)}")
+
 
 @router.post("/cite-source-comprehensive-test")
 async def cite_source_comprehensive_test(request: CiteSourceTestRequest):
@@ -1425,7 +1386,7 @@ async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOut
                 # Try direct translation of summary as fallback
                 try:
                     if output.summary:
-                        translated_summary = await translate(output.summary, target_lang=target_lang)
+                        translated_summary = await translate_with_fallback(output.summary, target_lang=target_lang, field_name="summary")
                         if translated_summary:
                             translated_output.summary = translated_summary
                 except Exception as retry_error:
@@ -1436,3 +1397,43 @@ async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOut
     except Exception as e:
         logger.error(f"❌ Failed to translate EvidenceAppraisalOutput: {e}", exc_info=True)
         return output
+
+@router.post("/unified-evidence-analysis-from-pdf-translated", response_model=GradeEvidenceAppraisalOutput)
+async def unified_evidence_analysis_from_pdf_translated(
+    file: UploadFile = File(...),
+    clinical_question: Optional[str] = Form(None),
+    extraction_mode: Optional[str] = Form("balanced")
+):
+    """
+    Analyzes a PDF, appraises it, and returns the results translated to Portuguese.
+    """
+    try:
+        from io import BytesIO
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+
+        file_content = await file.read()
+        
+        # Recreate a file-like object for the internal call to avoid stream consumption issues
+        temp_file = StarletteUploadFile(
+            filename=file.filename,
+            file=BytesIO(file_content)
+        )
+
+        # Call the non-translated PDF analysis endpoint
+        analysis_output = await unified_evidence_analysis_from_pdf(
+            file=temp_file,
+            clinical_question=clinical_question,
+            extraction_mode=extraction_mode
+        )
+
+        # Translate the results
+        logger.info(f"Translating unified evidence analysis (from PDF) results to Portuguese")
+        translated_output = await _translate_enhanced_appraisal_output(analysis_output, target_lang="PT")
+        logger.info(f"✅ Translation of unified evidence analysis (from PDF) complete")
+
+        return translated_output
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error in translated PDF analysis and appraisal endpoint: {e}")
+        raise HTTPException(status_code=500, detail=f"Error in translated PDF analysis and appraisal: {str(e)}")

@@ -22,10 +22,6 @@ from baml_client.types import (
 # Import SNAPPS-related types from clinical_simulation module
 from baml_client.types import (
     AnalyzeDifferentialDiagnosesSNAPPSInput as BAMLAnalyzeDifferentialDiagnosesSNAPPSInput,
-
-
-
-
 )
 
 # Define missing BAML types that aren't generated properly
@@ -50,7 +46,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 from .clinical_assistant_router import BAMLProblemRepresentationInput
 
-from services.translator_service import translate
+from services.translator_service import translate_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +138,7 @@ async def analyze_differential_diagnoses_snapps(payload: AnalyzeDifferentialDiag
         
         # Translate the response if needed
         try:
-            translated_response = await translate(response_str, target_lang="PT")
+            translated_response = await translate_with_fallback(response_str, target_lang="PT")
             
             # Verify translation was successful
             if translated_response == response_str and len(response_str) > 20:
@@ -586,7 +582,7 @@ async def _translate_analyze_differential_diagnoses_snapps_output(
     logger.info(f"🌐 Starting translation of SNAPPS differential diagnoses analysis to {target_lang}")
     
     try:
-        translated = await translate(output.response, target_lang)
+        translated = await translate_with_fallback(output.response, target_lang)
         
         # Verify translation was successful
         if translated == output.response and target_lang == "PT":
@@ -612,7 +608,7 @@ async def _translate_evaluate_summary_snapps_output(
     logger.info(f"🌐 Starting translation of SNAPPS summary evaluation to {target_lang}")
     
     try:
-        translated = await translate(output.response, target_lang)
+        translated = await translate_with_fallback(output.response, target_lang)
         
         # Verify translation was successful
         if translated == output.response and target_lang == "PT":
@@ -638,7 +634,7 @@ async def _translate_facilitate_ddx_analysis_snapps_output(
     logger.info(f"🌐 Starting translation of SNAPPS DDx analysis facilitation to {target_lang}")
     
     try:
-        translated = await translate(output.response, target_lang)
+        translated = await translate_with_fallback(output.response, target_lang)
         
         # Verify translation was successful
         if translated == output.response and target_lang == "PT":
@@ -664,7 +660,7 @@ async def _translate_evaluate_management_plan_snapps_output(
     logger.info(f"🌐 Starting translation of SNAPPS management plan evaluation to {target_lang}")
     
     try:
-        translated = await translate(output.response, target_lang)
+        translated = await translate_with_fallback(output.response, target_lang)
         
         # Verify translation was successful
         if translated == output.response and target_lang == "PT":
@@ -690,7 +686,7 @@ async def _translate_generate_summary_snapps_output(
     logger.info(f"🌐 Starting translation of SNAPPS session summary to {target_lang}")
     
     try:
-        translated = await translate(output.response, target_lang)
+        translated = await translate_with_fallback(output.response, target_lang)
         
         # Verify translation was successful
         if translated == output.response and target_lang == "PT":
@@ -706,7 +702,7 @@ async def _translate_generate_summary_snapps_output(
                     for i, para in enumerate(paragraphs):
                         if para.strip():
                             try:
-                                trans_para = await translate(para, target_lang)
+                                trans_para = await translate_with_fallback(para, target_lang)
                                 translated_paragraphs.append(trans_para)
                             except Exception:
                                 translated_paragraphs.append(para)  # Keep original on failure
@@ -742,7 +738,7 @@ async def _translate_field(field, target_lang="PT", field_name=None):
             if not field.strip() or field.isupper() or field.isnumeric() or len(field) < 5:
                 return field
             try:
-                translated = await translate(field, target_lang, field_name=field_name)
+                translated = await translate_with_fallback(field, target_lang, field_name=field_name)
                 # Verify translation was successful
                 if translated == field and target_lang == "PT" and not field.isupper():
                     logger.warning(f"Translation may have failed for field: {field_name} - text unchanged")
@@ -885,7 +881,7 @@ async def answer_probe_questions_snapps_translated(payload: AnswerProbeQuestions
         
         # Translate the response
         try:
-            translated_text = await translate(original_response.response, target_lang="PT")
+            translated_text = await translate_with_fallback(original_response.response, target_lang="PT")
             
             # Verify translation was successful
             if translated_text == original_response.response and len(original_response.response) > 20:

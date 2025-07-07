@@ -41,7 +41,7 @@ from fastapi import APIRouter, HTTPException, Form, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 
-from services.translator_service import translate
+from services.translator_service import translate_with_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +219,7 @@ async def generate_dr_corvus_lab_insights(payload: DrCorvusLabAnalysisInput):
         if not text:
             return None
         try:
-            translated = await translate(text, target_lang="PT")
+            translated = await translate_with_fallback(text, target_lang="PT")
             return translated
         except Exception as e:
             logger.error(f"Translation failed for '{text[:50]}...': {str(e)}. Returning original text.")
@@ -264,18 +264,6 @@ async def generate_dr_corvus_lab_insights(payload: DrCorvusLabAnalysisInput):
             error=f"Error generating insights: {str(e)}",
         )
 
-    except ValueError as ve:
-        # Handle validation errors
-        error_msg = str(ve)
-        logger.warning(f"Validation error in generate_lab_insights: {error_msg}")
-        raise HTTPException(status_code=400, detail=error_msg)
-        
-    except Exception as e:
-        # Handle unexpected errors
-        error_msg = f"Unexpected error in generate_lab_insights: {str(e)}"
-        logger.error(error_msg)
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=error_msg)
 
 # --- Pydantic Models for PatientFriendlyFollowUpChecklist ---
 
@@ -837,7 +825,7 @@ async def _translate_generate_clinical_workflow_questions_output(response: Clini
         lengths.append(('overall_rationale', 1))
 
         # 2. Perform batch translation
-        translated_texts = await translate(texts_to_translate, target_lang=target_lang, field_name="clinical_workflow_questions_output")
+        translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="clinical_workflow_questions_output")
         ptr = 0
         # 3. Map back to model
         translated_categories = []
@@ -907,7 +895,7 @@ async def _translate_field(field, target_lang="PT", field_name=None):
             # Avoid translating non-translatable strings
             if not field.strip() or field.isupper() or field.isnumeric():
                 return field
-            return await translate(field, target_lang, field_name=field_name)
+            return await translate_with_fallback(field, target_lang, field_name=field_name)
         if isinstance(field, list):
             return [await _translate_field(item, target_lang, f"{field_name}[{i}]" if field_name else None)
                     for i, item in enumerate(field)]
@@ -925,17 +913,57 @@ async def _translate_field(field, target_lang="PT", field_name=None):
 
 async def _translate_expanded_ddx_output(output: ExpandedDdxOutputModel, target_lang="PT") -> ExpandedDdxOutputModel:
     """
-    Translates user-facing fields of the ExpandedDdxOutputModel.
+    Batch translates user-facing fields of the ExpandedDdxOutputModel.
+    Uses a single batch request for efficiency and prevents duplicate requests.
     """
     if not output:
         return output
     
     logger.info(f"🌐 Starting translation of ExpandedDdxOutputModel to {target_lang}")
     
-    output.applied_approach_description = await _translate_field(output.applied_approach_description, target_lang, "applied_approach_description")
-    output.suggested_additional_diagnoses_with_rationale = await _translate_field(output.suggested_additional_diagnoses_with_rationale, target_lang, "suggested_additional_diagnoses_with_rationale")
-    
-    return output
+    try:
+        # Import the translate_with_fallback function for safer translation
+        from services.translator_service import translate_with_fallback
+        
+        # Create a copy of the output to avoid modifying the original
+        from copy import deepcopy
+        result = deepcopy(output)
+        
+        # Collect all texts to translate in a single batch
+        texts_to_translate = []
+        
+        # Add the description
+        texts_to_translate.append(output.applied_approach_description or "")
+        
+        # Add all diagnoses
+        diagnoses = output.suggested_additional_diagnoses_with_rationale or []
+        texts_to_translate.extend(diagnoses)
+        
+        # Skip if no text to translate
+        if not texts_to_translate:
+            return output
+            
+        # Perform a single batch translation with field name to improve caching
+        # Use translate_with_fallback to ensure we don't fail if translation service is unavailable
+        translated_texts = await translate_with_fallback(
+            texts_to_translate, 
+            target_lang=target_lang, 
+            field_name="expanded_ddx_batch"
+        )
+        
+        # Map translated texts back to the output model
+        if translated_texts and len(translated_texts) == len(texts_to_translate):
+            result.applied_approach_description = translated_texts[0]
+            result.suggested_additional_diagnoses_with_rationale = translated_texts[1:]
+        else:
+            logger.warning(f"Translation returned incorrect number of items: expected {len(texts_to_translate)}, got {len(translated_texts) if translated_texts else 0}")
+            
+        logger.info(f"✅ ExpandedDdxOutputModel translation completed successfully")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error batch translating ExpandedDdxOutputModel: {str(e)}", exc_info=True)
+        return output  # Return original output if translation fails
 
 async def _translate_problem_representation_feedback_output(response: ProblemRepresentationFeedbackOutputModel, target_lang: str) -> ProblemRepresentationFeedbackOutputModel:
     """
@@ -969,7 +997,7 @@ async def _translate_problem_representation_feedback_output(response: ProblemRep
             return response
             
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="problem_representation_feedback")
             
             # Verify we got the expected number of translations
             if not translated_texts or len(translated_texts) != len(texts_to_translate):
@@ -994,7 +1022,7 @@ async def _translate_problem_representation_feedback_output(response: ProblemRep
             # Try direct translation of overall_assessment as fallback
             try:
                 if response.overall_assessment:
-                    direct_translation = await translate(response.overall_assessment, target_lang=target_lang)
+                    direct_translation = await translate_with_fallback(response.overall_assessment, target_lang=target_lang, field_name="overall_assessment_direct")
                     if direct_translation and direct_translation != response.overall_assessment:
                         translated_overall_assessment = direct_translation
                         logger.info("Direct translation of overall_assessment succeeded as fallback")
@@ -1026,10 +1054,6 @@ async def _translate_illness_script_output(response: IllnessScriptOutputModel, t
         
     logger.info(f"🌐 Starting batch translation of IllnessScriptOutputModel to {target_lang}")
     
-    # Maximum number of retry attempts
-    max_retries = 2
-    retry_delay = 1.0  # Initial delay in seconds
-    
     # Prepare the text to translate
     texts_to_translate = []
     texts_to_translate.append(response.disease_name or "")
@@ -1050,57 +1074,42 @@ async def _translate_illness_script_output(response: IllnessScriptOutputModel, t
     if not any(t.strip() for t in texts_to_translate if t):
         return response
     
-    # Attempt translation with retries
-    for attempt in range(max_retries + 1):
-        try:
-            # Add a small delay between retries to avoid rate limiting
-            if attempt > 0:
-                wait_time = min(retry_delay * (2 ** (attempt - 1)), 10)  # Exponential backoff, max 10s
-                logger.info(f"Retry attempt {attempt}/{max_retries} after {wait_time:.1f}s...")
-                await asyncio.sleep(wait_time)
+    try:
+        # Attempt the translation
+        translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="illness_script")
+        
+        # If we get here, translation was successful
+        ptr = 0
+        disease_name = translated_texts[ptr]; ptr += 1
+        pathophysiology_summary = translated_texts[ptr]; ptr += 1
+        predisposing_conditions_trans = translated_texts[ptr:ptr+len_predisposing]; ptr += len_predisposing
+        key_symptoms_and_signs_trans = translated_texts[ptr:ptr+len_symptoms]; ptr += len_symptoms
+        relevant_diagnostics_trans = translated_texts[ptr:ptr+len_diagnostics]; ptr += len_diagnostics
+        
+        # Verify translation was successful by checking key fields
+        if disease_name == response.disease_name and target_lang == "PT":
+            logger.warning(f"Translation may have failed - disease_name unchanged")
+            # Try direct translation as fallback
+            try:
+                direct_translation = await translate_with_fallback(response.disease_name, target_lang=target_lang, field_name="disease_name_direct")
+                if direct_translation and direct_translation != response.disease_name:
+                    disease_name = direct_translation
+            except Exception as e:
+                logger.error(f"Direct translation fallback failed: {e}")
                 
-            # Attempt the translation
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+        logger.info(f"✅ Illness script translation completed successfully")
+        
+        return IllnessScriptOutputModel(
+            disease_name=disease_name,
+            pathophysiology_summary=pathophysiology_summary,
+            predisposing_conditions=predisposing_conditions_trans,
+            key_symptoms_and_signs=key_symptoms_and_signs_trans,
+            relevant_diagnostics=relevant_diagnostics_trans,
+        )
             
-            # If we get here, translation was successful
-            ptr = 0
-            disease_name = translated_texts[ptr]; ptr += 1
-            pathophysiology_summary = translated_texts[ptr]; ptr += 1
-            predisposing_conditions_trans = translated_texts[ptr:ptr+len_predisposing]; ptr += len_predisposing
-            key_symptoms_and_signs_trans = translated_texts[ptr:ptr+len_symptoms]; ptr += len_symptoms
-            relevant_diagnostics_trans = translated_texts[ptr:ptr+len_diagnostics]; ptr += len_diagnostics
-            
-            # Verify translation was successful by checking key fields
-            if disease_name == response.disease_name and target_lang == "PT":
-                logger.warning(f"Translation may have failed - disease_name unchanged on attempt {attempt+1}")
-                if attempt == max_retries:  # Last attempt
-                    logger.warning("Max retries reached with unsuccessful translation")
-                continue  # Try next attempt
-                
-            logger.info(f"✅ Illness script translation completed successfully on attempt {attempt+1}")
-            
-            return IllnessScriptOutputModel(
-                disease_name=disease_name,
-                pathophysiology_summary=pathophysiology_summary,
-                predisposing_conditions=predisposing_conditions_trans,
-                key_symptoms_and_signs=key_symptoms_and_signs_trans,
-                relevant_diagnostics=relevant_diagnostics_trans,
-            )
-            
-        except Exception as e:
-            # Log the error with attempt number
-            logger.warning(
-                f"Attempt {attempt + 1}/{max_retries + 1} failed for IllnessScriptOutputModel: {str(e)}",
-                exc_info=attempt == max_retries  # Only log full traceback on final attempt
-            )
-            
-            # If we've hit the max retries, return the original response
-            if attempt == max_retries:
-                logger.error("Max retries reached, returning original response without translation")
-                return response
-    
-    # This should never be reached due to the return in the loop, but just in case
-    return response
+    except Exception as e:
+        logger.error(f"Error batch translating IllnessScriptOutputModel: {str(e)}", exc_info=True)
+        return response
 
 async def _translate_generate_lab_insights_output(response: DrCorvusLabInsightsOutput, target_lang: str = "PT") -> DrCorvusLabInsightsOutput:
     """
@@ -1144,7 +1153,7 @@ async def _translate_generate_lab_insights_output(response: DrCorvusLabInsightsO
             return response
             
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="lab_insights")
             
             # Verify we got the expected number of translations
             if not translated_texts or len(translated_texts) != len(texts_to_translate):
@@ -1165,19 +1174,6 @@ async def _translate_generate_lab_insights_output(response: DrCorvusLabInsightsO
         patterns_trans = translated_texts[ptr:ptr+len_patterns]; ptr += len_patterns
         differential_trans = translated_texts[ptr:ptr+len_differential]; ptr += len_differential
         suggested_next_trans = translated_texts[ptr:ptr+len_suggested_next]; ptr += len_suggested_next
-        
-        # Verify translation was successful
-        if patient_friendly_summary == response.patient_friendly_summary and target_lang == "PT":
-            logger.warning("Translation may have failed - patient_friendly_summary unchanged")
-            # Try direct translation of patient_friendly_summary as fallback
-            try:
-                if response.patient_friendly_summary:
-                    direct_translation = await translate(response.patient_friendly_summary, target_lang=target_lang)
-                    if direct_translation and direct_translation != response.patient_friendly_summary:
-                        patient_friendly_summary = direct_translation
-                        logger.info("Direct translation of patient_friendly_summary succeeded as fallback")
-            except Exception as retry_error:
-                logger.error(f"Direct translation fallback also failed: {retry_error}")
                 
         logger.info(f"✅ Lab insights translation completed successfully")
         
@@ -1235,7 +1231,7 @@ async def _translate_compare_contrast_output(output: CompareContrastFeedbackOutp
             return output
         # Batch translate
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="compare_contrast")
         except Exception as e:
             logger.error(f"Batch translation failed for CompareContrastFeedbackOutputModel: {e}", exc_info=True)
             return output
@@ -1408,7 +1404,7 @@ async def _translate_teach_question_prioritization_output(response: TeachQuestio
         
         # 2. Batch translate
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="teach_question_prioritization")
         except Exception as e:
             logger.error(f"Batch translation failed for TeachQuestionPrioritizationOutputModel: {e}", exc_info=True)
             return response
@@ -1455,7 +1451,7 @@ async def _translate_assist_identifying_cognitive_biases_scenario_output(respons
         if not any(t.strip() for t in texts_to_translate if t):
             return response
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="cognitive_biases_scenario")
         except Exception as e:
             logger.error(f"Batch translation failed for CognitiveBiasCaseAnalysisOutputModel: {e}", exc_info=True)
             return response
@@ -1559,7 +1555,7 @@ async def _translate_generate_diagnostic_timeout_output(response: DiagnosticTime
         if not any(t.strip() for t in texts_to_translate if t):
             return response
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="diagnostic_timeout")
         except Exception as e:
             logger.error(f"Batch translation failed for DiagnosticTimeoutOutputModel: {e}", exc_info=True)
             return response
@@ -1627,7 +1623,7 @@ async def _translate_provide_self_reflection_feedback_output(response: SelfRefle
         if not any(t.strip() for t in texts_to_translate if t):
             return response
         try:
-            translated_texts = await translate(texts_to_translate, target_lang=target_lang)
+            translated_texts = await translate_with_fallback(texts_to_translate, target_lang=target_lang, field_name="self_reflection_feedback")
             if not translated_texts:
                 logger.warning("Translation returned empty results for SelfReflectionFeedbackOutputModel")
                 return response

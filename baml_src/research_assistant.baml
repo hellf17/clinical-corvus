@@ -557,7 +557,7 @@ enum StudyDesignType {
 }
 
 class PopulationInfo {
-  sample_size int @description("Total sample size.")
+  sample_size int? @description("Total sample size.")
   key_demographics string @description("Demographic description of participants (age, sex, etc.).")
   inclusion_criteria string[] @description("Inclusion criteria for participants.")
   exclusion_criteria string[] @description("Exclusion criteria for participants.")
@@ -640,11 +640,10 @@ function AnalyzeMedicalPaper(paper_full_text: string, clinical_question_PICO: st
 
     - **DO NOT EVALUATE, DO NOT INTERPRET, DO NOT MAKE INFERENCES.** Just extract the facts.
     - If a specific piece of information is not found in the text, fill the corresponding field with "Not found in text" or an appropriate null/empty value.
+    - For numeric fields like 'sample_size', if the information is not found, use a 'null' value instead of a string.
 
-    {% if clinical_question_PICO %}
     **Clinical Question Focus (to guide relevance extraction):**
     {{ clinical_question_PICO }}
-    {% endif %}
 
     **Complete Article Text for Analysis:**
     ---

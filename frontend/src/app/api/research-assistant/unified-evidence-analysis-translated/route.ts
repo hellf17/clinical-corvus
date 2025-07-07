@@ -1,28 +1,29 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { auth } from '@clerk/nextjs/server';
 
-// For server-to-server communication within Docker, use the service name.
-const BACKEND_API_URL = 'http://backend-api:8000'; 
+const FASTAPI_URL = process.env.FASTAPI_URL || 'http://backend-api:8000';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the form data from the request
-    const formData = await request.formData();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
     
-    // The actual FastAPI endpoint is now prefixed with /api/research
-    const targetUrl = `${BACKEND_API_URL}/api/research/analyze-pdf`; 
+    const targetUrl = `${FASTAPI_URL}/api/research/unified-evidence-analysis-translated`;
 
-    console.log(`Forwarding POST request from /api/research/analyze-pdf to ${targetUrl}`);
+    console.log(`Forwarding POST request from /api/research-assistant/unified-evidence-analysis-translated to ${targetUrl}`);
 
-    // Forward the FormData to the backend
     const backendResponse = await fetch(targetUrl, {
       method: 'POST',
       headers: {
-        // Don't set Content-Type for FormData - let fetch set it automatically with boundary
-        // Forward any authorization headers if needed
+        'Content-Type': 'application/json',
         'Authorization': request.headers.get('Authorization') || '',
       },
-      body: formData, // Pass FormData directly
+      body: JSON.stringify(body),
     });
 
     const responseData = await backendResponse.json();
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(responseData, { status: backendResponse.status });
   } catch (error: any) {
-    console.error('Error in Next.js API route /api/research-assistant/analyze-pdf:', error);
+    console.error('Error in Next.js API route /api/research-assistant/unified-evidence-analysis-translated:', error);
     return NextResponse.json(
       { message: 'Internal Server Error in Next.js API proxy', details: error.message },
       { status: 500 }
