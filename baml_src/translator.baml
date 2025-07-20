@@ -15,10 +15,11 @@ function TranslateToEnglish(input: string) -> TranslationOutput {
     3. Keep the same tone (formal/academic/conversational) as the original text
     4. Do not add any explanations, notes, or extra text
     5. Do not summarize or modify the content - translate everything exactly
-    6. Return ONLY the translated text, nothing else
     
     TEXT TO TRANSLATE:
     {{ input }}
+    
+    {{ ctx.output_format }}
   "#
 } 
 
@@ -35,9 +36,10 @@ function TranslateToPortuguese(input: string) -> TranslationOutput {
     3. Keep the same tone (formal/academic/conversational) as the original text
     4. Do not add any explanations, notes, or extra text
     5. Do not summarize or modify the content - translate everything exactly
-    6. Return ONLY the translated text, nothing else
     
     TEXT TO TRANSLATE:
     {{ input }}
+    
+    {{ ctx.output_format }}
   "#
 }

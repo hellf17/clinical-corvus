@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { MessageSquare, User } from "lucide-react";
-import { FeedbackDisplay } from "./FeedbackDisplay";
+
 import { RefObject } from "react";
 
 interface SNAPPSStep {
@@ -45,7 +45,11 @@ export function SessionHistory({ steps, responseRef }: SessionHistoryProps) {
               <p className="text-sm">{step.userInput}</p>
             </div>
             
-            {step.response && <FeedbackDisplay feedback={step.response} />}
+            {step.response && (
+              <div className="ml-6 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <p className="text-sm font-medium text-blue-800">{step.response}</p>
+              </div>
+            )}
           </div>
         ))}
       </CardContent>

@@ -63,24 +63,23 @@ export default function DashboardPage() {
   }, [isLoaded, isSignedIn, sessionClaims]);
 
   useEffect(() => {
-    // Future patient support (commented out for now)
-    // if (userRole === 'patient') {
-    //   const fetchPatientProfile = async () => {
-    //     setIsLoadingProfile(true);
-    //     setPatientProfileError(null);
-    //     try {
-    //       const token = await getToken();
-    //       if (!token) throw new Error("Authentication token not available.");
-    //       const profile = await getMyPatientProfile(token);
-    //       setPatientProfile(profile);
-    //     } catch (error: any) {
-    //       console.error("Error fetching patient profile:", error);
-    //       setPatientProfileError(error.message || "Falha ao carregar perfil do paciente.");
-    //     }
-    //     setIsLoadingProfile(false);
-    //   };
-    //   fetchPatientProfile();
-    // }
+    if (userRole === 'patient') {
+      const fetchPatientProfile = async () => {
+        setIsLoadingProfile(true);
+        setPatientProfileError(null);
+        try {
+          const token = await getToken();
+          if (!token) throw new Error("Authentication token not available.");
+          const profile = await getMyPatientProfile(token);
+          setPatientProfile(profile);
+        } catch (error: any) {
+          console.error("Error fetching patient profile:", error);
+          setPatientProfileError(error.message || "Falha ao carregar perfil do paciente.");
+        }
+        setIsLoadingProfile(false);
+      };
+      fetchPatientProfile();
+    }
   }, [userRole, getToken]);
 
   useEffect(() => {
@@ -237,8 +236,7 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Future patient support (commented out for now) */}
-      {/* {userRole === 'patient' && patientProfile && (
+      {userRole === 'patient' && patientProfile && (
         <>
           <div className="lg:col-span-2">
             <PatientOverview patient={patientProfile} />
@@ -303,7 +301,7 @@ export default function DashboardPage() {
             </Card>
           </div>
         </>
-      )} */}
+      )}
     {/* </motion.div> */}
     </div>
   );

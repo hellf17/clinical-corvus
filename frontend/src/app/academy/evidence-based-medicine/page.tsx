@@ -1,21 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
-import { Textarea } from "@/components/ui/Textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabs";
 import { ArrowRight, BookOpenCheck, SearchCheck, Microscope, HelpCircle, Lightbulb, FileQuestion, CheckSquare, Filter, RefreshCw, Search, FileText, Scale, Info, ArrowUpRight, BookOpen, Target, Zap, Brain, Users } from "lucide-react";
 import Link from "next/link";
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/Select";
 import { Badge } from "@/components/ui/Badge";
-import { Separator } from "@/components/ui/Separator";
-import { InformationTypeNeededEnumFE, InformationTypeNeededEnumBE, informationTypeMap } from '@/types/academy';
 
-// Importar os novos componentes de pesquisa profunda
 import DeepResearchComponent from '@/components/academy/research/DeepResearchComponent';
 import UnifiedEvidenceAnalysisComponent from '@/components/academy/research/UnifiedEvidenceAnalysisComponent';
 import PICOFormulationComponent from '@/components/academy/research/PICOFormulationComponent';
@@ -414,24 +407,28 @@ export default function EvidenceBasedMedicinePage() {
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-          <div className="p-5 bg-white rounded-xl border border-purple-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">📊</span>
+          <div className="p-5 bg-white rounded-xl border border-blue-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">🔎</span>
+                </div>
+                <h4 className="font-bold text-blue-800 text-lg">Diagnóstico Diferencial</h4>
               </div>
-              <h4 className="font-bold text-purple-800 text-lg">Medicina Baseada em Evidências</h4>
+              <p className="text-sm text-gray-600 mb-4 text-center leading-relaxed">
+                Explore diagnósticos diferenciais e desenvolva habilidades de raciocínio clínico.
+              </p>
+              <div className="text-center">
+                <Link href="/academy/differential-diagnosis">
+                  <Button 
+                    size="sm" 
+                    variant="default"
+                    className="px-4 py-2 w-full font-medium"
+                  >
+                    Diagnóstico Diferencial →
+                  </Button>
+                </Link>
+              </div>
             </div>
-            <p className="text-sm text-gray-600 mb-4 text-center leading-relaxed">
-              Aprenda a buscar, avaliar e aplicar evidências científicas para complementar seu raciocínio diagnóstico.
-            </p>
-            <div className="text-center">
-              <Link href="/academy/evidence-based-medicine">
-                <Button variant="default" size="sm" className="w-full">
-                  Explorar MBE →
-                </Button>
-              </Link>
-            </div>
-          </div>
 
           <div className="p-5 bg-white rounded-xl border border-blue-200 hover:shadow-lg transition-all duration-300 hover:scale-105">
             <div className="text-center mb-4">

@@ -1,5 +1,5 @@
 {
-  "name": "clinical-helper-frontend",
+  "name": "clinical-corvus-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -66,7 +66,7 @@
     "react-icons": "^4.12.0",
     "react-markdown": "^10.1.0",
     "react-vertical-timeline-component": "^3.6.0",
-    "recharts": "^2.15.3",
+    "recharts": "^2.15.4",
     "select": "^1.1.2",
     "shadcn-ui": "^0.9.5",
     "sharp": "^0.34.1",

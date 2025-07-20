@@ -42,16 +42,22 @@ def all_succeeded(checks: Dict[CheckName, Check]) -> bool:
 
 class AssessmentValue(str, Enum):
     
-    POSITIVO = "POSITIVO"
-    NEUTRO = "NEUTRO"
-    NEGATIVO = "NEGATIVO"
+    POSITIVE = "POSITIVE"
+    NEUTRAL = "NEUTRAL"
+    NEGATIVE = "NEGATIVE"
 
 class GradeLevel(str, Enum):
     
-    ALTA = "ALTA"
-    MODERADA = "MODERADA"
-    BAIXA = "BAIXA"
-    MUITO_BAIXA = "MUITO_BAIXA"
+    HIGH = "HIGH"
+    MODERATE = "MODERATE"
+    LOW = "LOW"
+    VERY_LOW = "VERY_LOW"
+
+class HypothesisFindingEvaluation(str, Enum):
+    
+    SUPPORTS = "SUPPORTS"
+    NEUTRAL = "NEUTRAL"
+    REFUTES = "REFUTES"
 
 class PossibleCognitiveBias(str, Enum):
     
@@ -63,8 +69,8 @@ class PossibleCognitiveBias(str, Enum):
 
 class RecommendationStrength(str, Enum):
     
-    FORTE = "FORTE"
-    FRACA = "FRACA"
+    STRONG = "STRONG"
+    WEAK = "WEAK"
 
 class ResearchSourceType(str, Enum):
     
@@ -80,6 +86,15 @@ class ResearchSourceType(str, Enum):
     ACADEMIC_DATABASE_GENERAL = "ACADEMIC_DATABASE_GENERAL"
     GUIDELINE_RESOURCE = "GUIDELINE_RESOURCE"
     PREPRINT = "PREPRINT"
+
+class SNAPPSStep(str, Enum):
+    
+    SUMMARIZE = "SUMMARIZE"
+    NARROW = "NARROW"
+    ANALYZE = "ANALYZE"
+    PROBE = "PROBE"
+    PLAN = "PLAN"
+    SELECT = "SELECT"
 
 class StudyDesignType(str, Enum):
     
@@ -103,20 +118,23 @@ class StudyTypeFilter(str, Enum):
     CLINICAL_TRIAL = "CLINICAL_TRIAL"
     REVIEW = "REVIEW"
 
+class TextType(str, Enum):
+    
+    FULL_TEXT = "FULL_TEXT"
+    ABSTRACT_ONLY = "ABSTRACT_ONLY"
+
 class UserRole(str, Enum):
     
     PATIENT = "PATIENT"
     DOCTOR_STUDENT = "DOCTOR_STUDENT"
 
-class AnalyzeDifferentialDiagnosesSNAPPSInput(BaseModel):
-    case_summary: str
+class AnalyzeDDxInput(BaseModel):
+    session_state: "SessionState"
     student_differential_diagnoses: List[str]
-    case_context: str
 
-class AnswerProbeQuestionsSNAPPSInputModel(BaseModel):
-    session_context: str
-    student_questions: str
-    case_data: str
+class AnswerProbeQuestionsInput(BaseModel):
+    session_state: "SessionState"
+    student_questions: List[str]
 
 class AnsweredQuestion(BaseModel):
     question: str
@@ -135,10 +153,11 @@ class BenchmarkComparison(BaseModel):
     improvement_targets: List[str]
 
 class BiasAnalysis(BaseModel):
-    selection_bias: str
-    performance_bias: str
-    reporting_bias: str
-    confirmation_bias: str
+    id: str
+    bias_type: str
+    potential_impact: str
+    mitigation_strategies: str
+    actionable_suggestion: str
 
 class BiasReflectionPoint(BaseModel):
     bias_type: "PossibleCognitiveBias"
@@ -225,9 +244,9 @@ class ClinicalWorkflowQuestionsOutput(BaseModel):
     overall_rationale: str
 
 class CognitiveBiasInput(BaseModel):
-    case_summary_by_user: str
-    user_working_hypothesis: str
-    user_reasoning_summary: str
+    case_summary_by_user: Optional[str] = None
+    case_vignette_id: Optional[str] = None
+    user_identified_biases: List[str]
 
 class CognitiveBiasReflectionOutput(BaseModel):
     potential_biases_to_consider: List["DetectedCognitiveBias"]
@@ -240,6 +259,11 @@ class CompareContrastFeedbackOutput(BaseModel):
     overall_feedback: Optional[str] = None
     detailed_feedback_per_hypothesis: List["HypothesisComparisonFeedback"]
     suggested_learning_focus: Optional[str] = None
+
+class CompareContrastMatrixInput(BaseModel):
+    scenario: "CaseScenarioInput"
+    student_matrix_analysis: List["HypothesisFindingAnalysis"]
+    student_chosen_discriminator: str
 
 class DdxEvaluation(BaseModel):
     diagnosis: str
@@ -297,14 +321,13 @@ class DifferentialAnalysisOutputModel(BaseModel):
     socratic_questions: List[str]
     next_step_guidance: str
 
-class EvaluateManagementPlanSNAPPSInputModel(BaseModel):
-    session_context: str
+class EvaluateManagementPlanInput(BaseModel):
+    session_state: "SessionState"
     student_plan: str
-    case_data: str
 
-class EvaluateSummarySNAPPSInputModel(BaseModel):
+class EvaluateSummaryInput(BaseModel):
+    case_context: "CaseContext"
     student_summary: str
-    case_description: str
 
 class EvidenceAnalysisData(BaseModel):
     study_objective: str
@@ -317,13 +340,10 @@ class EvidenceAnalysisData(BaseModel):
     authors_acknowledged_limitations: List[str]
 
 class EvidenceAppraisalOutput(BaseModel):
-    overall_quality: "GradeLevel"
-    quality_reasoning: str
-    recommendation_strength: "RecommendationStrength"
-    strength_reasoning: str
+    grade_summary: "GradeSummary"
     quality_factors: List["QualityFactor"]
-    bias_analysis: "BiasAnalysis"
-    practice_recommendations: List[str]
+    bias_analysis: List["BiasAnalysis"]
+    practice_recommendations: "PracticeRecommendations"
 
 class EvidenceTheme(BaseModel):
     theme_name: str
@@ -348,14 +368,18 @@ class ExpandedDdxOutput(BaseModel):
     applied_approach_description: str
     suggested_additional_diagnoses_with_rationale: List[str]
 
+class ExpertHypothesisFindingAnalysis(BaseModel):
+    finding_name: str
+    hypothesis_name: str
+    expert_evaluation: "HypothesisFindingEvaluation"
+    expert_rationale: str
+
+class FacilitateDDxAnalysisInput(BaseModel):
+    session_state: "SessionState"
+    student_analysis: str
+
 class FacilitateDDxAnalysisOutputModel(BaseModel):
     response: str
-
-class FacilitateDDxAnalysisSNAPPSInputModel(BaseModel):
-    case_summary: str
-    differential_diagnoses: List[str]
-    student_analysis: str
-    case_context: str
 
 class FormulatedSearchStrategyOutput(BaseModel):
     refined_query_for_llm_synthesis: str
@@ -363,12 +387,25 @@ class FormulatedSearchStrategyOutput(BaseModel):
     search_rationale: str
     expected_evidence_types: List[str]
 
+class GradeSummary(BaseModel):
+    overall_quality: "GradeLevel"
+    recommendation_strength: "RecommendationStrength"
+    summary_of_findings: str
+    recommendation_balance: "RecommendationBalance"
+    reasoning_tags: List["ReasoningTag"]
+
 class HypothesisComparisonFeedback(BaseModel):
     hypothesis_name: str
     feedback_on_supporting_findings: Optional[str] = None
     feedback_on_refuting_findings: Optional[str] = None
     feedback_on_discriminators: Optional[str] = None
     expert_comparison_points: Optional[List[str]] = None
+
+class HypothesisFindingAnalysis(BaseModel):
+    finding_name: str
+    hypothesis_name: str
+    student_evaluation: "HypothesisFindingEvaluation"
+    student_rationale: Optional[str] = None
 
 class IllnessScriptInput(BaseModel):
     disease_name: str
@@ -415,6 +452,15 @@ class LabTestResult(BaseModel):
     interpretation_flag: Optional[str] = None
     notes: Optional[str] = None
 
+class MatrixFeedbackOutput(BaseModel):
+    overall_matrix_feedback: str
+    discriminator_feedback: str
+    expert_matrix_analysis: List["ExpertHypothesisFindingAnalysis"]
+    expert_recommended_discriminator: str
+    expert_discriminator_rationale: str
+    learning_focus_suggestions: List[str]
+    matrix_accuracy_score: Optional[float] = None
+
 class PDFAnalysisInput(BaseModel):
     pdf_content: str
     analysis_focus: Optional[str] = None
@@ -432,6 +478,7 @@ class PDFAnalysisOutput(BaseModel):
 
 class PICOFormulationOutput(BaseModel):
     structured_pico_question: "PICOQuestion"
+    structured_question: str
     explanation: str
     pico_derivation_reasoning: str
     search_terms_suggestions: List[str]
@@ -472,6 +519,11 @@ class PopulationInfo(BaseModel):
     inclusion_criteria: List[str]
     exclusion_criteria: List[str]
 
+class PracticeRecommendations(BaseModel):
+    clinical_application: str
+    monitoring_points: List[str]
+    evidence_caveats: str
+
 class ProbeResponseOutputModel(BaseModel):
     answers_to_questions: List["AnsweredQuestion"]
     additional_considerations: List[str]
@@ -493,12 +545,11 @@ class ProcessingMetadata(BaseModel):
     timestamp: str
     version: str
 
-class ProvideSessionSummarySNAPPSInputModel(BaseModel):
-    session_history: List[str]
-    case_context: str
-    student_selected_topic: Optional[str] = None
+class ProvideSessionSummaryInput(BaseModel):
+    session_state: "SessionState"
 
 class QualityFactor(BaseModel):
+    id: str
     factor_name: str
     assessment: "AssessmentValue"
     justification: str
@@ -531,6 +582,16 @@ class RawSearchResultItem(BaseModel):
     relevance_score: Optional[float] = None
     composite_impact_score: Optional[float] = None
     academic_source_name: Optional[str] = None
+
+class ReasoningTag(BaseModel):
+    tag: str
+    reference_id: str
+
+class RecommendationBalance(BaseModel):
+    positive_factors: List[str]
+    negative_factors: List[str]
+    overall_balance: str
+    reasoning_tags: List[str]
 
 class ResearchMetrics(BaseModel):
     total_articles_analyzed: int
@@ -573,6 +634,16 @@ class SelfReflectionInput(BaseModel):
     clinical_scenario: str
     user_hypothesis: str
     user_reasoning_summary: str
+
+class SessionState(BaseModel):
+    case_context: "CaseContext"
+    student_summary: Optional[str] = None
+    student_ddx: Optional[List[str]] = None
+    student_analysis: Optional[str] = None
+    student_probe_questions: Optional[List[str]] = None
+    student_management_plan: Optional[str] = None
+    student_selected_topic: Optional[str] = None
+    feedback_history: List[str]
 
 class SessionSummaryOutputModel(BaseModel):
     overall_performance: str

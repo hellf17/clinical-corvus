@@ -9,7 +9,6 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
-import { Separator } from '@/components/ui/Separator';
 import { 
   FileQuestion, 
   RefreshCw, 
@@ -241,20 +240,25 @@ export default function PICOFormulationComponent({
   );
 
   return (
-    <Card>
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       <form onSubmit={handleSubmit}>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileQuestion className="h-6 w-6 mr-2" />
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <FileQuestion className="h-6 w-6 mr-2 text-green-500" />
             Formulação de Perguntas PICO
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600">
             Transforme cenários clínicos em perguntas estruturadas seguindo a metodologia PICO (População, Intervenção, Comparação, Outcome). 
             Dr. Corvus ajudará a formular sua pergunta de pesquisa de forma clara e direcionada.
           </CardDescription>
+          <div className="flex items-center justify-center space-x-2 mt-4">
+            <Target className="h-5 w-5 text-yellow-500" />
+            <span className="text-sm text-gray-500">Estruturação metodológica PICO</span>
+          </div>
         </CardHeader>
         
-        <CardContent className="space-y-6">
+        <CardContent className="relative z-10 space-y-6">
           {/* Seção de Exemplos */}
           <Collapsible open={showExamples} onOpenChange={setShowExamples}>
             <CollapsibleTrigger asChild>
@@ -274,21 +278,21 @@ export default function PICOFormulationComponent({
                 {picoExamples.map((example, index) => (
                   <div 
                     key={index}
-                    className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-purple-300 hover:bg-purple-50 ${
-                      selectedExample === index ? 'border-purple-500 bg-purple-50' : 'border-gray-200'
+                    className={`p-3 border rounded-lg cursor-pointer transition-all hover:border-green-300 hover:bg-green-50 ${
+                      selectedExample === index ? 'border-green-500 bg-green-50' : 'border-gray-200'
                     }`}
                     onClick={() => handleLoadExample(index)}
                   >
-                    <h4 className="font-medium text-sm text-purple-800 mb-2">{example.title}</h4>
+                    <h4 className="font-medium text-sm text-green-800 mb-2">{example.title}</h4>
                     <p className="text-xs text-gray-600 line-clamp-3">{example.scenario.substring(0, 100)}...</p>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">P</Badge>
-                      <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">I</Badge>
-                      <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">C</Badge>
-                      <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">O</Badge>
+                      <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">P</Badge>
+                      <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">I</Badge>
+                      <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">C</Badge>
+                      <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">O</Badge>
                     </div>
                     {selectedExample === index && (
-                      <div className="mt-2 text-xs text-purple-600 font-medium">✓ Carregado</div>
+                      <div className="mt-2 text-xs text-green-600 font-medium">✓ Carregado</div>
                     )}
                   </div>
                 ))}
@@ -334,53 +338,53 @@ export default function PICOFormulationComponent({
           </div>
 
           {/* Guia PICO */}
-          <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+          <div className="p-4 bg-white border border-green-200 rounded-lg">
             <div className="flex items-center mb-3">
-              <Target className="h-5 w-5 text-purple-600 mr-2" />
-              <h4 className="font-semibold text-purple-800">Guia de Estruturação PICO</h4>
+              <Target className="h-5 w-5 text-green-600 mr-2" />
+              <h4 className="font-semibold text-green-800">Guia de Estruturação PICO</h4>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <div className="flex items-center mb-1">
-                  <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">P</Badge>
+                  <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">P</Badge>
                   <strong>População/Paciente</strong>
                   <PICOTooltip 
                     element="População" 
                     description="Características específicas dos pacientes: idade, sexo, condição clínica, comorbidades, estágio da doença" 
                   />
                 </div>
-                <p className="text-xs text-purple-600 mb-3">Quem são os pacientes de interesse?</p>
+                <p className="text-xs text-green-600 mb-3">Quem são os pacientes de interesse?</p>
                 
                 <div className="flex items-center mb-1">
-                  <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">I</Badge>
+                  <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">I</Badge>
                   <strong>Intervenção</strong>
                   <PICOTooltip 
                     element="Intervenção" 
                     description="Tratamento, procedimento, teste diagnóstico, exposição ou fator prognóstico principal sendo estudado" 
                   />
                 </div>
-                <p className="text-xs text-purple-600">O que você está considerando fazer?</p>
+                <p className="text-xs text-green-600">O que você está considerando fazer?</p>
               </div>
               <div>
                 <div className="flex items-center mb-1">
-                  <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">C</Badge>
+                  <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">C</Badge>
                   <strong>Comparação</strong>
                   <PICOTooltip 
                     element="Comparação" 
                     description="Alternativa terapêutica, placebo, padrão-ouro atual ou ausência de intervenção" 
                   />
                 </div>
-                <p className="text-xs text-purple-600 mb-3">Qual é a alternativa principal?</p>
+                <p className="text-xs text-green-600 mb-3">Qual é a alternativa principal?</p>
                 
                 <div className="flex items-center mb-1">
-                  <Badge variant="outline" className="text-xs mr-2 bg-purple-100 text-purple-700">O</Badge>
+                  <Badge variant="outline" className="text-xs mr-2 bg-green-100 text-green-700">O</Badge>
                   <strong>Outcome (Desfecho)</strong>
                   <PICOTooltip 
                     element="Outcome" 
                     description="Resultado clínico de interesse: mortalidade, morbidade, qualidade de vida, efeitos adversos, custos" 
                   />
                 </div>
-                <p className="text-xs text-purple-600">Que resultado você espera medir?</p>
+                <p className="text-xs text-green-600">Que resultado você espera medir?</p>
               </div>
             </div>
           </div>
@@ -406,7 +410,7 @@ export default function PICOFormulationComponent({
                 type="button" 
                 variant="default" 
                 onClick={handleTransferToResearch}
-                className="flex items-center border-[#44154a] text-[#44154a] hover:bg-[#44154a] hover:text-white"
+                className="flex items-center"
               >
                 <Search className="mr-2 h-4 w-4" />
                 Pesquisar Evidências
@@ -443,93 +447,105 @@ export default function PICOFormulationComponent({
           {results && (
             <div className="mt-8 space-y-6">
               {/* Pergunta PICO Estruturada */}
-              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-300 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center">
                     <CheckCircle className="h-6 w-6 text-green-600 mr-2" />
-                    <h3 className="text-lg font-semibold text-green-800">Pergunta PICO Estruturada</h3>
+                    <h3 className="text-lg font-semibold text-blue-800">Pergunta PICO Estruturada</h3>
                   </div>
                   <Button 
                     size="sm" 
                     variant="default" 
                     onClick={() => copyToClipboard(results.structured_question)}
-                    className="flex items-center"
+                    className="flex items-center bg-green-600 hover:bg-green-700"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
+                </div>
+                <div className="mb-4 p-4 bg-white border border-green-100 rounded-lg">
+                  <p className="text-gray-800 font-medium text-base leading-relaxed">
+                    "{results.structured_question}"
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <span className="text-sm font-medium text-green-700">
+                    Pergunta formulada segundo metodologia PICO
+                  </span>
+                  <Target className="h-4 w-4 text-green-700" />
                 </div>
               </div>
 
               {/* Componentes PICO Detalhados - MIGRATION: use structured_pico_question */}
               {results.structured_pico_question && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center mb-2">
-                      <Badge className="mr-2 bg-blue-600">P</Badge>
-                      <h4 className="font-semibold text-blue-800">População</h4>
+                      <Badge className="mr-2 bg-green-600">P</Badge>
+                      <h4 className="font-semibold text-green-800">População</h4>
                     </div>
-                    <p className="text-sm text-blue-700">{results.structured_pico_question.patient_population || '-'}</p>
+                    <p className="text-sm text-green-700">{results.structured_pico_question.patient_population || '-'}</p>
                   </div>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center mb-2">
-                      <Badge className="mr-2 bg-blue-600">I</Badge>
-                      <h4 className="font-semibold text-blue-800">Intervenção</h4>
+                      <Badge className="mr-2 bg-green-600">I</Badge>
+                      <h4 className="font-semibold text-green-800">Intervenção</h4>
                     </div>
-                    <p className="text-sm text-blue-700">{results.structured_pico_question.intervention || '-'}</p>
+                    <p className="text-sm text-green-700">{results.structured_pico_question.intervention || '-'}</p>
                   </div>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center mb-2">
-                      <Badge className="mr-2 bg-blue-600">C</Badge>
-                      <h4 className="font-semibold text-blue-800">Comparação</h4>
+                      <Badge className="mr-2 bg-green-600">C</Badge>
+                      <h4 className="font-semibold text-green-800">Comparação</h4>
                     </div>
-                    <p className="text-sm text-blue-700">{results.structured_pico_question.comparison || '-'}</p>
+                    <p className="text-sm text-green-700">{results.structured_pico_question.comparison || '-'}</p>
                   </div>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center mb-2">
-                      <Badge className="mr-2 bg-blue-600">O</Badge>
-                      <h4 className="font-semibold text-blue-800">Outcome (Desfecho)</h4>
+                      <Badge className="mr-2 bg-green-600">O</Badge>
+                      <h4 className="font-semibold text-green-800">Outcome (Desfecho)</h4>
                     </div>
-                    <p className="text-sm text-blue-700">{results.structured_pico_question.outcome || '-'}</p>
+                    <p className="text-sm text-green-700">{results.structured_pico_question.outcome || '-'}</p>
                   </div>
                   {results.structured_pico_question.time_frame && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center mb-2">
-                        <Badge className="mr-2 bg-blue-600">T</Badge>
-                        <h4 className="font-semibold text-blue-800">Tempo</h4>
+                        <Badge className="mr-2 bg-green-600">T</Badge>
+                        <h4 className="font-semibold text-green-800">Tempo</h4>
                       </div>
-                      <p className="text-sm text-blue-700">{results.structured_pico_question.time_frame}</p>
+                      <p className="text-sm text-green-700">{results.structured_pico_question.time_frame}</p>
                     </div>
                   )}
                   {results.structured_pico_question.study_type && (
-                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex items-center mb-2">
-                        <Badge className="mr-2 bg-blue-600">S</Badge>
-                        <h4 className="font-semibold text-blue-800">Tipo de Estudo</h4>
+                        <Badge className="mr-2 bg-green-600">S</Badge>
+                        <h4 className="font-semibold text-green-800">Tipo de Estudo</h4>
                       </div>
-                      <p className="text-sm text-blue-700">{results.structured_pico_question.study_type}</p>
+                      <p className="text-sm text-green-700">{results.structured_pico_question.study_type}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Raciocínio Detalhado */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center mb-3">
-                  <MessageSquare className="h-5 w-5 text-blue-600 mr-2" />
-                  <h4 className="font-semibold text-blue-800">Raciocínio Detalhado (Chain-of-Thought)</h4>
+                  <MessageSquare className="h-5 w-5 text-green-600 mr-2" />
+                  <h4 className="font-semibold text-green-800">Raciocínio Detalhado (Chain-of-Thought)</h4>
                 </div>
-                <div className="text-sm text-blue-700 leading-relaxed">
+                <div className="text-sm text-green-700 leading-relaxed">
                   <ReactMarkdown>{results.pico_derivation_reasoning}</ReactMarkdown>
                 </div>
               </div>
 
               {/* Explicação da Formulação */}
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center mb-3">
-                  <Lightbulb className="h-5 w-5 text-blue-600 mr-2" />
-                  <h4 className="font-semibold text-blue-800">Explicação da Formulação</h4>
+                  <Lightbulb className="h-5 w-5 text-green-600 mr-2" />
+                  <h4 className="font-semibold text-green-800">Explicação da Formulação</h4>
                 </div>
-                <div className="text-sm text-blue-700 leading-relaxed">
+                <div className="text-sm text-green-700 leading-relaxed">
                   <ReactMarkdown>{results.explanation}</ReactMarkdown>
                 </div>
               </div>
@@ -537,10 +553,10 @@ export default function PICOFormulationComponent({
               {/* Estratégia de Busca */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Tipos de Estudo Recomendados */}
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center mb-3">
-                    <Filter className="h-5 w-5 text-blue-600 mr-2" />
-                    <h4 className="font-semibold text-blue-800">Tipos de Estudo Recomendados</h4>
+                    <Filter className="h-5 w-5 text-green-600 mr-2" />
+                    <h4 className="font-semibold text-green-800">Tipos de Estudo Recomendados</h4>
                   </div>
                   <div className="space-y-1">
                     {results.recommended_study_types.map((type, index) => (
@@ -555,10 +571,10 @@ export default function PICOFormulationComponent({
 
               {/* Estratégias de Busca Booleana */}
               {results.boolean_search_strategies.length > 0 && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center mb-3">
-                    <Globe className="h-5 w-5 text-blue-600 mr-2" />
-                    <h4 className="font-semibold text-blue-800">Estratégias de Busca Booleana</h4>
+                    <Globe className="h-5 w-5 text-green-600 mr-2" />
+                    <h4 className="font-semibold text-green-800">Estratégias de Busca Booleana</h4>
                   </div>
                   <div className="space-y-2">
                     {results.boolean_search_strategies.map((strategy, index) => (
@@ -595,7 +611,7 @@ export default function PICOFormulationComponent({
                   </CollapsibleTrigger>
                   <CollapsibleContent className="space-y-3 mt-4">
                     {(results.alternative_pico_formulations ?? []).map((alternative, index) => (
-                      <div key={index} className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                      <div key={index} className="p-3 bg-green-50 border border-green-200 rounded-md">
                         <div className="flex items-center justify-between">
                           <p className="text-sm flex-1">{alternative}</p>
                           <Button 
@@ -614,17 +630,17 @@ export default function PICOFormulationComponent({
               )}
 
               {/* Call to Action para Pesquisa */}
-              <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold text-blue-800 mb-1">Pronto para buscar evidências?</h4>
-                    <p className="text-sm text-blue-600">
+                    <h4 className="font-semibold text-green-800 mb-1">Pronto para buscar evidências?</h4>
+                    <p className="text-sm text-green-600">
                       Use sua pergunta PICO estruturada para fazer uma pesquisa avançada de evidências científicas.
                     </p>
                   </div>
                   <Button 
                     onClick={handleTransferToResearch}
-                    className="flex items-center"
+                    className="flex items-center bg-green-600 hover:bg-green-700"
                     variant="default"
                   >
                     <Search className="mr-2 h-4 w-4" />

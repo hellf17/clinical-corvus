@@ -45,7 +45,10 @@ import {
   ThumbsDown,
   Copy,
   ChevronRight,
-  FlaskConical
+  FlaskConical,
+  Activity,
+  Brain,
+  Database
 } from 'lucide-react';  
 
 // Interfaces para tipos de dados
@@ -431,20 +434,25 @@ export default function DeepResearchComponent({
   };
 
   return (
-      <Card>
+      <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       <form onSubmit={handleSubmit}>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Search className="h-6 w-6 mr-2 text-[#44154a]" />
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <Search className="h-6 w-6 mr-2 text-green-500" />
             Pesquisa Avançada de Evidências Científicas
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600">
             Utilize o Dr. Corvus para realizar uma pesquisa abrangente e síntese de evidências científicas sobre sua pergunta clínica.
             Escolha entre busca rápida (1-3 min) ou análise autônoma (4-6 min) para maior profundidade.
           </CardDescription>
+          <div className="flex items-center justify-center space-x-2 mt-4">
+            <Zap className="h-5 w-5 text-yellow-500" />
+            <span className="text-sm text-gray-500">Análise completa de evidências científicas</span>
+          </div>
         </CardHeader>
         
-        <CardContent className="space-y-6">
+        <CardContent className="relative z-10 space-y-6">
           {/* Campo principal de pesquisa */}
             <div>
             <label htmlFor="researchQuestion" className="block text-sm font-medium mb-1">
@@ -471,8 +479,8 @@ export default function DeepResearchComponent({
               <div 
                 className={`p-4 border rounded-lg cursor-pointer transition-all ${
                   researchMode === 'quick' 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-blue-300'
+                    ? 'border-green-500 bg-green-50' 
+                    : 'border-gray-200 hover:border-green-300'
                 }`}
                 onClick={() => setResearchMode('quick')}
               >
@@ -484,7 +492,7 @@ export default function DeepResearchComponent({
                     className="mr-2"
                     disabled={isLoading}
                   />
-                  <Zap className="h-4 w-4 mr-2 text-yellow-500" />
+                  <Zap className="h-4 w-4 mr-2 text-green-500" />
                   <span className="font-medium">Pesquisa Rápida</span>
                   <Badge variant="outline" className="ml-2 text-xs">1-3 min</Badge>
                 </div>
@@ -496,8 +504,8 @@ export default function DeepResearchComponent({
               <div 
                 className={`p-4 border rounded-lg cursor-pointer transition-all ${
                   researchMode === 'autonomous' 
-                    ? 'border-green-500 bg-green-50' 
-                    : 'border-gray-200 hover:border-green-300'
+                    ? 'border-emerald-500 bg-emerald-50' 
+                    : 'border-gray-200 hover:border-emerald-300'
                 }`}
                 onClick={() => setResearchMode('autonomous')}
               >
@@ -509,7 +517,7 @@ export default function DeepResearchComponent({
                     className="mr-2"
                     disabled={isLoading}
                   />
-                  <Target className="h-4 w-4 mr-2 text-blue-500" />
+                  <Target className="h-4 w-4 mr-2 text-emerald-500" />
                   <span className="font-medium">Análise Autônoma</span>
                   <Badge variant="outline" className="ml-2 text-xs">4-6 min</Badge>
                 </div>
@@ -660,7 +668,7 @@ export default function DeepResearchComponent({
 
           {/* Progresso da Pesquisa Autônoma */}
           {isLoading && researchMode === 'autonomous' && (
-            <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
               <div className="flex items-center mb-3">
                 <RefreshCw className="h-5 w-5 text-green-600 animate-spin mr-2" />
                 <h4 className="font-medium text-green-800">Análise Autônoma em Progresso</h4>
@@ -672,10 +680,10 @@ export default function DeepResearchComponent({
               />
               
               <div className="flex justify-between items-center text-sm">
-                <span className="text-purple-700">
+                <span className="text-green-700">
                   {progressMessage || progressStages[currentProgressStage]?.label || 'Preparando...'}
                 </span>
-                <span className="text-purple-600 flex items-center">
+                <span className="text-green-600 flex items-center">
                   <Clock className="h-3 w-3 mr-1" />
                   ~{Math.max(0, estimatedTimeRemaining)}s restantes
                 </span>
@@ -754,14 +762,19 @@ export default function DeepResearchComponent({
               )}
 
               {/* Cabeçalho dos Resultados com Ações */}
-              <Card className="border-l-4 border-l-green-500">
-                <CardHeader>
+              <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500">
+                <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                <CardHeader className="relative z-10">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
                       <CardTitle className="text-xl flex items-center text-green-800">
                         <CheckCircle className="h-6 w-6 mr-3 text-green-600" />
                         Análise de Evidências Concluída
                       </CardTitle>
+                      <div className="flex items-center justify-center space-x-2 mt-2">
+                        <Zap className="h-4 w-4 text-yellow-500" />
+                        <span className="text-sm text-gray-500">Síntese científica completa</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3 md:mt-0">
                       <Button 
@@ -819,12 +832,17 @@ export default function DeepResearchComponent({
 
               {/* Métricas Unificadas da Pesquisa */}
               {results.research_metrics && (
-                <Card className="bg-blue-50 border-blue-100">
-                  <CardHeader>
-                    <CardTitle className="text-xl font-semibold flex items-center text-blue-800">
+                <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 bg-green-50 border-green-100">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <CardHeader className="relative z-10">
+                    <CardTitle className="text-xl font-semibold flex items-center text-green-800">
                       <BarChart3 className="h-5 w-5 mr-2" />
                       Métricas e Detalhes da Pesquisa
                     </CardTitle>
+                    <div className="flex items-center justify-center space-x-2 mt-2">
+                      <Activity className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700">Análise quantitativa dos resultados</span>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
@@ -1066,14 +1084,22 @@ export default function DeepResearchComponent({
 
               {/* Resumo Executivo */}
               {results && results.executive_summary && (
-                <Card className="border-l-4 border-l-green-500 bg-white mb-6 shadow-md">
-                  <CardHeader>
+                <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500 bg-white mb-6 shadow-md">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <CardHeader className="relative z-10">
                     <CardTitle className="text-lg flex items-center text-green-800">
                       <TrendingUp className="h-5 w-5 mr-2" />
                       Resumo Executivo
                     </CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-green-700">
+                        Síntese principal dos achados
+                      </span>
+                      <BookOpen className="h-4 w-4 text-green-700" />
+                    </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="relative z-10">
                     <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
                       <ReactMarkdown>{results.executive_summary || ''}</ReactMarkdown>
                     </div>
@@ -1083,14 +1109,22 @@ export default function DeepResearchComponent({
 
               {/* Clinical Implications Card */}
               {results && !isFallbackResult(results) && results.clinical_implications && results.clinical_implications.length > 0 && (
-                <Card className="mt-8 border-l-4 border-l-green-500 bg-green-50">
-                  <CardHeader>
+                <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 mt-8 border-l-4 border-green-500 bg-green-50">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <CardHeader className="relative z-10">
                     <CardTitle className="text-lg flex items-center text-green-800">
                       <Lightbulb className="h-5 w-5 mr-2" />
                       Implicações Clínicas
                     </CardTitle>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-green-700">
+                        {results.clinical_implications.length} implicação(ões) identificada(s)
+                      </span>
+                      <Target className="h-4 w-4 text-green-700" />
+                    </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="relative z-10">
                     <ul className="space-y-3 list-none pl-0">
                       {results.clinical_implications.map((implication: string, index: number) => (
                         <li key={index} className="flex items-start">
@@ -1107,8 +1141,9 @@ export default function DeepResearchComponent({
               
               {/* Achados por Tema */}
               {results.key_findings_by_theme && results.key_findings_by_theme.length > 0 && (
-                <Card>
-                  <CardHeader>
+                <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <CardHeader className="relative z-10">
                     <CardTitle className="text-lg flex items-center text-green-800">
                       <Target className="h-5 w-5 mr-2 text-green-600" />
                       Achados por Tema
@@ -1116,8 +1151,15 @@ export default function DeepResearchComponent({
                     <CardDescription>
                       Evidências organizadas por temas principais identificados na literatura
                     </CardDescription>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-green-700">
+                        {results.key_findings_by_theme.length} tema(s) identificado(s)
+                      </span>
+                      <BookOpen className="h-4 w-4 text-green-700" />
+                    </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="relative z-10">
                     <div className="space-y-6">
                       {results.key_findings_by_theme.map((theme, index) => (
                         <div key={index} className="border-l-4 border-l-green-400 border border-gray-200 rounded-lg overflow-hidden">
@@ -1176,8 +1218,9 @@ export default function DeepResearchComponent({
               {/* Card para Raciocínio Detalhado Profissional (CoT) */}
               {results && results.professional_detailed_reasoning_cot && (
                 <Collapsible open={isReasoningCotOpen} onOpenChange={setIsReasoningCotOpen} className="mb-6">
-                  <Card className="border-l-4 border-l-green-500 bg-white shadow-lg">
-                    <CardHeader className="cursor-pointer">
+                  <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500 bg-white shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                    <CardHeader className="relative z-10 cursor-pointer">
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle className="text-xl font-semibold flex items-center text-green-800">
@@ -1187,6 +1230,13 @@ export default function DeepResearchComponent({
                           <CardDescription className="mt-1">
                             Análise técnica e processo de raciocínio do assistente.
                           </CardDescription>
+                          <div className="flex items-center space-x-2 mt-2">
+                            <div className="w-3 h-3 rounded-full bg-green-500" />
+                            <span className="text-sm font-medium text-green-700">
+                              Cadeia de pensamento detalhada
+                            </span>
+                            <Brain className="h-4 w-4 text-green-700" />
+                          </div>
                         </div>
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" size="sm" className="w-9 p-0">
@@ -1197,7 +1247,7 @@ export default function DeepResearchComponent({
                       </div>
                     </CardHeader>
                     <CollapsibleContent>
-                      <CardContent className="pt-0">
+                      <CardContent className="relative z-10 pt-0">
                         <div className="prose prose-base max-w-none text-gray-800 bg-green-50 p-4 rounded-md border border-green-100" style={{lineHeight: '1.7', letterSpacing: '0.01em'}}><ReactMarkdown>
                           {results.professional_detailed_reasoning_cot || ''}
                         </ReactMarkdown></div>
@@ -1244,14 +1294,22 @@ export default function DeepResearchComponent({
                   console.warn('Nenhuma referência encontrada após filtro! allRefs:', allRefs);
                 }
                 return (
-                  <Card className="bg-gray-50 border border-gray-200 shadow-sm">
-                    <CardHeader>
+                  <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 bg-gray-50 border border-gray-200 shadow-sm">
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                    <CardHeader className="relative z-10">
                       <CardTitle className="text-xl font-semibold flex items-center text-gray-800">
-                        <BookOpen className="h-5 w-5 mr-3 text-gray-700" />
+                        <BookOpen className="h-5 w-5 mr-3 text-green-700" />
                         Referências Analisadas
                       </CardTitle>
+                      <div className="flex items-center space-x-2 mt-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500" />
+                        <span className="text-sm font-medium text-green-700">
+                          {sortedReferences.length} referência(s) encontrada(s)
+                        </span>
+                        <Database className="h-4 w-4 text-green-700" />
+                      </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="relative z-10">
                       <ScrollArea className="h-[400px] p-3 border rounded-md bg-gray-100/50">
                         <div className="space-y-3">
                           {sortedReferences.length === 0 ? (

@@ -127,7 +127,7 @@ class BamlSyncClient:
     
     def AnalyzeDifferentialDiagnoses_SNAPPS(
         self,
-        input: types.AnalyzeDifferentialDiagnosesSNAPPSInput,
+        input: types.AnalyzeDDxInput,
         baml_options: BamlCallOptions = {},
     ) -> types.DifferentialAnalysisOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -154,7 +154,7 @@ class BamlSyncClient:
     
     def AnalyzeMedicalPaper(
         self,
-        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        paper_text: str,text_type: types.TextType,clinical_question: Optional[str],source_type: Optional[str],publication_year: Optional[int],
         baml_options: BamlCallOptions = {},
     ) -> types.EvidenceAnalysisData:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -170,7 +170,7 @@ class BamlSyncClient:
       raw = self.__runtime.call_function_sync(
         "AnalyzeMedicalPaper",
         {
-          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+          "paper_text": paper_text,"text_type": text_type,"clinical_question": clinical_question,"source_type": source_type,"publication_year": publication_year,
         },
         self.__ctx_manager.get(),
         tb,
@@ -208,7 +208,7 @@ class BamlSyncClient:
     
     def AnswerProbeQuestions_SNAPPS(
         self,
-        input: types.AnswerProbeQuestionsSNAPPSInputModel,
+        input: types.AnswerProbeQuestionsInput,
         baml_options: BamlCallOptions = {},
     ) -> types.ProbeResponseOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -262,7 +262,7 @@ class BamlSyncClient:
     
     def EvaluateManagementPlan_SNAPPS(
         self,
-        input: types.EvaluateManagementPlanSNAPPSInputModel,
+        input: types.EvaluateManagementPlanInput,
         baml_options: BamlCallOptions = {},
     ) -> types.PlanEvaluationOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -289,7 +289,7 @@ class BamlSyncClient:
     
     def EvaluateSummary_SNAPPS(
         self,
-        input: types.EvaluateSummarySNAPPSInputModel,
+        input: types.EvaluateSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> types.SummaryFeedbackOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -370,7 +370,7 @@ class BamlSyncClient:
     
     def FacilitateDDxAnalysis_SNAPPS(
         self,
-        input: types.FacilitateDDxAnalysisSNAPPSInputModel,
+        input: types.FacilitateDDxAnalysisInput,
         baml_options: BamlCallOptions = {},
     ) -> types.FacilitateDDxAnalysisOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -559,7 +559,7 @@ class BamlSyncClient:
     
     def GenerateEvidenceAppraisal(
         self,
-        extracted_data: types.EvidenceAnalysisData,
+        extracted_data: types.EvidenceAnalysisData,clinical_question: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> types.EvidenceAppraisalOutput:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -575,7 +575,7 @@ class BamlSyncClient:
       raw = self.__runtime.call_function_sync(
         "GenerateEvidenceAppraisal",
         {
-          "extracted_data": extracted_data,
+          "extracted_data": extracted_data,"clinical_question": clinical_question,
         },
         self.__ctx_manager.get(),
         tb,
@@ -692,6 +692,33 @@ class BamlSyncClient:
       )
       return cast(types.ProblemRepresentationFeedbackOutputModel, raw.cast_to(types, types, partial_types, False))
     
+    def ProvideMatrixFeedback(
+        self,
+        input: types.CompareContrastMatrixInput,
+        baml_options: BamlCallOptions = {},
+    ) -> types.MatrixFeedbackOutput:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "ProvideMatrixFeedback",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.MatrixFeedbackOutput, raw.cast_to(types, types, partial_types, False))
+    
     def ProvideSelfReflectionFeedback(
         self,
         input: types.SelfReflectionInput,
@@ -721,7 +748,7 @@ class BamlSyncClient:
     
     def ProvideSessionSummary_SNAPPS(
         self,
-        input: types.ProvideSessionSummarySNAPPSInputModel,
+        input: types.ProvideSessionSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> types.SessionSummaryOutputModel:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1011,7 +1038,7 @@ class BamlStreamClient:
     
     def AnalyzeDifferentialDiagnoses_SNAPPS(
         self,
-        input: types.AnalyzeDifferentialDiagnosesSNAPPSInput,
+        input: types.AnalyzeDDxInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.DifferentialAnalysisOutputModel, types.DifferentialAnalysisOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1045,7 +1072,7 @@ class BamlStreamClient:
     
     def AnalyzeMedicalPaper(
         self,
-        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        paper_text: str,text_type: types.TextType,clinical_question: Optional[str],source_type: Optional[str],publication_year: Optional[int],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.EvidenceAnalysisData, types.EvidenceAnalysisData]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1061,8 +1088,11 @@ class BamlStreamClient:
       raw = self.__runtime.stream_function_sync(
         "AnalyzeMedicalPaper",
         {
-          "paper_full_text": paper_full_text,
-          "clinical_question_PICO": clinical_question_PICO,
+          "paper_text": paper_text,
+          "text_type": text_type,
+          "clinical_question": clinical_question,
+          "source_type": source_type,
+          "publication_year": publication_year,
         },
         None,
         self.__ctx_manager.get(),
@@ -1114,7 +1144,7 @@ class BamlStreamClient:
     
     def AnswerProbeQuestions_SNAPPS(
         self,
-        input: types.AnswerProbeQuestionsSNAPPSInputModel,
+        input: types.AnswerProbeQuestionsInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.ProbeResponseOutputModel, types.ProbeResponseOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1182,7 +1212,7 @@ class BamlStreamClient:
     
     def EvaluateManagementPlan_SNAPPS(
         self,
-        input: types.EvaluateManagementPlanSNAPPSInputModel,
+        input: types.EvaluateManagementPlanInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.PlanEvaluationOutputModel, types.PlanEvaluationOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1216,7 +1246,7 @@ class BamlStreamClient:
     
     def EvaluateSummary_SNAPPS(
         self,
-        input: types.EvaluateSummarySNAPPSInputModel,
+        input: types.EvaluateSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.SummaryFeedbackOutputModel, types.SummaryFeedbackOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1318,7 +1348,7 @@ class BamlStreamClient:
     
     def FacilitateDDxAnalysis_SNAPPS(
         self,
-        input: types.FacilitateDDxAnalysisSNAPPSInputModel,
+        input: types.FacilitateDDxAnalysisInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.FacilitateDDxAnalysisOutputModel, types.FacilitateDDxAnalysisOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1556,7 +1586,7 @@ class BamlStreamClient:
     
     def GenerateEvidenceAppraisal(
         self,
-        extracted_data: types.EvidenceAnalysisData,
+        extracted_data: types.EvidenceAnalysisData,clinical_question: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.EvidenceAppraisalOutput, types.EvidenceAppraisalOutput]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
@@ -1573,6 +1603,7 @@ class BamlStreamClient:
         "GenerateEvidenceAppraisal",
         {
           "extracted_data": extracted_data,
+          "clinical_question": clinical_question,
         },
         None,
         self.__ctx_manager.get(),
@@ -1725,6 +1756,40 @@ class BamlStreamClient:
         self.__ctx_manager.get(),
       )
     
+    def ProvideMatrixFeedback(
+        self,
+        input: types.CompareContrastMatrixInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.MatrixFeedbackOutput, types.MatrixFeedbackOutput]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "ProvideMatrixFeedback",
+        {
+          "input": input,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.MatrixFeedbackOutput, types.MatrixFeedbackOutput](
+        raw,
+        lambda x: cast(partial_types.MatrixFeedbackOutput, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.MatrixFeedbackOutput, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
     def ProvideSelfReflectionFeedback(
         self,
         input: types.SelfReflectionInput,
@@ -1761,7 +1826,7 @@ class BamlStreamClient:
     
     def ProvideSessionSummary_SNAPPS(
         self,
-        input: types.ProvideSessionSummarySNAPPSInputModel,
+        input: types.ProvideSessionSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.BamlSyncStream[partial_types.SessionSummaryOutputModel, types.SessionSummaryOutputModel]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}

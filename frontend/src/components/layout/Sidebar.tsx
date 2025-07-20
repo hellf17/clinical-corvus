@@ -74,8 +74,7 @@ const AppSidebar = () => {
 
   // Itens para médicos e estudantes
   const doctorItems: MenuItem[] = [
-    { label: 'Visão Geral', href: '/dashboard-doctor', icon: LayoutDashboard, disabled: true, soon: true },
-    { label: 'Pacientes', href: '/patients', icon: Users, disabled: true, soon: true },
+    { label: 'Visão Geral', href: '/dashboard-doctor', icon: LayoutDashboard},
     { label: 'Análise Laboratorial', href: '/analysis', icon: Upload },
     { label: 'Academia Clínica', href: '/academy', icon: BrainCircuit },
     { label: 'Chat Dr. Corvus', href: '/chat', icon: MessageSquare, disabled: true, soon: true },

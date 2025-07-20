@@ -1217,7 +1217,7 @@ export default function AnalysisPage() {
                     <>
                       {drCorvusInsights.professional_detailed_reasoning_cot && (
                         <AccordionItem value="prof-detailed-reasoning" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-gray-700 hover:text-blue-900">
+                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
                             🧠 Processo de Pensamento Detalhado
                           </AccordionTrigger>
                           <AccordionContent className="pt-2 pb-4">

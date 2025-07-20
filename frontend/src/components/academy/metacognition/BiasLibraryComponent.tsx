@@ -27,7 +27,10 @@ import {
   Award,
   PlayCircle,
   RefreshCw,
-  Eye
+  Eye,
+  Shield,
+  Activity,
+  Zap
 } from 'lucide-react';
 
 // Interfaces
@@ -212,6 +215,33 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
   const [quizScore, setQuizScore] = useState(0);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [answeredQuestions, setAnsweredQuestions] = useState<boolean[]>(new Array(quizQuestions.length).fill(false));
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
+
+  // Helper function to determine bias impact severity
+  const getBiasImpactSeverity = (severity: string, frequency: string) => {
+    if (severity === 'Alta' && (frequency === 'Muito Comum' || frequency === 'Comum')) return 'high';
+    if (severity === 'Alta' || frequency === 'Muito Comum') return 'medium';
+    return 'low';
+  };
+
+  // Helper function to get severity indicator
+  const getSeverityIndicator = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return { color: 'bg-red-500', icon: Activity, text: 'Alto Impacto', textColor: 'text-red-700' };
+      case 'medium':
+        return { color: 'bg-yellow-500', icon: Activity, text: 'Moderado', textColor: 'text-yellow-700' };
+      default:
+        return { color: 'bg-green-500', icon: CheckCircle, text: 'Baixo', textColor: 'text-green-700' };
+    }
+  };
+
+  const toggleSectionExpansion = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
 
   // Aplicar filtros
   useEffect(() => {
@@ -310,13 +340,14 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
   const currentQ = quizQuestions[currentQuestion];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="relative z-10">
+        <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           <Library className="h-6 w-6 mr-2 text-blue-500" />
           Biblioteca de Vieses Cognitivos Interativa
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-gray-600">
           Explore vieses cognitivos comuns no diagnóstico clínico, teste seus conhecimentos com quiz interativo e aprenda estratégias de mitigação.
         </CardDescription>
       </CardHeader>
@@ -401,14 +432,25 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
 
             {/* Lista de Vieses */}
             <div className="space-y-4">
-              {filteredBiases.map((bias) => (
-                <div key={bias.id} className="border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+              {filteredBiases.map((bias) => {
+                const impactSeverity = getBiasImpactSeverity(bias.severity, bias.frequency);
+                const severityIndicator = getSeverityIndicator(impactSeverity);
+                
+                return (
+                  <Card key={bias.id} className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-blue-400">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/3 to-purple-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
                   <Collapsible open={expandedBias === bias.id} onOpenChange={(open) => setExpandedBias(open ? bias.id : null)}>
                     <CollapsibleTrigger asChild>
-                      <div className="p-4 cursor-pointer hover:bg-gray-50">
+                        <CardContent className="relative z-10 p-6 cursor-pointer hover:bg-gray-50/50 transition-colors">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
-                            <h3 className="font-semibold text-lg text-gray-900">{bias.name}</h3>
+                              <h3 className="text-xl font-semibold text-gray-900">{bias.name}</h3>
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-3 h-3 rounded-full ${severityIndicator.color}`} />
+                                <span className={`text-sm font-medium ${severityIndicator.textColor}`}>
+                                  {severityIndicator.text}
+                                </span>
+                              </div>
                             <Badge variant="outline" className={getSeverityColor(bias.severity)}>
                               {bias.severity}
                             </Badge>
@@ -418,12 +460,12 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
                           </div>
                           {expandedBias === bias.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                         </div>
-                        <p className="text-sm text-gray-600 mt-2">{bias.description}</p>
-                      </div>
+                          <p className="text-gray-600 mt-3 leading-relaxed">{bias.description}</p>
+                        </CardContent>
                     </CollapsibleTrigger>
                     
                     <CollapsibleContent>
-                      <div className="px-4 pb-4 space-y-4 border-t bg-gray-50">
+                        <CardContent className="relative z-10 px-6 pb-6 space-y-4 border-t bg-gradient-to-r from-gray-50 to-blue-50">
                         {/* Exemplo Clínico */}
                         <div>
                           <h4 className="font-medium text-gray-800 mb-2 flex items-center">
@@ -501,11 +543,12 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
                             Usar Este Exemplo
                           </Button>
                         </div>
-                      </div>
+                        </CardContent>
                     </CollapsibleContent>
                   </Collapsible>
-                </div>
-              ))}
+                  </Card>
+                );
+              })}
             </div>
 
             {filteredBiases.length === 0 && (
@@ -517,15 +560,19 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
             )}
 
             {/* Expansão da Biblioteca */}
-            <div className="mt-8 p-4 border rounded-md bg-sky-50 border-sky-200">
-              <div className="flex items-center">
-                <Lightbulb className="h-5 w-5 mr-2 text-sky-600" />
-                <h3 className="text-md font-semibold text-sky-700">Biblioteca em Expansão</h3>
+            <div className="mt-8 p-6 border rounded-xl bg-gradient-to-r from-sky-50 to-blue-50 border-sky-200 shadow-sm">
+              <div className="flex items-center mb-3">
+                <Lightbulb className="h-6 w-6 mr-3 text-sky-600" />
+                <h3 className="text-lg font-semibold text-sky-700">Biblioteca em Expansão</h3>
               </div>
-              <p className="text-sm text-sky-600 mt-2">
+              <p className="text-sky-600 leading-relaxed">
                 Esta biblioteca está em constante crescimento. Novos vieses, exemplos e estratégias são adicionados regularmente. 
                 Sugestões de casos ou vieses? Entre em contato conosco!
               </p>
+              <div className="mt-4 flex items-center text-sm text-sky-500">
+                <Shield className="h-4 w-4 mr-2" />
+                <span>Conteúdo científico curado por especialistas em psicologia cognitiva</span>
+              </div>
             </div>
           </TabsContent>
 
@@ -534,14 +581,21 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
             {!quizCompleted ? (
               <div className="space-y-6">
                 {/* Progress */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold">Quiz de Vieses Cognitivos</h3>
-                    <span className="text-sm text-gray-600">
+                    <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Quiz de Vieses Cognitivos</h3>
+                    <div className="flex items-center space-x-2">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      <span className="text-sm font-medium text-gray-600">
                       Pergunta {currentQuestion + 1} de {quizQuestions.length}
                     </span>
+                    </div>
                   </div>
-                  <Progress value={((currentQuestion + 1) / quizQuestions.length) * 100} />
+                  <Progress value={((currentQuestion + 1) / quizQuestions.length) * 100} className="h-3" />
+                  <div className="flex items-center justify-center space-x-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    <span className="text-xs text-gray-500">Teste seus conhecimentos sobre vieses cognitivos</span>
+                  </div>
                 </div>
 
                 {/* Question */}
@@ -611,28 +665,41 @@ export default function BiasLibraryComponent({ onBiasSelected, onTransferToAnaly
               </div>
             ) : (
               /* Quiz Results */
-              <div className="text-center space-y-6">
-                <div className="p-8 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
-                  <Award className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Quiz Completo!</h3>
-                  <p className="text-lg text-gray-700 mb-4">
-                    Você acertou <strong>{quizScore}</strong> de <strong>{quizQuestions.length}</strong> perguntas
+              <div className="text-center space-y-6 animate-fade-in">
+                <div className="p-8 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-xl shadow-lg">
+                  <Award className="h-20 w-20 text-yellow-500 mx-auto mb-6 animate-pulse" />
+                  <h3 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-3">Quiz Completo!</h3>
+                  <div className="space-y-4">
+                    <p className="text-lg text-gray-700">
+                      Você acertou <strong className="text-green-600">{quizScore}</strong> de <strong>{quizQuestions.length}</strong> perguntas
                   </p>
                   
-                  <div className="text-lg font-semibold mb-4">
+                    <div className="flex items-center justify-center space-x-3">
+                      <div className="text-2xl font-bold text-gray-800">
                     Desempenho: {Math.round((quizScore / quizQuestions.length) * 100)}%
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Zap className="h-5 w-5 text-yellow-500" />
+                        <span className="text-sm text-gray-500">
+                          {Math.round((quizScore / quizQuestions.length) * 100) >= 80 ? 'Excelente!' : 
+                           Math.round((quizScore / quizQuestions.length) * 100) >= 60 ? 'Bom!' : 'Continue praticando!'}
+                        </span>
+                      </div>
                   </div>
                   
-                  <div className="text-sm text-gray-600 mb-6">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-gray-700 leading-relaxed">
                     {quizScore === quizQuestions.length ? 
                       '🎉 Excelente! Você domina bem os vieses cognitivos!' :
                       quizScore >= quizQuestions.length * 0.7 ?
                       '👏 Muito bom! Continue praticando para aperfeiçoar.' :
                       '📚 Continue estudando! A prática leva à perfeição.'
                     }
+                      </p>
+                    </div>
                   </div>
                   
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
                     <Button onClick={resetQuiz}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refazer Quiz

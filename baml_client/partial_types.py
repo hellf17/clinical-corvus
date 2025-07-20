@@ -35,15 +35,13 @@ class StreamState(BaseModel, Generic[T]):
     state: Literal["Pending", "Incomplete", "Complete"]
 
 
-class AnalyzeDifferentialDiagnosesSNAPPSInput(BaseModel):
-    case_summary: Optional[str] = None
+class AnalyzeDDxInput(BaseModel):
+    session_state: Optional["SessionState"] = None
     student_differential_diagnoses: List[str]
-    case_context: Optional[str] = None
 
-class AnswerProbeQuestionsSNAPPSInputModel(BaseModel):
-    session_context: Optional[str] = None
-    student_questions: Optional[str] = None
-    case_data: Optional[str] = None
+class AnswerProbeQuestionsInput(BaseModel):
+    session_state: Optional["SessionState"] = None
+    student_questions: List[str]
 
 class AnsweredQuestion(BaseModel):
     question: Optional[str] = None
@@ -62,10 +60,11 @@ class BenchmarkComparison(BaseModel):
     improvement_targets: List[str]
 
 class BiasAnalysis(BaseModel):
-    selection_bias: Optional[str] = None
-    performance_bias: Optional[str] = None
-    reporting_bias: Optional[str] = None
-    confirmation_bias: Optional[str] = None
+    id: Optional[str] = None
+    bias_type: Optional[str] = None
+    potential_impact: Optional[str] = None
+    mitigation_strategies: Optional[str] = None
+    actionable_suggestion: Optional[str] = None
 
 class BiasReflectionPoint(BaseModel):
     bias_type: Optional[types.PossibleCognitiveBias] = None
@@ -153,8 +152,8 @@ class ClinicalWorkflowQuestionsOutput(BaseModel):
 
 class CognitiveBiasInput(BaseModel):
     case_summary_by_user: Optional[str] = None
-    user_working_hypothesis: Optional[str] = None
-    user_reasoning_summary: Optional[str] = None
+    case_vignette_id: Optional[str] = None
+    user_identified_biases: List[str]
 
 class CognitiveBiasReflectionOutput(BaseModel):
     potential_biases_to_consider: List["DetectedCognitiveBias"]
@@ -167,6 +166,11 @@ class CompareContrastFeedbackOutput(BaseModel):
     overall_feedback: Optional[str] = None
     detailed_feedback_per_hypothesis: List["HypothesisComparisonFeedback"]
     suggested_learning_focus: Optional[str] = None
+
+class CompareContrastMatrixInput(BaseModel):
+    scenario: Optional["CaseScenarioInput"] = None
+    student_matrix_analysis: List["HypothesisFindingAnalysis"]
+    student_chosen_discriminator: Optional[str] = None
 
 class DdxEvaluation(BaseModel):
     diagnosis: Optional[str] = None
@@ -224,14 +228,13 @@ class DifferentialAnalysisOutputModel(BaseModel):
     socratic_questions: List[str]
     next_step_guidance: Optional[str] = None
 
-class EvaluateManagementPlanSNAPPSInputModel(BaseModel):
-    session_context: Optional[str] = None
+class EvaluateManagementPlanInput(BaseModel):
+    session_state: Optional["SessionState"] = None
     student_plan: Optional[str] = None
-    case_data: Optional[str] = None
 
-class EvaluateSummarySNAPPSInputModel(BaseModel):
+class EvaluateSummaryInput(BaseModel):
+    case_context: Optional["CaseContext"] = None
     student_summary: Optional[str] = None
-    case_description: Optional[str] = None
 
 class EvidenceAnalysisData(BaseModel):
     study_objective: Optional[str] = None
@@ -244,13 +247,10 @@ class EvidenceAnalysisData(BaseModel):
     authors_acknowledged_limitations: List[str]
 
 class EvidenceAppraisalOutput(BaseModel):
-    overall_quality: Optional[types.GradeLevel] = None
-    quality_reasoning: Optional[str] = None
-    recommendation_strength: Optional[types.RecommendationStrength] = None
-    strength_reasoning: Optional[str] = None
+    grade_summary: Optional["GradeSummary"] = None
     quality_factors: List["QualityFactor"]
-    bias_analysis: Optional["BiasAnalysis"] = None
-    practice_recommendations: List[str]
+    bias_analysis: List["BiasAnalysis"]
+    practice_recommendations: Optional["PracticeRecommendations"] = None
 
 class EvidenceTheme(BaseModel):
     theme_name: Optional[str] = None
@@ -275,14 +275,18 @@ class ExpandedDdxOutput(BaseModel):
     applied_approach_description: Optional[str] = None
     suggested_additional_diagnoses_with_rationale: List[str]
 
+class ExpertHypothesisFindingAnalysis(BaseModel):
+    finding_name: Optional[str] = None
+    hypothesis_name: Optional[str] = None
+    expert_evaluation: Optional[types.HypothesisFindingEvaluation] = None
+    expert_rationale: Optional[str] = None
+
+class FacilitateDDxAnalysisInput(BaseModel):
+    session_state: Optional["SessionState"] = None
+    student_analysis: Optional[str] = None
+
 class FacilitateDDxAnalysisOutputModel(BaseModel):
     response: Optional[str] = None
-
-class FacilitateDDxAnalysisSNAPPSInputModel(BaseModel):
-    case_summary: Optional[str] = None
-    differential_diagnoses: List[str]
-    student_analysis: Optional[str] = None
-    case_context: Optional[str] = None
 
 class FormulatedSearchStrategyOutput(BaseModel):
     refined_query_for_llm_synthesis: Optional[str] = None
@@ -290,12 +294,25 @@ class FormulatedSearchStrategyOutput(BaseModel):
     search_rationale: Optional[str] = None
     expected_evidence_types: List[str]
 
+class GradeSummary(BaseModel):
+    overall_quality: Optional[types.GradeLevel] = None
+    recommendation_strength: Optional[types.RecommendationStrength] = None
+    summary_of_findings: Optional[str] = None
+    recommendation_balance: Optional["RecommendationBalance"] = None
+    reasoning_tags: List["ReasoningTag"]
+
 class HypothesisComparisonFeedback(BaseModel):
     hypothesis_name: Optional[str] = None
     feedback_on_supporting_findings: Optional[str] = None
     feedback_on_refuting_findings: Optional[str] = None
     feedback_on_discriminators: Optional[str] = None
     expert_comparison_points: Optional[List[str]] = None
+
+class HypothesisFindingAnalysis(BaseModel):
+    finding_name: Optional[str] = None
+    hypothesis_name: Optional[str] = None
+    student_evaluation: Optional[types.HypothesisFindingEvaluation] = None
+    student_rationale: Optional[str] = None
 
 class IllnessScriptInput(BaseModel):
     disease_name: Optional[str] = None
@@ -342,6 +359,15 @@ class LabTestResult(BaseModel):
     interpretation_flag: Optional[str] = None
     notes: Optional[str] = None
 
+class MatrixFeedbackOutput(BaseModel):
+    overall_matrix_feedback: Optional[str] = None
+    discriminator_feedback: Optional[str] = None
+    expert_matrix_analysis: List["ExpertHypothesisFindingAnalysis"]
+    expert_recommended_discriminator: Optional[str] = None
+    expert_discriminator_rationale: Optional[str] = None
+    learning_focus_suggestions: List[str]
+    matrix_accuracy_score: Optional[float] = None
+
 class PDFAnalysisInput(BaseModel):
     pdf_content: Optional[str] = None
     analysis_focus: Optional[str] = None
@@ -359,6 +385,7 @@ class PDFAnalysisOutput(BaseModel):
 
 class PICOFormulationOutput(BaseModel):
     structured_pico_question: Optional["PICOQuestion"] = None
+    structured_question: Optional[str] = None
     explanation: Optional[str] = None
     pico_derivation_reasoning: Optional[str] = None
     search_terms_suggestions: List[str]
@@ -399,6 +426,11 @@ class PopulationInfo(BaseModel):
     inclusion_criteria: List[str]
     exclusion_criteria: List[str]
 
+class PracticeRecommendations(BaseModel):
+    clinical_application: Optional[str] = None
+    monitoring_points: List[str]
+    evidence_caveats: Optional[str] = None
+
 class ProbeResponseOutputModel(BaseModel):
     answers_to_questions: List["AnsweredQuestion"]
     additional_considerations: List[str]
@@ -420,12 +452,11 @@ class ProcessingMetadata(BaseModel):
     timestamp: Optional[str] = None
     version: Optional[str] = None
 
-class ProvideSessionSummarySNAPPSInputModel(BaseModel):
-    session_history: List[str]
-    case_context: Optional[str] = None
-    student_selected_topic: Optional[str] = None
+class ProvideSessionSummaryInput(BaseModel):
+    session_state: Optional["SessionState"] = None
 
 class QualityFactor(BaseModel):
+    id: Optional[str] = None
     factor_name: Optional[str] = None
     assessment: Optional[types.AssessmentValue] = None
     justification: Optional[str] = None
@@ -458,6 +489,16 @@ class RawSearchResultItem(BaseModel):
     relevance_score: Optional[float] = None
     composite_impact_score: Optional[float] = None
     academic_source_name: Optional[str] = None
+
+class ReasoningTag(BaseModel):
+    tag: Optional[str] = None
+    reference_id: Optional[str] = None
+
+class RecommendationBalance(BaseModel):
+    positive_factors: List[str]
+    negative_factors: List[str]
+    overall_balance: Optional[str] = None
+    reasoning_tags: List[str]
 
 class ResearchMetrics(BaseModel):
     total_articles_analyzed: Optional[int] = None
@@ -500,6 +541,16 @@ class SelfReflectionInput(BaseModel):
     clinical_scenario: Optional[str] = None
     user_hypothesis: Optional[str] = None
     user_reasoning_summary: Optional[str] = None
+
+class SessionState(BaseModel):
+    case_context: Optional["CaseContext"] = None
+    student_summary: Optional[str] = None
+    student_ddx: Optional[List[str]] = None
+    student_analysis: Optional[str] = None
+    student_probe_questions: Optional[List[str]] = None
+    student_management_plan: Optional[str] = None
+    student_selected_topic: Optional[str] = None
+    feedback_history: List[str]
 
 class SessionSummaryOutputModel(BaseModel):
     overall_performance: Optional[str] = None

@@ -72,6 +72,21 @@ function GenerateDrCorvusInsights(input: LabAnalysisInput) -> LabInsightsOutput 
     - The `professional_detailed_reasoning_cot` field MUST contain EXACTLY the "DETAILED REASONING PROCESS" you elaborated in the 6 steps above.
     - All other professional fields should be CONCISE SUMMARIES extracted from your detailed reasoning.
 
+    MANDATORY JSON STRUCTURE FOR PROFESSIONAL MODE:
+    {
+      "patient_friendly_summary": null,
+      "potential_health_implications_patient": null,
+      "lifestyle_tips_patient": null,
+      "questions_to_ask_doctor_patient": null,
+      "important_results_to_discuss_with_doctor": [array of critical findings],
+      "professional_detailed_reasoning_cot": "EXACTLY the detailed reasoning process you wrote above",
+      "key_abnormalities_professional": [array of key abnormalities],
+      "key_normal_results_with_context": [array of relevant normal findings],
+      "potential_patterns_and_correlations": [array of patterns],
+      "differential_considerations_professional": [array of differential diagnoses],
+      "suggested_next_steps_professional": [array of next steps],
+    }
+
     {% else %}
     // PATIENT MODE
     {{ GetPatientIntroduction() }}
@@ -99,37 +114,18 @@ function GenerateDrCorvusInsights(input: LabAnalysisInput) -> LabInsightsOutput 
     {{ input.patient_context }}
     {% endif %}
 
+    {% endif %}
+
     // Final instruction for output format
     {{ ctx.output_format }}
 
     // Input data for analysis 
     Please analyze the following laboratory results.
-    
-    {% if input.user_role == "DOCTOR_STUDENT" %}
-    Remember to start your response with the "**DETAILED REASONING PROCESS:**" section followed by the 6 steps, and THEN provide the JSON object.
-
-    MANDATORY JSON STRUCTURE FOR PROFESSIONAL MODE:
-    {
-      "patient_friendly_summary": null,
-      "potential_health_implications_patient": null,
-      "lifestyle_tips_patient": null,
-      "questions_to_ask_doctor_patient": null,
-      "important_results_to_discuss_with_doctor": [array of critical findings],
-      "professional_detailed_reasoning_cot": "EXACTLY the detailed reasoning process you wrote above",
-      "key_abnormalities_professional": [array of key abnormalities],
-      "key_normal_results_with_context": [array of relevant normal findings],
-      "potential_patterns_and_correlations": [array of patterns],
-      "differential_considerations_professional": [array of differential diagnoses],
-      "suggested_next_steps_professional": [array of next steps],
-    }
-
-    {% endif %}
 
     Laboratory Results:
     {% for lr in input.lab_results %}
     - Test: {{ lr.test_name }}, Value: {{ lr.value }}{% if lr.unit %} {{ lr.unit }}{% endif %}{% if lr.reference_range_low and lr.reference_range_high %}, Ref: {{ lr.reference_range_low }} - {{ lr.reference_range_high }}{% endif %}{% if lr.interpretation_flag %}, Flag: {{ lr.interpretation_flag }}{% endif %}{% if lr.notes %}, Notes: {{ lr.notes }}{% endif %}
     {% endfor %}
-    {% endif %}
   """#
 }
 
@@ -549,10 +545,11 @@ function GenerateIllnessScript(input: IllnessScriptInput) -> IllnessScriptOutput
 
 // --- Input and Output Classes for AssistInIdentifyingCognitiveBiases ---
 class CognitiveBiasInput {
-  case_summary_by_user string @description("Clinical case summary provided by the healthcare professional.")
-  user_working_hypothesis string @description("The current working diagnostic hypothesis of the professional.")
-  user_reasoning_summary string @description("A summary of the professional's reasoning that led to the working hypothesis.")
+  case_summary_by_user string? @description("Clinical case summary provided by the healthcare professional for custom scenarios.")
+  case_vignette_id string? @description("The identifier for a pre-defined case vignette.")
+  user_identified_biases string[] @description("The cognitive biases identified by the user.")
 }
+
 class DetectedCognitiveBias {
   bias_type string @description("The type of cognitive bias potentially identified (e.g., ANCHORING, AVAILABILITY, CONFIRMATION).")
   explanation_as_question string @description("An explanation of why this bias MAY be relevant, formulated as a reflective question for the user.")
@@ -601,9 +598,14 @@ function AssistInIdentifyingCognitiveBiases(input: CognitiveBiasInput) -> Cognit
     -   Fundamental Attribution Error
 
     DATA PROVIDED BY USER:
+    {% if input.case_summary_by_user %}
     Case Summary: {{ input.case_summary_by_user }}
-    Working Hypothesis: {{ input.user_working_hypothesis }}
-    Stated Reasoning: {{ input.user_reasoning_summary }}
+    {% elif input.case_vignette_id %}
+    Case Vignette ID: {{ input.case_vignette_id }}
+    // Note to LLM: The full vignette text corresponding to this ID is provided in the context.
+    // You should analyze the vignette as if it were the case summary.
+    {% endif %}
+    User Identified Biases: {{ input.user_identified_biases | join(", ") }}
 
     {{ ctx.output_format }}
   """#
@@ -674,8 +676,34 @@ function ProvideSelfReflectionFeedback(input: SelfReflectionInput) -> SelfReflec
     **FINAL INSTRUCTIONS:**
     - Use a mentor tone, constructive and encouraging.
     - Your output must be in English and strictly adhere to the `SelfReflectionFeedbackOutput` class format.
+    - CRITICAL: Ensure valid JSON syntax with proper commas between all fields.
 
-    {{ ctx.output_format }}
+    PossibleCognitiveBias
+    ----
+    - ANCHORING: Excessive fixation on initial information.
+    - CONFIRMATION_BIAS: Seeking or interpreting evidence in a way that confirms pre-existing beliefs.
+    - PREMATURE_CLOSURE: Accepting a diagnosis before it is fully verified.
+    - AVAILABILITY_HEURISTIC: Over-estimating the probability of diagnoses that come to mind easily.
+    - REPRESENTATIVENESS_HEURISTIC: Judging probability based on similarity to a prototype, ignoring prevalence.
+
+    Answer in JSON using this schema:
+    {
+      // A neutral description of the reasoning pattern detected in the user's input.
+      identified_reasoning_pattern: string,
+      // A list of reflection points on possible cognitive biases.
+      bias_reflection_points: [
+        {
+          // The type of cognitive bias to be considered.
+          bias_type: PossibleCognitiveBias,
+          // A socratic question to help the user reflect on this specific bias in the context of the case.
+          reflection_question: string,
+        }
+      ],
+      // A challenging and general question to test the robustness of the user's conclusion.
+      devils_advocate_challenge: string,
+      // A suggestion of a mental exercise or action for the user to follow.
+      suggested_next_reflective_action: string,
+    }
   """#
 }
 
@@ -825,6 +853,91 @@ function SummarizeAndStructureClinicalData(input: ClinicalDataInput) -> Structur
     - Semantic qualifiers noted: [acute], [localized], [febrile].
     - Details abstracted: Transformed '''[patient language]''' into '''[medical term]'''.
     - Points for investigation: Given the mention of [vague symptom], it would be useful to explore [topic A and B].
+
+    {{ ctx.output_format }}
+  """#
+}
+
+// --- New Matrix-Based Hypothesis Comparison Classes and Function ---
+enum HypothesisFindingEvaluation {
+  SUPPORTS @description("The finding supports this hypothesis")
+  NEUTRAL @description("The finding is neutral for this hypothesis")
+  REFUTES @description("The finding refutes this hypothesis")
+}
+
+class HypothesisFindingAnalysis {
+  finding_name string @description("Name of the clinical finding")
+  hypothesis_name string @description("Name of the hypothesis being evaluated")
+  student_evaluation HypothesisFindingEvaluation @description("Student's evaluation of how the finding relates to the hypothesis")
+  student_rationale string? @description("Optional rationale for the student's evaluation")
+}
+
+class ExpertHypothesisFindingAnalysis {
+  finding_name string @description("Name of the clinical finding")
+  hypothesis_name string @description("Name of the hypothesis being evaluated")
+  expert_evaluation HypothesisFindingEvaluation @description("Expert's evaluation of how the finding relates to the hypothesis")
+  expert_rationale string @description("Expert's rationale for the evaluation")
+}
+
+class CompareContrastMatrixInput {
+  scenario CaseScenarioInput @description("The case scenario for analysis")
+  student_matrix_analysis HypothesisFindingAnalysis[] @description("Student's matrix analysis of findings vs hypotheses")
+  student_chosen_discriminator string @description("The finding the student selected as the key discriminator")
+}
+
+class MatrixFeedbackOutput {
+  overall_matrix_feedback string @description("General feedback on the student's matrix analysis")
+  discriminator_feedback string @description("Feedback on the student's choice of key discriminator")
+  expert_matrix_analysis ExpertHypothesisFindingAnalysis[] @description("Expert's matrix analysis for comparison")
+  expert_recommended_discriminator string @description("Expert's recommended key discriminator")
+  expert_discriminator_rationale string @description("Rationale for the expert's discriminator choice")
+  learning_focus_suggestions string[] @description("Specific learning topics the student should focus on")
+  matrix_accuracy_score float? @description("Overall accuracy score for the student's matrix (0-1)")
+}
+
+function ProvideMatrixFeedback(input: CompareContrastMatrixInput) -> MatrixFeedbackOutput {
+  client DrCorvusLLM
+  prompt #"""
+    {{ GetProfessionalIntroduction() }}
+    Você é Dr. Corvus, um preceptor de raciocínio clínico experiente. O estudante completou um exercício de matriz "Evidências vs. Hipóteses" onde cada achado clínico foi classificado como "Suporta", "Neutro" ou "Refuta" para cada hipótese diagnóstica.
+
+    **CENÁRIO CLÍNICO:**
+    Vinheta: {{ input.scenario.case_vignette }}
+    
+    Achados Principais:
+    {% for finding in input.scenario.initial_findings %}
+    - {{ finding.finding_name }}{% if finding.details %}: {{ finding.details }}{% endif %}{% if finding.onset_duration_pattern %} ({{ finding.onset_duration_pattern }}){% endif %}{% if finding.severity_level %}, {{ finding.severity_level }}{% endif %}
+    {% endfor %}
+    
+    Hipóteses a Analisar: {{ input.scenario.plausible_hypotheses | join(", ") }}
+
+    **ANÁLISE MATRICIAL DO ESTUDANTE:**
+    {% for analysis in input.student_matrix_analysis %}
+    - Achado "{{ analysis.finding_name }}" foi classificado como "{{ analysis.student_evaluation }}" para a hipótese "{{ analysis.hypothesis_name }}"{% if analysis.student_rationale %} (Justificativa: {{ analysis.student_rationale }}){% endif %}
+    {% endfor %}
+
+    **DISCRIMINADOR CHAVE ESCOLHIDO PELO ESTUDANTE:** "{{ input.student_chosen_discriminator }}"
+
+    **SUA TAREFA COMO PRECEPTOR:**
+
+    1. **Avalie a Matriz Geral (overall_matrix_feedback):** Forneça um comentário sobre a precisão geral das classificações do estudante. Destaque acertos importantes e identifique erros significativos. Seja específico sobre quais relações foram bem identificadas e quais foram mal avaliadas.
+
+    2. **Avalie a Escolha do Discriminador (discriminator_feedback):** A escolha do estudante foi ideal? Existe um discriminador mais forte? Explique por que a escolha foi boa ou como poderia ser melhorada.
+
+    3. **Gere uma Matriz Expert (expert_matrix_analysis):** Forneça sua própria classificação para cada célula da matriz, incluindo uma justificativa clara para cada avaliação. Foque nas relações mais importantes para o diagnóstico diferencial.
+
+    4. **Recomende um Discriminador Expert (expert_recommended_discriminator e expert_discriminator_rationale):** Qual achado você consideraria o discriminador mais poderoso? Explique por que este achado é superior para diferenciar entre as hipóteses.
+
+    5. **Sugira Foco de Aprendizado (learning_focus_suggestions):** Com base nos padrões de erros e acertos, sugira 2-3 tópicos específicos para estudo (ex: "Revisar os sintomas urinários da cistite", "Estudar a fisiopatologia da dor referida").
+
+    6. **Calcule Pontuação de Precisão (matrix_accuracy_score):** Atribua uma pontuação de 0.0 a 1.0 baseada na precisão geral da matriz do estudante.
+
+    **DIRETRIZES PEDAGÓGICAS:**
+    - Mantenha um tom construtivo e encorajador
+    - Seja específico em seus exemplos
+    - Foque no PROCESSO de pensamento, não apenas no resultado
+    - Explique o raciocínio por trás das classificações corretas
+    - Use linguagem didática apropriada para estudantes
 
     {{ ctx.output_format }}
   """#

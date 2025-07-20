@@ -12,7 +12,7 @@ from . import stored_analyses
 from . import me
 from . import vital_signs
 from . import scores
-from . import clinical_assistant_router as clinical_assistant
+
 from . import research_assistant_router
 
 # You can also define a top-level router here if you want to group them

@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/clinical/teach-question-prioritization`, {
+        const response = await fetch(`${apiUrl}/clinical/teach-question-prioritization`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -28,7 +28,15 @@ import {
   Award,
   CheckSquare,
   AlertCircle,
-  Loader2
+  Loader2,
+  Shield,
+  Activity,
+  Eye,
+  Brain,
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb
 } from 'lucide-react';
 
 // Interfaces for data types
@@ -45,26 +53,49 @@ interface PDFAnalysisOutput {
 
 // Define interfaces for the new GRADE-based evidence appraisal output
 interface QualityFactor {
+  id: string;
   factor_name: string;
-  assessment: string; // 'POSITIVO', 'NEUTRO', 'NEGATIVO'
+  assessment: string; // 'POSITIVE', 'NEUTRAL', 'NEGATIVE'
   justification: string;
 }
 
-interface BiasAnalysis {
-  selection_bias: string;
-  performance_bias: string;
-  reporting_bias: string;
-  confirmation_bias: string;
+interface BiasAnalysisItem {
+  id: string;
+  bias_type: string;
+  potential_impact: string;
+  mitigation_strategies: string;
+  actionable_suggestion: string;
+}
+
+interface RecommendationBalance {
+  positive_factors: string[];
+  negative_factors: string[];
+  overall_balance: string;
+  reasoning_tags: string[];
+}
+
+interface GradeSummary {
+  overall_quality: string; // 'ALTA', 'MODERADA', 'BAIXA', 'MUITO BAIXA'
+  recommendation_strength: string; // 'FORTE', 'FRACA'
+  summary_of_findings: string;
+  recommendation_balance: RecommendationBalance;
+  reasoning_tags: Array<{
+    tag: string;
+    reference_id: string;
+  }>;
+}
+
+interface PracticeRecommendations {
+  clinical_application: string;
+  monitoring_points: string[];
+  evidence_caveats: string;
 }
 
 interface GradeEvidenceAppraisalOutput {
-  overall_quality: string; // 'ALTA', 'MODERADA', 'BAIXA', 'MUITO BAIXA'
-  quality_reasoning: string;
+  grade_summary: GradeSummary;
   quality_factors: QualityFactor[];
-  recommendation_strength: string; // 'FORTE', 'FRACA'
-  strength_reasoning: string;
-  bias_analysis: BiasAnalysis;
-  practice_recommendations: string[];
+  bias_analysis: BiasAnalysisItem[];
+  practice_recommendations: PracticeRecommendations;
 }
 
 interface Props {
@@ -95,6 +126,33 @@ export default function UnifiedEvidenceAnalysisComponent({
   
   // Unified Dashboard State
   const [unifiedResults, setUnifiedResults] = useState<GradeEvidenceAppraisalOutput | null>(null);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
+
+  // Helper function to determine evidence impact severity
+  const getEvidenceImpactSeverity = (quality: string, strength: string) => {
+    if (quality === 'ALTA' && strength === 'FORTE') return 'high';
+    if (quality === 'ALTA' || strength === 'FORTE') return 'medium';
+    return 'low';
+  };
+
+  // Helper function to get severity indicator
+  const getSeverityIndicator = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return { color: 'bg-green-500', icon: Activity, text: 'Alto Impacto', textColor: 'text-green-700' };
+      case 'medium':
+        return { color: 'bg-yellow-500', icon: Activity, text: 'Moderado', textColor: 'text-yellow-700' };
+      default:
+        return { color: 'bg-red-500', icon: Activity, text: 'Baixo', textColor: 'text-red-700' };
+    }
+  };
+
+  const toggleSectionExpansion = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
 
   useEffect(() => {
     if (initialContent && initialContent !== evidenceText) {
@@ -207,20 +265,38 @@ export default function UnifiedEvidenceAnalysisComponent({
   };
 
   const getAssessmentColor = (assessment: string) => {
-    switch (assessment) {
+    const normalizedAssessment = assessment?.toUpperCase();
+    switch (normalizedAssessment) {
+      case 'POSITIVE': 
       case 'POSITIVO': return 'text-green-600';
+      case 'NEUTRAL': 
       case 'NEUTRO': return 'text-amber-600';
+      case 'NEGATIVE': 
       case 'NEGATIVO': return 'text-red-600';
       default: return 'text-gray-600';
     }
   };
 
   const getAssessmentIcon = (assessment: string) => {
-    switch (assessment) {
+    const normalizedAssessment = assessment?.toUpperCase();
+    switch (normalizedAssessment) {
+      case 'POSITIVE': 
       case 'POSITIVO': return <CheckCircle className="h-5 w-5 text-green-600" />;
+      case 'NEUTRAL': 
       case 'NEUTRO': return <AlertCircle className="h-5 w-5 text-amber-600" />;
+      case 'NEGATIVE': 
       case 'NEGATIVO': return <AlertTriangle className="h-5 w-5 text-red-600" />;
       default: return <HelpCircle className="h-5 w-5 text-gray-600" />;
+    }
+  };
+  
+  const translateAssessment = (assessment: string) => {
+    const normalizedAssessment = assessment?.toUpperCase();
+    switch (normalizedAssessment) {
+      case 'POSITIVE': return 'POSITIVO';
+      case 'NEUTRAL': return 'NEUTRO';
+      case 'NEGATIVE': return 'NEGATIVO';
+      default: return assessment;
     }
   };
 
@@ -229,136 +305,284 @@ export default function UnifiedEvidenceAnalysisComponent({
   };
 
   const renderUnifiedResults = () => unifiedResults && (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-fade-in">
       {/* Dashboard de Confiança - Cabeçalho */}
-      <Card className="border-t-4 border-t-blue-600">
-        <CardHeader>
-          <CardTitle className="flex items-center text-xl">
-            <Award className="mr-2 h-6 w-6 text-blue-600" />
+      <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300 border-t-4 border-t-green-600">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <Award className="mr-3 h-6 w-6 text-green-600" />
             Dashboard de Confiança da Evidência
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600">
             Avaliação estruturada baseada no framework GRADE
           </CardDescription>
+          <div className="flex items-center justify-center space-x-2 mt-4">
+            <Zap className="h-5 w-5 text-yellow-500" />
+            <span className="text-sm text-gray-500">Análise completa de qualidade metodológica</span>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Qualidade da Evidência */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-lg">Qualidade da Evidência</h3>
-                <Badge 
-                  className={`text-md py-1 px-3 ${unifiedResults?.overall_quality === 'ALTA' ? 'bg-green-100 text-green-800' : 
-                    unifiedResults?.overall_quality === 'MODERADA' ? 'bg-amber-100 text-amber-800' : 
-                    unifiedResults?.overall_quality === 'BAIXA' ? 'bg-orange-100 text-orange-800' : 
-                    'bg-red-100 text-red-800'}`}
-                >
-                  {unifiedResults?.overall_quality}
-                </Badge>
+                <div className={`px-6 py-3 rounded-lg font-bold text-lg border-2 shadow-lg ${
+                  unifiedResults?.grade_summary?.overall_quality === 'ALTA' ? 'bg-green-100 text-green-900 border-green-300' : 
+                  unifiedResults?.grade_summary?.overall_quality === 'MODERADA' ? 'bg-amber-100 text-amber-900 border-amber-300' : 
+                  unifiedResults?.grade_summary?.overall_quality === 'BAIXA' ? 'bg-orange-100 text-orange-900 border-orange-300' : 
+                  'bg-red-100 text-red-900 border-red-300'
+                }`}>
+                  <div className="flex items-center space-x-2">
+                    <Award className="h-5 w-5" />
+                    <span>{unifiedResults?.grade_summary?.overall_quality}</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-muted-foreground text-sm">{unifiedResults?.quality_reasoning}</p>
+              <p className="text-muted-foreground text-sm">{unifiedResults?.grade_summary?.summary_of_findings}</p>
+              
+              {/* Legenda de cores para Qualidade */}
+              <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-green-100 border border-green-800 mr-1"></div>
+                  <span>Alta</span>
+                </div>
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-amber-100 border border-amber-800 mr-1"></div>
+                  <span>Moderada</span>
+                </div>
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-orange-100 border border-orange-800 mr-1"></div>
+                  <span>Baixa</span>
+                </div>
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-red-100 border border-red-800 mr-1"></div>
+                  <span>Muito Baixa</span>
+                </div>
+              </div>
             </div>
 
             {/* Força da Recomendação */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-lg">Força da Recomendação</h3>
-                <Badge 
-                  className={`text-md py-1 px-3 ${unifiedResults?.recommendation_strength === 'FORTE' ? 
-                    'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}
-                >
-                  {unifiedResults?.recommendation_strength}
-                </Badge>
+                <div className={`px-6 py-3 rounded-lg font-bold text-lg border-2 shadow-lg ${
+                  unifiedResults?.grade_summary?.recommendation_strength === 'FORTE' ? 
+                  'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
+                }`}>
+                  <div className="flex items-center space-x-2">
+                    <Target className="h-5 w-5" />
+                    <span>{unifiedResults?.grade_summary?.recommendation_strength}</span>
+                  </div>
+                </div>
               </div>
-              <p className="text-muted-foreground text-sm">{unifiedResults?.strength_reasoning}</p>
+              <p className="text-muted-foreground text-sm">{unifiedResults?.grade_summary?.summary_of_findings}</p>
+              
+              {/* Legenda de cores para Força da Recomendação */}
+              <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-blue-100 border border-blue-800 mr-1"></div>
+                  <span>Forte</span>
+                </div>
+                <div className="flex items-center text-xs">
+                  <div className="w-3 h-3 rounded-full bg-amber-100 border border-amber-800 mr-1"></div>
+                  <span>Fraca</span>
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Fatores de Qualidade */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <BarChart3 className="mr-2 h-5 w-5 text-blue-600" />
-            Fatores que Influenciam a Qualidade
-          </CardTitle>
-          <CardDescription>Detalhamento dos fatores que impactam a qualidade da evidência</CardDescription>
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <CardHeader className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
+                <BarChart3 className="mr-3 h-6 w-6 text-green-600" />
+                Fatores que Influenciam a Qualidade
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-700">
+                  {unifiedResults?.quality_factors?.length || 0} fator(es)
+                </span>
+                <Activity className="h-4 w-4 text-green-700" />
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleSectionExpansion('quality_factors')}
+              className="hover:bg-green-50 transition-colors"
+            >
+              <span className="text-sm mr-2">
+                {expandedSections['quality_factors'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['quality_factors'] ? 'rotate-180' : ''}`} />
+            </Button>
+          </div>
+          <CardDescription className="text-gray-600">Detalhamento dos fatores que impactam a qualidade da evidência</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {unifiedResults?.quality_factors?.map((factor: QualityFactor, index: number) => (
-              <Card key={index} className="bg-white border-l-4 border-l-blue-600">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-md flex items-center">
-                    {getAssessmentIcon(factor.assessment)}
-                    <span className="ml-2">{factor.factor_name}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Badge 
-                    variant="outline" 
-                    className={`mb-2 ${getAssessmentColor(factor.assessment)}`}
-                  >
-                    {factor.assessment}
-                  </Badge>
-                  <p className="text-sm text-muted-foreground">{factor.justification}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {expandedSections['quality_factors'] && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {unifiedResults?.quality_factors?.map((factor: QualityFactor, index: number) => {
+                // Localization mapping for quality factor titles
+                const factorTitleMap: Record<string, string> = {
+                  'Study Design': 'Desenho do Estudo',
+                  'Risk of Bias': 'Risco de Viés',
+                  'Inconsistency': 'Inconsistência',
+                  'Indirectness': 'Evidência Indireta',
+                  'Imprecision': 'Imprecisão',
+                  'Publication Bias': 'Viés de Publicação',
+                  'Large Effect': 'Efeito Grande',
+                  'Dose Response': 'Resposta à Dose',
+                  'Confounders': 'Fatores de Confusão'
+                };
+                
+                const localizedTitle = factorTitleMap[factor.factor_name] || factor.factor_name;
+                
+                return (
+                  <Card key={index} className="bg-white border-l-4 border-l-blue-600">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-md flex items-center">
+                        {getAssessmentIcon(factor.assessment)}
+                        <span className="ml-2">{localizedTitle}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Badge 
+                        variant="outline" 
+                        className={`mb-2 ${getAssessmentColor(factor.assessment)}`}
+                      >
+                        {translateAssessment(factor.assessment)}
+                      </Badge>
+                      <p className="text-sm text-muted-foreground">{factor.justification}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Análise de Viés */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <Scale className="mr-2 h-5 w-5 text-blue-600" />
-            Análise de Viés
-          </CardTitle>
-          <CardDescription>Avaliação dos principais tipos de viés no estudo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="font-medium mb-2">Viés de Seleção</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.selection_bias}</p>
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/3 to-red-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <CardHeader className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
+                <Scale className="mr-3 h-6 w-6 text-orange-600" />
+                Análise de Viés
+              </CardTitle>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-orange-500" />
+                <span className="text-sm font-medium text-orange-700">
+                  {unifiedResults?.bias_analysis?.length || 0} análise(s) de viés
+                </span>
+                <Shield className="h-4 w-4 text-orange-700" />
+              </div>
             </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Performance</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.performance_bias}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Relato</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.reporting_bias}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2">Viés de Confirmação</h4>
-              <p className="text-sm text-muted-foreground">{unifiedResults.bias_analysis.confirmation_bias}</p>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleSectionExpansion('bias_analysis')}
+              className="hover:bg-orange-50 transition-colors"
+            >
+              <span className="text-sm mr-2">
+                {expandedSections['bias_analysis'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['bias_analysis'] ? 'rotate-180' : ''}`} />
+            </Button>
           </div>
+          <CardDescription className="text-gray-600">Avaliação dos principais tipos de viés no estudo</CardDescription>
+        </CardHeader>
+        <CardContent className="relative z-10">
+          {expandedSections['bias_analysis'] && (
+            <>
+              {/* Check if any bias analysis is available */}
+              {unifiedResults.bias_analysis && unifiedResults.bias_analysis.length > 0 ? (
+                <div className="space-y-6">
+                  {unifiedResults.bias_analysis.map((item: BiasAnalysisItem) => (
+                    <Card key={item.id} className="p-4 border border-orange-200 bg-gradient-to-r from-orange-50 to-red-50">
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Shield className="h-5 w-5 text-orange-600" />
+                          <h4 className="font-semibold text-lg text-orange-800">{item.bias_type}</h4>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="p-3 bg-orange-100 rounded-lg border-l-4 border-orange-400">
+                            <h5 className="font-medium text-orange-800 mb-1 flex items-center">
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Impacto Potencial
+                            </h5>
+                            <p className="text-sm text-orange-700">{item.potential_impact}</p>
+                          </div>
+                          
+                          <div className="p-3 bg-blue-100 rounded-lg border-l-4 border-blue-400">
+                            <h5 className="font-medium text-blue-800 mb-1 flex items-center">
+                              <Shield className="h-4 w-4 mr-2" />
+                              Estratégias de Mitigação
+                            </h5>
+                            <p className="text-sm text-blue-700">{item.mitigation_strategies}</p>
+                          </div>
+                          
+                          <div className="p-3 bg-green-100 rounded-lg border-l-4 border-green-400">
+                            <h5 className="font-medium text-green-800 mb-1 flex items-center">
+                              <Lightbulb className="h-4 w-4 mr-2" />
+                              Sugestão Acionável
+                            </h5>
+                            <p className="text-sm text-green-700">{item.actionable_suggestion}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Análise de Viés Não Disponível</AlertTitle>
+                  <AlertDescription>
+                    Não foi possível realizar uma análise detalhada dos viéses neste estudo com base nas informações disponíveis.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 
       {/* Recomendações para Prática */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <CheckSquare className="mr-2 h-5 w-5 text-blue-600" />
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-400">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
+            <CheckSquare className="mr-3 h-6 w-6 text-green-600" />
             Recomendações para Prática Clínica
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <Alert className="bg-blue-50">
-            <CheckCircle className="h-4 w-4 text-blue-600" />
-            <AlertTitle>Aplicação Clínica</AlertTitle>
+        <CardContent className="relative z-10">
+          <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800">Aplicação Clínica</AlertTitle>
             <AlertDescription>
-              <ul className="list-disc list-inside space-y-2 mt-2">
-                {unifiedResults.practice_recommendations.map((rec, index) => (
-                  <li key={index} className="text-muted-foreground">{rec}</li>
+              <p className="text-gray-700">{unifiedResults?.practice_recommendations?.clinical_application}</p>
+              <p className="text-gray-700 mt-2"><strong>Pontos de Monitoramento:</strong></p>
+              <ul className="list-disc list-outside pl-5 space-y-1 mt-1">
+                {unifiedResults?.practice_recommendations?.monitoring_points?.map((point, index) => (
+                  <li key={index} className="text-gray-700">{point}</li>
                 ))}
               </ul>
+              <p className="text-gray-700 mt-2"><strong>Caveats da Evidência:</strong></p>
+              <p className="text-gray-700">{unifiedResults?.practice_recommendations?.evidence_caveats}</p>
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -417,13 +641,14 @@ export default function UnifiedEvidenceAnalysisComponent({
 
   return (
     <div className="w-full mx-auto space-y-6">
-      <Card className="border-l-4 border-indigo-600">
-        <CardHeader>
-          <CardTitle className="flex items-center text-xl">
-            <BarChart3 className="mr-3 h-6 w-6 text-indigo-600" />
+      <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <CardHeader className="relative z-10">
+          <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+            <BarChart3 className="h-6 w-6 mr-2 text-green-500" />
             Análise de Evidências Unificada
           </CardTitle>
-          <CardDescription className="pl-9">
+          <CardDescription className="pl-9 text-gray-600">
             Avalie criticamente artigos fazendo upload de PDF ou colando o texto para uma análise detalhada.
           </CardDescription>
         </CardHeader>
@@ -481,12 +706,19 @@ export default function UnifiedEvidenceAnalysisComponent({
                 
                 <Button type="submit" disabled={isLoading || !selectedFile}>
                   {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analisando...
-                    </>
+                    <div className="flex items-center">
+                      <div className="relative mr-2">
+                        <div className="w-4 h-4 border-2 border-green-200 rounded-full animate-spin">
+                          <div className="absolute top-0 left-0 w-4 h-4 border-2 border-green-600 rounded-full animate-pulse border-t-transparent"></div>
+                        </div>
+                      </div>
+                      Analisando com Dr. Corvus...
+                    </div>
                   ) : (
-                    <>Analisar Evidência</>
+                    <>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analisar Evidência
+                    </>
                   )}
                 </Button>
               </form>
@@ -522,12 +754,19 @@ export default function UnifiedEvidenceAnalysisComponent({
 
                 <Button type="submit" disabled={isLoading || !evidenceText || !clinicalQuestion}>
                   {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Analisando...
-                    </>
+                    <div className="flex items-center">
+                      <div className="relative mr-2">
+                        <div className="w-4 h-4 border-2 border-green-200 rounded-full animate-spin">
+                          <div className="absolute top-0 left-0 w-4 h-4 border-2 border-green-600 rounded-full animate-pulse border-t-transparent"></div>
+                        </div>
+                      </div>
+                      Analisando com Dr. Corvus...
+                    </div>
                   ) : (
-                    <>Analisar Evidência</>
+                    <>
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Analisar Evidência
+                    </>
                   )}
                 </Button>
               </form>
@@ -542,10 +781,21 @@ export default function UnifiedEvidenceAnalysisComponent({
     {/* Remove the dedicated PDF results rendering */}
     {/* {renderPDFResults()} */}
 
-    {isLoading && (
-      <div className="flex justify-center items-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-        <p className="ml-4 text-muted-foreground">Analisando... um momento.</p>
+    {isLoading && !unifiedResults && (
+      <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-green-200 rounded-full animate-spin">
+            <div className="absolute top-0 left-0 w-16 h-16 border-4 border-green-600 rounded-full animate-pulse border-t-transparent"></div>
+          </div>
+          <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-green-600 animate-pulse" />
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está analisando evidências...</p>
+          <p className="text-sm text-gray-500">Avaliando qualidade metodológica e aplicabilidade clínica</p>
+        </div>
+        <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+        </div>
       </div>
     )}
 

@@ -1,20 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
-import { Loader2, Sparkles, AlertTriangle, Lightbulb, Search, HelpCircle, Flag, ListChecks, Brain, ChevronLeft, Info, RefreshCw, FileText, Users, Zap, List, ArrowRight, BookOpen, Network } from 'lucide-react';
-import { IntegratedWorkflowCard, WorkflowStep } from '@/components/academy/IntegratedWorkflowCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
-import { ScrollArea } from '@/components/ui/ScrollArea';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
-import { Separator } from '@/components/ui/Separator';
-import Link from 'next/link';
+import { ListPlus, RefreshCw, Info, Brain, Users, HelpCircle, ArrowRight, Lightbulb, BookOpen, Search, Target, ListChecks, Zap, List, Network } from 'lucide-react';
+import Link from "next/link";
+import MatrixHypothesisComparison from '@/components/academy/MatrixHypothesisComparison';
+import { IntegratedWorkflowCard, WorkflowStep } from '@/components/academy/IntegratedWorkflowCard';
 
 // Interfaces baseadas no BAML
 interface ExpandDifferentialDiagnosisInput {
@@ -92,6 +90,31 @@ interface CompareContrastFeedbackOutput {
   overall_feedback?: string;
   detailed_feedback_per_hypothesis: HypothesisComparisonFeedback[];
   suggested_learning_focus?: string;
+}
+
+// Add interfaces for the new matrix approach near the other interfaces
+interface HypothesisFindingAnalysis {
+  finding_name: string;
+  hypothesis_name: string;
+  student_evaluation: 'SUPPORTS' | 'NEUTRAL' | 'REFUTES';
+  student_rationale?: string;
+}
+
+interface ExpertHypothesisFindingAnalysis {
+  finding_name: string;
+  hypothesis_name: string;
+  expert_evaluation: 'SUPPORTS' | 'NEUTRAL' | 'REFUTES';
+  expert_rationale: string;
+}
+
+interface MatrixFeedbackOutput {
+  overall_matrix_feedback: string;
+  discriminator_feedback: string;
+  expert_matrix_analysis: ExpertHypothesisFindingAnalysis[];
+  expert_recommended_discriminator: string;
+  expert_discriminator_rationale: string;
+  learning_focus_suggestions: string[];
+  matrix_accuracy_score?: number;
 }
 
 // Sample cases for different difficulty levels
@@ -249,13 +272,115 @@ export default function DifferentialDiagnosisPage() {
   const [questionsError, setQuestionsError] = useState<string | null>(null);
 
   // Estados para o formulário "Comparando Hipóteses"
-  const [selectedCaseKey, setSelectedCaseKey] = useState<string>('basic');
+  const [selectedCaseKey, setSelectedCaseKey] = useState<keyof typeof clinicalCases>('basicAbdominal');
   const [currentCase, setCurrentCase] = useState<CaseScenarioInput>(clinicalCases.basic);
   const [studentAnalysis, setStudentAnalysis] = useState<StudentHypothesisAnalysis[]>([]);
   const [hypothesisFeedback, setHypothesisFeedback] = useState<CompareContrastFeedbackOutput | null>(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('expand-ddx');
+
+  // Estados para "Matriz de Comparação de Hipóteses" (nova abordagem)
+  const [matrixAnalysis, setMatrixAnalysis] = useState<HypothesisFindingAnalysis[]>([]);
+  const [selectedDiscriminator, setSelectedDiscriminator] = useState<string>('');
+  const [matrixFeedback, setMatrixFeedback] = useState<MatrixFeedbackOutput | null>(null);
+  const [isMatrixLoading, setIsMatrixLoading] = useState(false);
+  const [matrixError, setMatrixError] = useState<string | null>(null);
+
+  const initializeMatrix = useCallback(() => {
+    const newMatrix: HypothesisFindingAnalysis[] = [];
+    currentCase.initial_findings.forEach(finding => {
+      currentCase.plausible_hypotheses.forEach(hypothesis => {
+        newMatrix.push({
+          finding_name: finding.finding_name,
+          hypothesis_name: hypothesis,
+          student_evaluation: 'NEUTRAL', // Default to neutral
+          student_rationale: undefined
+        });
+      });
+    });
+    setMatrixAnalysis(newMatrix);
+    setSelectedDiscriminator('');
+    setMatrixFeedback(null);
+    setMatrixError(null);
+  }, [currentCase]);
+
+  // Initialize matrix when case changes
+  useEffect(() => {
+    initializeMatrix();
+  }, [initializeMatrix]);
+
+  const handleMatrixCellChange = (findingName: string, hypothesisName: string, evaluation: 'SUPPORTS' | 'NEUTRAL' | 'REFUTES') => {
+    setMatrixAnalysis(prev => 
+      prev.map(item => 
+        item.finding_name === findingName && item.hypothesis_name === hypothesisName
+          ? { ...item, student_evaluation: evaluation }
+          : item
+      )
+    );
+  };
+
+  const handleSubmitMatrixAnalysis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsMatrixLoading(true);
+    setMatrixError(null);
+    setMatrixFeedback(null);
+
+    try {
+      if (!selectedDiscriminator.trim()) {
+        throw new Error('Por favor, selecione o achado discriminador chave.');
+      }
+
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Autenticação necessária. Por favor, faça login.');
+      }
+
+      const response = await fetch('/api/clinical-assistant/compare-contrast-matrix-feedback-translated', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          scenario: {
+            case_vignette: currentCase.case_vignette,
+            initial_findings: currentCase.initial_findings,
+            plausible_hypotheses: currentCase.plausible_hypotheses
+          },
+          student_matrix_analysis: matrixAnalysis,
+          student_chosen_discriminator: selectedDiscriminator,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      const data: MatrixFeedbackOutput = await response.json();
+      setMatrixFeedback(data);
+    } catch (err) {
+      setMatrixError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
+    } finally {
+      setIsMatrixLoading(false);
+    }
+  };
+
+  const getEvaluationIcon = (evaluation: 'SUPPORTS' | 'NEUTRAL' | 'REFUTES') => {
+    switch (evaluation) {
+      case 'SUPPORTS': return '✅';
+      case 'NEUTRAL': return '⚪';
+      case 'REFUTES': return '❌';
+      default: return '⚪';
+    }
+  };
+
+  const getEvaluationColor = (evaluation: 'SUPPORTS' | 'NEUTRAL' | 'REFUTES') => {
+    switch (evaluation) {
+      case 'SUPPORTS': return 'text-green-600 bg-green-50 border-green-200';
+      case 'NEUTRAL': return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'REFUTES': return 'text-red-600 bg-red-50 border-red-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
 
   const handleSubmitExpandDdx = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,8 +626,8 @@ export default function DifferentialDiagnosisPage() {
 
   // Função para trocar de caso clínico
   const handleCaseChange = (caseKey: string) => {
-    setSelectedCaseKey(caseKey);
-    setCurrentCase(clinicalCases[caseKey]);
+    setSelectedCaseKey(caseKey as keyof typeof clinicalCases);
+    setCurrentCase(clinicalCases[caseKey as keyof typeof clinicalCases]);
     setHypothesisFeedback(null);
     setAnalysisError(null);
   };
@@ -546,9 +671,10 @@ export default function DifferentialDiagnosisPage() {
     <div className="container mx-auto p-4 md:p-8 space-y-12">
       {/* Updated Header Section */}
       <section className="text-center py-10 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
+        <div className="mx-auto max-w-4xl">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white flex items-center justify-center mb-4">
             <Search className="h-10 w-10 md:h-12 md:w-12 mr-3 text-white" />
-          Diagnóstico Diferencial
+            Diagnóstico Diferencial
           </h1>
           <p className="mt-2 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
             Domine a arte de gerar, priorizar e testar hipóteses diagnósticas através de abordagens sistemáticas e ferramentas interativas.
@@ -565,6 +691,7 @@ export default function DifferentialDiagnosisPage() {
             <div className="bg-white/20 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm flex items-center">
               <Users className="h-4 w-4 mr-2" />
               Comparação de Hipóteses
+            </div>
           </div>
         </div>
       </section>
@@ -637,20 +764,25 @@ export default function DifferentialDiagnosisPage() {
         </TabsList>
 
         <TabsContent value="expand-ddx">
-          <Card>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <form onSubmit={handleSubmitExpandDdx}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Lightbulb className="h-6 w-6 mr-2 text-yellow-500" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                  <Lightbulb className="h-6 w-6 mr-2 text-purple-500" />
                   Ferramenta: Expandindo o Diagnóstico Diferencial
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600">
                   Utilize abordagens sistemáticas (anatômica, mnemônicos como VINDICATE e outros) para não esquecer diagnósticos importantes.
                   Insira os sintomas, sinais clínicos e seus diagnósticos diferenciais iniciais.
                   Dr. Corvus sugerirá categorias e diagnósticos adicionais.
                 </CardDescription>
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <Search className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm text-gray-500">Expansão sistemática de hipóteses</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative z-10 space-y-6">
                 <div>
                   <label htmlFor="symptoms" className="block text-sm font-medium mb-1">
                     Sintomas (Subjetivos) <span className="text-red-500">*</span>
@@ -787,19 +919,24 @@ export default function DifferentialDiagnosisPage() {
 
         {/* Nova Tab: Gerar Perguntas para DDx */}
         <TabsContent value="generate-questions">
-          <Card>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <form onSubmit={handleSubmitGenerateQuestions}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Search className="h-6 w-6 mr-2 text-blue-500" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                  <Search className="h-6 w-6 mr-2 text-purple-500" />
                   Ferramenta: Gerar Perguntas para Diagnóstico Diferencial
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600">
                   Aprenda a fazer as perguntas certas para cada queixa. Insira a queixa principal e dados demográficos do paciente.
                   Dr. Corvus sugerirá perguntas essenciais para explorar possíveis diagnósticos diferenciais.
                 </CardDescription>
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <HelpCircle className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm text-gray-500">Geração inteligente de perguntas</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative z-10 space-y-6">
                 <div>
                   <label htmlFor="chiefComplaintQuestions" className="block text-sm font-medium mb-1">Queixa Principal <span className="text-red-500">*</span></label>
                   <Input 
@@ -924,337 +1061,112 @@ export default function DifferentialDiagnosisPage() {
         </TabsContent>
 
         <TabsContent value="compare-hypotheses">
-          <Card>
-            <form onSubmit={handleSubmitAnalysis}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Brain className="h-6 w-6 mr-2 text-purple-500" />
-                  Exercício: Comparando e Contrastando Hipóteses
-                </CardTitle>
-                <CardDescription>
-                  Analise o caso e identifique os achados que suportam ou refutam cada hipótese diagnóstica, além das características que melhor discriminam cada hipótese das demais.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Seletor de Casos Clínicos */}
-                <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg">
-                  <div className="flex items-center mb-3">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-                      <span className="text-indigo-600 font-bold text-sm">📚</span>
-                    </div>
-                    <h3 className="text-lg font-semibold text-indigo-800">Selecione um Caso Clínico</h3>
-                  </div>
-                  <p className="text-sm text-indigo-700 mb-4">
-                    Escolha um caso de acordo com seu nível de experiência para praticar a análise comparativa de hipóteses diagnósticas.
-                  </p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {Object.entries(clinicalCases).map(([caseKey, caseData]) => {
-                      const diffInfo = getDifficultyInfo(caseKey);
-                      const isSelected = selectedCaseKey === caseKey;
-                      
-                      return (
-                        <button
-                          key={caseKey}
-                          onClick={() => handleCaseChange(caseKey)}
-                          className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${
-                            isSelected 
-                              ? 'border-indigo-500 bg-indigo-50 shadow-md' 
-                              : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25'
-                          }`}
-                        >
-                          <div className="flex items-center mb-2">
-                            <span className="text-lg mr-2">{diffInfo.icon}</span>
-                            <span className={`font-semibold text-sm ${
-                              isSelected ? 'text-indigo-800' : 'text-gray-700'
-                            }`}>
-                              {diffInfo.label}
-                            </span>
-                          </div>
-                          <p className={`text-xs leading-relaxed ${
-                            isSelected ? 'text-indigo-600' : 'text-gray-600'
-                          }`}>
-                            {diffInfo.description}
-                          </p>
-                          {isSelected && (
-                            <div className="mt-2 flex items-center">
-                              <span className="text-indigo-500 text-xs font-medium">✓ Selecionado</span>
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  
-                  <div className="mt-4 p-3 bg-white/50 border border-indigo-100 rounded-md">
-                    <div className="flex items-center mb-1">
-                      <span className="text-indigo-600 mr-2">{getDifficultyInfo(selectedCaseKey).icon}</span>
-                      <span className="font-semibold text-indigo-800 text-sm">
-                        Caso Atual: {getDifficultyInfo(selectedCaseKey).label}
-                      </span>
-                    </div>
-                    <p className="text-xs text-indigo-600">
-                      {getDifficultyInfo(selectedCaseKey).description}
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Apresentação do Caso */}
-                <div className="p-4 border rounded-md bg-secondary/20">
-                  <h3 className="text-lg font-semibold mb-2">Caso Clínico:</h3>
-                  <p className="mb-4">{currentCase.case_vignette}</p>
-                  
-                  <h4 className="font-medium mb-2">Achados Principais:</h4>
-                  <ul className="list-disc pl-5 space-y-1">
-                    {currentCase.initial_findings.map((finding, idx) => (
-                      <li key={idx} className="text-base">
-                        <span className="font-medium">{finding.finding_name}</span>
-                        {finding.details && <span>: {finding.details}</span>}
-                        {finding.onset_duration_pattern && <span> ({finding.onset_duration_pattern})</span>}
-                        {finding.severity_level && <span>, {finding.severity_level}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  <h4 className="font-medium mt-4 mb-2">Hipóteses a Analisar:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {currentCase.plausible_hypotheses.map((hypothesis, idx) => (
-                      <Badge key={idx} variant="outline" className="text-base">
-                        {hypothesis}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Formulários de Análise para cada Hipótese */}
-                <div className="space-y-6">
-                  <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg">
-                    <div className="flex items-center mb-3">
-                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center mr-3">
-                        <span className="text-indigo-600 font-bold text-sm">📝</span>
-                      </div>
-                      <h3 className="text-lg font-semibold text-indigo-800">Sua Análise das Hipóteses</h3>
-                    </div>
-                    <p className="text-sm text-indigo-700">
-                      Para cada hipótese, identifique os achados que a suportam, refutam e as características que a distinguem das demais.
-                    </p>
-                  </div>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+            <CardHeader className="relative z-10">
+              <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                <Brain className="h-6 w-6 mr-2 text-purple-500" />
+                Matriz de Análise: Achados vs. Hipóteses
+              </CardTitle>
+              <CardDescription className="text-gray-600">
+                Para cada achado clínico, avalie como ele se relaciona com cada hipótese diagnóstica. Em seguida, identifique o achado mais decisivo.
+              </CardDescription>
+              <div className="flex items-center justify-center space-x-2 mt-4">
+                <Users className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm text-gray-500">Análise sistemática e interativa</span>
+              </div>
+            </CardHeader>
 
-                  {studentAnalysis.map((analysis, index) => (
-                    <div key={index} className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm">
-                      <div className="flex items-center mb-6">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                          <span className="text-blue-700 font-semibold text-sm">{index + 1}</span>
+            {/* Seletor de Casos Clínicos */}
+            <CardContent className="relative z-10">
+              <div className="p-4 bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-lg mb-6">
+                <div className="flex items-center mb-3">
+                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-purple-600 font-bold text-sm">📚</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-purple-800">Selecione um Caso Clínico</h3>
+                </div>
+                <p className="text-sm text-purple-700 mb-4">
+                  Escolha um caso para praticar a análise matricial de hipóteses diagnósticas.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {Object.entries(clinicalCases).map(([caseKey, caseData]) => {
+                    const diffInfo = getDifficultyInfo(caseKey);
+                    const isSelected = selectedCaseKey === caseKey;
+                    
+                    return (
+                      <button
+                        key={caseKey}
+                        onClick={() => handleCaseChange(caseKey)}
+                        className={`p-3 rounded-lg border-2 transition-all duration-200 text-left ${
+                          isSelected 
+                            ? 'border-indigo-500 bg-indigo-50 shadow-md' 
+                            : 'border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25'
+                        }`}
+                      >
+                        <div className="flex items-center mb-2">
+                          <span className="text-lg mr-2">{diffInfo.icon}</span>
+                          <span className={`font-semibold text-sm ${
+                            isSelected ? 'text-indigo-800' : 'text-gray-700'
+                          }`}>
+                            {diffInfo.label}
+                          </span>
                         </div>
-                        <h3 className="text-xl font-semibold text-blue-900">{analysis.hypothesis_name}</h3>
-                      </div>
-                      
-                      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
-                        {/* Achados de Suporte */}
-                        <div className="space-y-3">
-                          <div className="flex items-center">
-                            <span className="text-green-600 mr-2 text-lg">✅</span>
-                            <label htmlFor={`supporting-${index}`} className="text-sm font-semibold text-green-800">
-                              Achados que SUPORTAM
-                          </label>
+                        <p className={`text-xs leading-relaxed ${
+                          isSelected ? 'text-indigo-600' : 'text-gray-600'
+                        }`}>
+                          {diffInfo.description}
+                        </p>
+                        {isSelected && (
+                          <div className="mt-2 flex items-center">
+                            <span className="text-indigo-500 text-xs font-medium">✓ Selecionado</span>
                           </div>
-                          <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                          <Textarea 
-                            id={`supporting-${index}`} 
-                            placeholder="• Achado clínico 1&#10;• Achado clínico 2&#10;• Achado clínico 3&#10;&#10;Dica: Liste dados objetivos e subjetivos que fortalecem esta hipótese"
-                            rows={4}
-                            className="border-0 bg-transparent resize-none focus:ring-0 text-sm"
-                            value={analysis.supporting_findings.join('\n')}
-                            onChange={(e) => handleAnalysisChange(index, 'supporting_findings', parseTextToArray(e.target.value))}
-                            disabled={isAnalysisLoading}
-                          />
-                          </div>
-                          <p className="text-xs text-green-600">Liste os achados que apoiam esta hipótese</p>
-                        </div>
-                        
-                        {/* Achados de Refutação */}
-                        <div className="space-y-3">
-                          <div className="flex items-center">
-                            <span className="text-red-600 mr-2 text-lg">❌</span>
-                            <label htmlFor={`refuting-${index}`} className="text-sm font-semibold text-red-800">
-                              Achados que REFUTAM
-                          </label>
-                          </div>
-                          <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                          <Textarea 
-                            id={`refuting-${index}`} 
-                            placeholder="• Achado inconsistente 1&#10;• Achado inconsistente 2&#10;• Achado inconsistente 3&#10;&#10;Dica: Considere dados que não se encaixam no padrão típico desta condição"
-                            rows={4}
-                            className="border-0 bg-transparent resize-none focus:ring-0 text-sm"
-                            value={analysis.refuting_findings.join('\n')}
-                            onChange={(e) => handleAnalysisChange(index, 'refuting_findings', parseTextToArray(e.target.value))}
-                            disabled={isAnalysisLoading}
-                          />
-                          </div>
-                          <p className="text-xs text-red-600">Liste os achados que enfraquecem esta hipótese</p>
-                        </div>
-                        
-                        {/* Discriminadores */}
-                        <div className="space-y-3">
-                          <div className="flex items-center">
-                            <span className="text-yellow-600 mr-2 text-lg">🎯</span>
-                            <label htmlFor={`discriminators-${index}`} className="text-sm font-semibold text-yellow-800">
-                              DISCRIMINADORES Chave
-                          </label>
-                          </div>
-                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                          <Textarea 
-                            id={`discriminators-${index}`} 
-                            placeholder="• Característica distintiva 1&#10;• Característica distintiva 2&#10;• Característica distintiva 3&#10;&#10;Dica: O que diferencia ESTA hipótese das outras listadas?"
-                            rows={4}
-                            className="border-0 bg-transparent resize-none focus:ring-0 text-sm"
-                            value={analysis.key_discriminators_against_others.join('\n')}
-                            onChange={(e) => handleAnalysisChange(index, 'key_discriminators_against_others', parseTextToArray(e.target.value))}
-                            disabled={isAnalysisLoading}
-                          />
-                          </div>
-                          <p className="text-xs text-yellow-600">Características que distinguem das outras hipóteses</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 
-                <Button type="submit" disabled={isAnalysisLoading || !authIsLoaded} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white">
-                  {isAnalysisLoading ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Analisando hipóteses...
-                    </>
-                  ) : "Analisar Hipóteses"}
-                </Button>
-                
-                {isAnalysisLoading && <HypothesisAnalysisSkeleton />}
-                {analysisError && (
-                  <Alert variant="destructive" className="mt-4">
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>Ops! Algo deu errado</AlertTitle>
-                    <AlertDescription className="mt-2">
-                      {analysisError}
-                      <br />
-                      <span className="text-sm mt-2 block">Se o problema persistir, tente recarregar a página ou entre em contato conosco.</span>
-                    </AlertDescription>
-                  </Alert>
-                )}
-                
-                {/* Exibição do Feedback da Análise */}
-                {hypothesisFeedback && (
-                  <div className="mt-8 space-y-6">
-                    {/* Feedback Geral */}
-                      {hypothesisFeedback.overall_feedback && (
-                      <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-                        <div className="flex items-start">
-                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                            <span className="text-purple-600 font-bold text-sm">👨‍⚕️</span>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold mb-2 text-purple-800">Feedback Geral do Dr. Corvus</h3>
-                            <p className="text-sm text-purple-700 leading-relaxed">{hypothesisFeedback.overall_feedback}</p>
-                          </div>
-                        </div>
-                        </div>
-                      )}
-                      
-                    {/* Análise Detalhada por Hipótese */}
-                    <div className="space-y-4">
-                      <h4 className="text-lg font-semibold text-primary">Análise Detalhada por Hipótese:</h4>
-                        {hypothesisFeedback.detailed_feedback_per_hypothesis.map((feedback, idx) => (
-                        <div key={idx} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
-                          <div className="flex items-center mb-4">
-                            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                              <span className="text-blue-700 font-semibold text-xs">{idx + 1}</span>
-                            </div>
-                            <h5 className="text-lg font-semibold text-blue-900">{feedback.hypothesis_name}</h5>
-                          </div>
-                          
-                          <div className="space-y-4">
-                            {feedback.feedback_on_supporting_findings && (
-                              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                                <div className="flex items-center mb-2">
-                                  <span className="text-green-600 mr-2">✅</span>
-                                  <h6 className="font-medium text-green-800">Achados de Suporte</h6>
-                                </div>
-                                <p className="text-sm text-green-700">{feedback.feedback_on_supporting_findings}</p>
-                              </div>
-                            )}
-                            
-                            {feedback.feedback_on_refuting_findings && (
-                              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                                <div className="flex items-center mb-2">
-                                  <span className="text-red-600 mr-2">❌</span>
-                                  <h6 className="font-medium text-red-800">Achados de Refutação</h6>
-                                </div>
-                                <p className="text-sm text-red-700">{feedback.feedback_on_refuting_findings}</p>
-                              </div>
-                            )}
-                            
-                            {feedback.feedback_on_discriminators && (
-                              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                                <div className="flex items-center mb-2">
-                                  <span className="text-yellow-600 mr-2">🎯</span>
-                                  <h6 className="font-medium text-yellow-800">Discriminadores</h6>
-                                </div>
-                                <p className="text-sm text-yellow-700">{feedback.feedback_on_discriminators}</p>
-                              </div>
-                            )}
-                            
-                            {feedback.expert_comparison_points && feedback.expert_comparison_points.length > 0 && (
-                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                <div className="flex items-center mb-2">
-                                  <span className="text-blue-600 mr-2">🧠</span>
-                                  <h6 className="font-medium text-blue-800">Pontos de Comparação do Expert</h6>
-                                </div>
-                                <ul className="text-sm text-blue-700 space-y-1">
-                                  {feedback.expert_comparison_points.map((point, pointIdx) => (
-                                    <li key={pointIdx} className="flex items-start">
-                                      <span className="text-blue-500 mr-2 mt-1">•</span>
-                                      <span>{point}</span>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                    {/* Sugestão de Foco para Aprendizado */}
-                      {hypothesisFeedback.suggested_learning_focus && (
-                      <div className="p-4 bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg">
-                        <div className="flex items-start">
-                          <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                            <span className="text-emerald-600 font-bold text-sm">📚</span>
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-emerald-800 mb-2">Sugestão de Foco para Aprendizado</h4>
-                            <p className="text-sm text-emerald-700 leading-relaxed">{hypothesisFeedback.suggested_learning_focus}</p>
-                          </div>
-                        </div>
-                        </div>
-                      )}
+                <div className="mt-4 p-3 bg-white/50 border border-indigo-100 rounded-md">
+                  <div className="flex items-center mb-1">
+                    <span className="text-indigo-600 mr-2">{getDifficultyInfo(selectedCaseKey as string).icon}</span>
+                    <span className="font-semibold text-indigo-800 text-sm">
+                      Caso Atual: {getDifficultyInfo(selectedCaseKey as string).label}
+                    </span>
                   </div>
-                )}
-              </CardContent>
-            </form>
+                  <p className="text-xs text-indigo-600">
+                    {getDifficultyInfo(selectedCaseKey as string).description}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+
+            <MatrixHypothesisComparison
+              currentCase={currentCase}
+              matrixAnalysis={matrixAnalysis}
+              selectedDiscriminator={selectedDiscriminator}
+              matrixFeedback={matrixFeedback}
+              isMatrixLoading={isMatrixLoading}
+              matrixError={matrixError}
+              authIsLoaded={authIsLoaded}
+              onMatrixCellChange={handleMatrixCellChange}
+              onDiscriminatorChange={setSelectedDiscriminator}
+              onSubmitAnalysis={handleSubmitMatrixAnalysis}
+            />
           </Card>
         </TabsContent>
       </Tabs>
 
       {/* Dica de Integração - Movida para antes dos próximos passos */}
-      <div className="mt-12 p-6 border rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200 shadow-sm">
+      <div className="mt-12 p-6 border rounded-lg bg-gradient-to-r from-purple-50 to-violet-50 border-purple-200 shadow-sm">
         <div className="flex items-start">
-          <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
-            <Lightbulb className="h-6 w-6 text-amber-700" />
+          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-4 mt-1 flex-shrink-0">
+            <Lightbulb className="h-6 w-6 text-purple-700" />
           </div>
           <div>
-            <h5 className="font-bold text-amber-800 mb-2 text-lg">Dica de Integração Diagnóstica</h5>
-            <p className="text-sm text-amber-700 leading-relaxed">
+            <h5 className="font-bold text-purple-800 mb-2 text-lg">Dica de Integração Diagnóstica</h5>
+            <p className="text-sm text-purple-700 leading-relaxed">
               <strong>Conecte os Pontos:</strong> Use as ferramentas de expansão de DDx para brainstorm. Depois, gere perguntas direcionadas para coletar dados que diferenciem suas hipóteses. Finalmente, compare e contraste para refinar sua lista e chegar a um diagnóstico provável. A MBE pode ajudar a encontrar a prevalência e a acurácia dos testes para suas hipóteses.
             </p>
           </div>

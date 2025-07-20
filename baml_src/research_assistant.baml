@@ -143,6 +143,7 @@ class ClinicalScenarioInput {
 
 class PICOFormulationOutput {
   structured_pico_question PICOQuestion @description("Structured PICO question generated.")
+  structured_question string @description("The full, human-readable PICO question string.")
   explanation string @description("Explanation of how the PICO question was formulated.")
   pico_derivation_reasoning string @description("Detailed chain-of-thought reasoning for identifying each PICO component.")
   search_terms_suggestions string[] @description("Search term suggestions for this PICO question, ideally in English for international databases, including MeSH terms if applicable.")
@@ -355,31 +356,6 @@ function AnalyzePDFDocument(input: PDFAnalysisInput) -> PDFAnalysisOutput {
     **3. Key Findings (`key_findings`):**
     - Extract the most important results and data from the document.
     - Present these as a list of clear and concise strings.
-    - Each string should represent a distinct, significant finding.
-
-    **4. Clinical Relevance (`clinical_relevance`):**
-    - Assess the practical implications of the findings for clinical practice.
-    - How might these results change patient management, diagnostic approaches, or treatment protocols?
-    - If a clinical question was provided, directly address how the findings answer that question.
-
-    **5. Evidence Quality (`evidence_quality`):**
-    - Critically evaluate the strength and reliability of the evidence.
-    - Consider the study design's position in the evidence hierarchy.
-    - Assess the risk of bias (e.g., selection bias, performance bias, detection bias).
-    - Comment on the statistical power and the precision of the results (e.g., confidence intervals).
-
-    **6. Recommendations (`recommendations`):**
-    - List the explicit recommendations or conclusions made by the authors.
-    - These should be direct quotes or close paraphrases of the authors' concluding statements.
-
-    **7. Limitations (`limitations`):**
-    - Identify and list the limitations acknowledged by the authors.
-    - Add any other critical limitations you have identified during your analysis.
-
-    **8. Structured Summary (`structured_summary`):**
-    - Provide a comprehensive, structured summary of the entire document.
-    - This summary should integrate all the points above into a coherent narrative, suitable for a busy clinician to quickly understand the paper's essence. Start with a one-sentence takeaway, followed by a more detailed breakdown.
-
     **CRITICAL:** Your entire response must be in English and conform to the JSON output format specified by the function's return type.
 
     {{ ctx.output_format }}
@@ -588,50 +564,79 @@ class EvidenceAnalysisData {
 // --- Classes de Estrutura de Dados para o Dashboard Final ---
 
 enum GradeLevel {
-  ALTA @description("High quality of evidence")
-  MODERADA @description("Moderate quality of evidence")
-  BAIXA @description("Low quality of evidence")
-  MUITO_BAIXA @description("Very low quality of evidence")
+  HIGH @description("High quality of evidence")
+  MODERATE @description("Moderate quality of evidence")
+  LOW @description("Low quality of evidence")
+  VERY_LOW @description("Very low quality of evidence")
 }
 
 enum RecommendationStrength {
-  FORTE @description("Forte recomendação para a prática clínica")
-  FRACA @description("Fraca recomendação para a prática clínica")
+  STRONG @description("Strong recommendation for clinical practice")
+  WEAK @description("Weak recommendation for clinical practice")
 }
 
 enum AssessmentValue {
-  POSITIVO @description("Positive assessment of the factor")
-  NEUTRO @description("Neutral assessment of the factor")
-  NEGATIVO @description("Negative assessment of the factor")
+  POSITIVE @description("Positive assessment of the factor")
+  NEUTRAL @description("Neutral assessment of the factor")
+  NEGATIVE @description("Negative assessment of the factor")
 }
 
 class QualityFactor {
-  factor_name string @description("Name of the quality factor, e.g: 'Study Design'.")
-  assessment AssessmentValue @description("Avaliação do fator (POSITIVO, NEUTRO, NEGATIVO).")
+  id string @description("A unique, kebab-case identifier for this factor, e.g., 'risk-of-bias'.")
+  factor_name string @description("Name of the quality factor being assessed (e.g., 'Risk of Bias', 'Inconsistency', 'Indirectness', 'Imprecision', 'Publication Bias').")
+  assessment AssessmentValue @description("Assessment of the factor's impact on the evidence quality.")
   justification string @description("Brief justification for the assessment.")
 }
 
 class BiasAnalysis {
-  selection_bias string @description("Analysis of the risk of selection bias.")
-  performance_bias string @description("Analysis of the risk of performance/bias.")
-  reporting_bias string @description("Analysis of the risk of reporting bias.")
-  confirmation_bias string @description("Analysis of the risk of confirmation bias.")
+  id string @description("A unique, kebab-case identifier for this bias, e.g., 'selection-bias'.")
+  bias_type string @description("Type of bias analyzed (e.g., 'Selection Bias', 'Performance Bias', 'Detection Bias', 'Attrition Bias', 'Reporting Bias').")
+  potential_impact string @description("Potential impact of this bias on the study results.")
+  mitigation_strategies string @description("Strategies used by the authors to mitigate this bias, if any.")
+  actionable_suggestion string @description("A practical suggestion for clinicians on how to account for this bias when interpreting or applying the study's findings.")
 }
 
 // A classe de output final para a UI
-class EvidenceAppraisalOutput {
-  overall_quality GradeLevel @description("The overall quality of the evidence, based on the GRADE framework.")
-  quality_reasoning string @description("Justification for the overall quality assessment.")
-  recommendation_strength RecommendationStrength @description("The strength of the recommendation for clinical practice.")
-  strength_reasoning string @description("Justification for the strength of the recommendation.")
-  quality_factors QualityFactor[] @description("Detailed analysis of the factors that influence the quality of the evidence.")
-  bias_analysis BiasAnalysis @description("Structured analysis of the main types of bias.")
-  practice_recommendations string[] @description("Practical recommendations and actionable insights for the clinician.")
+
+class RecommendationBalance {
+  positive_factors string[] @description("List of key factors or findings supporting the recommendation (e.g., 'Large effect size', 'Clear benefit in primary outcome').")
+  negative_factors string[] @description("List of key factors or findings weighing against the recommendation (e.g., 'High risk of bias', 'Significant side effects', 'Imprecise results').")
+  overall_balance string @description("A qualitative summary statement of the balance between positive and negative factors, explaining the final recommendation strength.")
+  reasoning_tags string[] @description("A list of short, scannable, actionable tags summarizing the key reasons for the recommendation balance (e.g., 'High Risk of Bias', 'Strong Efficacy', 'Limited Generalizability', 'Novel Mechanism').")
 }
 
-// --- Função BAML de Extração ---
+class ReasoningTag {
+  tag string @description("The brief, high-level tag text (e.g., 'High Risk of Bias').")
+  reference_id string @description("The unique ID of the QualityFactor or BiasAnalysis this tag refers to.")
+}
 
-function AnalyzeMedicalPaper(paper_full_text: string, clinical_question_PICO: string | null) -> EvidenceAnalysisData {
+class GradeSummary {
+  overall_quality GradeLevel @description("Overall quality of the evidence, based on the GRADE framework.")
+  recommendation_strength RecommendationStrength @description("Strength of the recommendation for clinical practice.")
+  summary_of_findings string @description("A concise summary of the key findings and their implications for the clinical question.")
+  recommendation_balance RecommendationBalance @description("A summary of factors for and against the recommendation, to be used for visualization.")
+  reasoning_tags ReasoningTag[] @description("A list of tags that justify the quality and recommendation, linked to specific factors by their 'reference_id'.")
+}
+
+class PracticeRecommendations {
+  clinical_application string @description("Specific, actionable recommendations on how to apply the findings in a clinical setting.")
+  monitoring_points string[] @description("Key points to monitor in the patient if the intervention is applied.")
+  evidence_caveats string @description("Important caveats and limitations of the evidence that a clinician must consider.")
+}
+
+class EvidenceAppraisalOutput {
+  grade_summary GradeSummary
+  quality_factors QualityFactor[] @description("List of factors influencing the quality of evidence (e.g., study design, risk of bias). Used to justify the grade_summary.")
+  bias_analysis BiasAnalysis[] @description("Detailed analysis of potential biases in the study.")
+  practice_recommendations PracticeRecommendations
+}
+
+enum TextType {
+  FULL_TEXT
+  ABSTRACT_ONLY
+}
+
+function AnalyzeMedicalPaper(paper_text: string, text_type: TextType, clinical_question: string?, source_type: string?, publication_year: int?) -> EvidenceAnalysisData {
   client DrCorvusLLM
   prompt #"""
     You are Dr. Corvus, an AI assistant highly precise, specialized in **extracting and structuring information** from medical scientific articles.
@@ -639,19 +644,83 @@ function AnalyzeMedicalPaper(paper_full_text: string, clinical_question_PICO: st
     **Your sole task is to read the complete article text provided and fill the output JSON object with maximum precision, based solely on the text.**
 
     - **DO NOT EVALUATE, DO NOT INTERPRET, DO NOT MAKE INFERENCES.** Just extract the facts.
-    - If a specific piece of information is not found in the text, fill the corresponding field with "Not found in text" or an appropriate null/empty value.
+    - If a specific piece of information is not found in the text, fill the corresponding field with "Not found in text" (for strings) or a 'null' value (for numbers/objects).
     - For numeric fields like 'sample_size', if the information is not found, use a 'null' value instead of a string.
+    - Do not leave any field missing or omitted, even if not present in the article.
 
     **Clinical Question Focus (to guide relevance extraction):**
-    {{ clinical_question_PICO }}
+    {{ clinical_question or "Not provided" }}
+
+    **Source Type:** {{ source_type or "Not provided" }}
+    **Publication Year:** {{ publication_year or "Not provided" }}
 
     **Complete Article Text for Analysis:**
     ---
-    {{ paper_full_text }}
+    {{ paper_text }}
     ---
 
-    Fill all the fields of the output JSON object ('EvidenceAnalysisData') based on the instructions above.
-    **Your output MUST be in English.**
+    ---
+    **MANDATORY OUTPUT SCHEMA (fill every field, do not omit any):**
+    {
+      "study_objective": "<The main objective of the study, as declared by the authors.>",
+      "study_design": "<RCT | COHORT | CASE_CONTROL | CROSS_SECTIONAL | SYSTEMATIC_REVIEW | META_ANALYSIS | CASE_REPORT | REVIEW_ARTICLE | LITERATURE_REVIEW | OTHER>",
+      "population": {
+        "sample_size": <Total sample size (number) or null>,
+        "key_demographics": "<Demographic description of participants (age, sex, etc.).>",
+        "inclusion_criteria": [
+          "<Inclusion criterion 1>",
+          "<Inclusion criterion 2>"
+        ],
+        "exclusion_criteria": [
+          "<Exclusion criterion 1>",
+          "<Exclusion criterion 2>"
+        ]
+      },
+      "interventions": {
+        "intervention_details": "<Details of the intervention group.>",
+        "comparator_details": "<Details of the comparator group.>"
+      },
+      "primary_outcomes": [
+        "<Primary outcome 1>",
+        "<Primary outcome 2>"
+      ],
+      "key_results": [
+        {
+          "finding_description": "<Description of the primary finding.>",
+          "reported_values": "<Numeric, statistical values, and confidence intervals reported (e.g., 'OR 1.5, 95% CI 1.2-1.8, p<0.05').>"
+        }
+      ],
+      "authors_conclusions": [
+        "<Main conclusion 1>",
+        "<Main conclusion 2>"
+      ],
+      "authors_acknowledged_limitations": [
+        "<Limitation 1 acknowledged by authors>",
+        "<Limitation 2 acknowledged by authors>"
+      ]
+    }
+    ---
+    **Field-by-field extraction rules:**
+    - For each string field: If not found, use "Not found in text".
+    - For each number: If not found, use null.
+    - For lists/arrays: If not found, use an empty list [].
+    - For objects: If not found, use null or an object with all fields set to "Not found in text" or null as appropriate.
+    - For 'study_design': If cannot be determined, set to "Not found in text".
+    - For 'sample_size': If not reported, set to null.
+    - For every field: Do not omit any field, even if not present in the article.
+
+    {% if text_type == "ABSTRACT_ONLY" %}
+    WARNING: The text provided is only an abstract. Extract the information that is explicitly present. For fields such as detailed methodology or limitations, it is likely that the response will be "Not found in abstract". Be extra vigilant not to hallucinate details that are not in the abstract.
+    
+    IMPORTANT: When information is not found, use "Not found in abstract" rather than "Not found in text" for clarity to the end user.
+    {% else %}
+    NOTE: You have access to the full text of the document. When information is not found, use "Not found in full text" rather than generic "Not found" messages.
+    {% endif %}
+
+    **CRITICAL INSTRUCTIONS:**
+    - Output ONLY a valid JSON object matching this schema. DO NOT include any extra text, markdown, or explanations.
+    - Fill every field. If information is missing, provide the best possible value or a clear justification as above.
+    - All output must be in English, even if the article is in another language.
 
     {{ ctx.output_format }}
   """#
@@ -659,33 +728,58 @@ function AnalyzeMedicalPaper(paper_full_text: string, clinical_question_PICO: st
 
 // --- Função BAML de Avaliação ---
 
-function GenerateEvidenceAppraisal(extracted_data: EvidenceAnalysisData) -> EvidenceAppraisalOutput {
+function GenerateEvidenceAppraisal(extracted_data: EvidenceAnalysisData, clinical_question: string?) -> EvidenceAppraisalOutput {
   client DrCorvusLLM
   prompt #"""
-    You are Dr. Corvus, an expert in Evidence-Based Medicine. Your task is to **critically evaluate the extracted data** from a scientific article to generate a final evaluation panel.
+    You are Dr. Corvus, an AI assistant specialized in **critically appraising medical evidence** using the GRADE (Grading of Recommendations, Assessment, Development, and Evaluations) framework. Your task is to synthesize the provided `EvidenceAnalysisData` into a final `EvidenceAppraisalOutput` for a clinician.
 
-    **EXTRACTED DATA FOR YOUR EVALUATION:**
-    {{ extracted_data | json_string }}
+    **Framework:**
+    1.  **Assess Quality of Evidence:** Start with the study design and systematically downgrade for:
+        - **Risk of Bias:** Limitations in the study design or execution.
+        - **Inconsistency:** Unexplained heterogeneity of results across studies.
+        - **Indirectness:** Differences between the study's PICO and the clinician's question.
+        - **Imprecision:** Wide confidence intervals.
+        - **Publication Bias:** Selective publication of studies.
+        *Upgrade for:* large effect, dose-response gradient, and opposing plausible confounding.
 
-    **EVALUATION PROCESS (GRADE Framework):**
+    2.  **Determine Strength of Recommendation:** Balance the quality of evidence with:
+        - **Balance of benefits vs. harms/costs.**
+        - **Patient values and preferences.**
 
-    1.  **Initial Quality:** Start with a baseline. If the `study_design` is `RCT`, the initial quality is HIGH. If it is a `SYSTEMATIC_REVIEW` of RCTs, it is HIGH. If it is `COHORT` or `CASE_CONTROL`, it is LOW.
+    **Contextual Information:**
+    - **User's Clinical Question:** `{{ clinical_question or "Not provided" }}`
+    - **Extracted Data from Article:**
+    ```json
+    {{ extracted_data }}
+    ```
 
-    2.  **Downgrade (Reduce Quality):** Analyze the following factors to reduce quality:
-        - **Risk of Bias:** Based on the `study_design` and `authors_acknowledged_limitations`, evaluate the risk of bias. If it is high, reduce 1 or 2 levels in quality.
-        - **Inconsistency:** (Usually requires comparison with other studies, but can be inferred if the `key_results` are contradictory).
-        - **Indirectness:** Is the population, intervention, or outcomes (`population`, `interventions`, `primary_outcomes`) of the study very different from the general clinical question? If so, reduce 1 level.
-        - **Imprecisão:** The `key_results` show very wide confidence intervals? The `sample_size` is very small? If so, reduce 1 level.
+    **CRITICAL INSTRUCTIONS & LOGIC:**
 
-    3.  **Upgrade (Aumentar a Qualidade, raro):** The study shows a large effect size or a strong dose-response relationship? If so, it can increase 1 level.
+    1.  **Handle Abstract-Only Data:**
+        - Examine the `extracted_data`. If multiple fields contain phrases like "Not found in abstract" or "Não informado no resumo", the analysis is based on incomplete information.
+        - In this case, you MUST set `grade_summary.overall_quality` to `VERY_LOW`.
+        - The `grade_summary.quality_reasoning` MUST explain this: "The appraisal is based solely on the abstract, which does not permit a full critical analysis of the study's methodology, results, and potential biases."
 
-    4.  **Força da Recomendação:** Based on the `overall_quality` final, evaluate the strength of the recommendation.
-        - **FORTE:** High or moderate quality, with clear benefits outweighing risks.
-        - **FRACA:** Low or very low quality, or when benefits and risks are balanced or uncertain.
+    2.  **Targeted Indirectness Assessment:**
+        - Compare the study's population, intervention, and outcomes in `extracted_data` directly against the user's `clinical_question`.
+        - Explicitly state in the `quality_factors` analysis for 'Indirectness' how well the study matches the user's question. If the question was not provided, assess the generalizability.
 
-    5.  **Bias Analysis and Recommendations:** Fill the bias analysis and formulate practical recommendations for the clinician.
+    3.  **Synthesize the Recommendation Balance:**
+        - Review all `quality_factors` and `bias_analysis` assessments.
+        - Identify the most critical positive points (e.g., large effect size, low risk of bias in key domains) and list them in `recommendation_balance.positive_factors`.
+        - Identify the most critical negative points (e.g., high risk of bias, serious imprecision, significant side effects) and list them in `recommendation_balance.negative_factors`.
+        - Write a concise `overall_balance` statement that explains *why* the benefits do or do not outweigh the harms, justifying the `recommendation_strength`. For example: 'Despite the moderate quality evidence, the large observed benefit and lack of serious harms justify a strong recommendation.'
+        - Also, generate a list of 3-5 short, scannable `reasoning_tags` that summarize the most critical aspects of the appraisal (e.g., 'High Risk of Bias', 'Strong Efficacy', 'Limited Generalizability', 'Novel Mechanism').
 
-    Based on your analysis, fill the `EvidenceAppraisalOutput` object.
+    4.  **Fill the New Output Structure:**
+        - Meticulously populate the entire `EvidenceAppraisalOutput` object.
+        - `grade_summary`: Provide the final, high-level assessment.
+        - `quality_factors`: Detail each GRADE factor's contribution to the final quality score.
+        - `bias_analysis`: Provide a structured analysis of potential biases.
+        - `practice_recommendations`: Give clear, actionable advice. `evidence_caveats` is crucial for communicating the limits of the evidence.
+
+    4.  **Final Output:**
+        - Your output must be a single, valid JSON object that strictly follows the `EvidenceAppraisalOutput` schema. No extra text or markdown.
 
     {{ ctx.output_format }}
   """#

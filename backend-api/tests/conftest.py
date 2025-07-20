@@ -111,19 +111,18 @@ app.add_middleware(
 )
 
 # Import routers after app creation
-from routers import auth, patients, analysis, medications, clinical_notes, ai_chat, alerts, files, analyses
+from routers import auth, patients, lab_analysis, medications, clinical_notes, alerts, files, stored_analyses
 from routers.files import upload_pdf_guest
 
 # Register the routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(patients.router, prefix="/api/patients", tags=["Patients"])
-app.include_router(analysis.router, prefix="/api/analyze", tags=["Analysis"])
+app.include_router(lab_analysis.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(medications.router, prefix="/api", tags=["Medications"])
 app.include_router(clinical_notes.router, prefix="/api/clinical-notes", tags=["Clinical Notes"])
-app.include_router(ai_chat.router, prefix="/api/ai-chat", tags=["AI Chat"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
-app.include_router(analyses.router, prefix="/api", tags=["Analyses"])
+app.include_router(stored_analyses.router, prefix="/api", tags=["Analyses"])
 
 # Adicionar o endpoint de guest-upload diretamente à aplicação de teste
 @app.post("/api/guest-upload", tags=["Guest Access"])
@@ -137,7 +136,6 @@ async def test_guest_upload(file: UploadFile = File(...)):
 # Import models after router setup to avoid circular imports
 from database import Base
 from database.models import User, AIChatConversation, AIChatMessage  # Usando a estrutura unificada de modelos
-from security import create_access_token
 
 # Configura o banco de dados de teste em memória para SQLite
 @pytest.fixture(scope="function")
@@ -213,14 +211,10 @@ def sqlite_client(db_session):
         """
         # Cria um token de acesso para o usuário se user não for None
         if user is not None:
-            from security import create_access_token
-            access_token = create_access_token(
-                data={
-                    "sub": user.email,
-                    "user_id": user.user_id,
-                    "name": user.name
-                }
-            )
+            # No longer using create_access_token directly.
+            # For testing, we can mock the authentication or directly set headers.
+            # For now, we'll just set a dummy Authorization header if a user is provided.
+            access_token = "dummy_token_for_test"
             
             # Adiciona o token ao objeto de cliente para ser usado em todos os testes
             client.headers["Authorization"] = f"Bearer {access_token}"

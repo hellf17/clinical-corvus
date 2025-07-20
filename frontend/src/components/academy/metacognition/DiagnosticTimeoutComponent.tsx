@@ -32,7 +32,10 @@ import {
   FileText,
   Clipboard,
   MessageSquare,
-  AlertOctagon
+  AlertOctagon,
+  Shield,
+  Activity,
+  Eye
 } from 'lucide-react';
 
 // Interfaces
@@ -85,7 +88,7 @@ const timeoutTemplates: TimeoutTemplate[] = [
     ],
     category: 'Emergência',
     complexity: 'Básico',
-    color: 'bg-red-100 text-red-800 border-red-300'
+    color: 'bg-cyan-100 text-cyan-800 border-cyan-300'
   },
   {
     id: 'systematic-timeout',
@@ -183,6 +186,45 @@ export default function DiagnosticTimeoutComponent({
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<DiagnosticTimeoutOutput | null>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
+
+  // Helper function to determine analysis section severity
+  const getAnalysisSeverity = (content: string[]) => {
+    const hasUrgent = content.some(item => 
+      item.toLowerCase().includes('urgente') || 
+      item.toLowerCase().includes('crítico') || 
+      item.toLowerCase().includes('emergência')
+    );
+    if (hasUrgent) return 'high';
+    
+    const hasModerate = content.some(item => 
+      item.toLowerCase().includes('importante') || 
+      item.toLowerCase().includes('considerar') || 
+      item.toLowerCase().includes('atenção')
+    );
+    if (hasModerate) return 'medium';
+    
+    return 'low';
+  };
+
+  // Helper function to get severity indicator
+  const getSeverityIndicator = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return { color: 'bg-cyan-500', icon: AlertTriangle, text: 'Alto', textColor: 'text-cyan-700' };
+      case 'medium':
+        return { color: 'bg-yellow-500', icon: Activity, text: 'Moderado', textColor: 'text-yellow-700' };
+      default:
+        return { color: 'bg-green-500', icon: CheckCircle, text: 'Normal', textColor: 'text-green-700' };
+    }
+  };
+
+  const toggleSectionExpansion = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
 
   // Timer effect
   useEffect(() => {
@@ -414,7 +456,7 @@ export default function DiagnosticTimeoutComponent({
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      'Emergência': 'bg-red-100 text-red-800',
+      'Emergência': 'bg-cyan-100 text-cyan-800',
       'Ambulatório': 'bg-blue-100 text-blue-800',
       'Hospitalar': 'bg-green-100 text-green-800',
       'Especial': 'bg-purple-100 text-purple-800'
@@ -426,19 +468,20 @@ export default function DiagnosticTimeoutComponent({
     switch (complexity) {
       case 'Básico': return 'bg-green-100 text-green-800';
       case 'Intermediário': return 'bg-yellow-100 text-yellow-800';
-      case 'Avançado': return 'bg-red-100 text-red-800';
+      case 'Avançado': return 'bg-cyan-100 text-cyan-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Zap className="h-6 w-6 mr-2 text-orange-500" />
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="relative z-10">
+        <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+          <Zap className="h-6 w-6 mr-2 text-cyan-500" />
           Prática de Diagnostic Timeout Interativo
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-gray-600">
           Interrompa seu raciocínio diagnóstico para reconsiderar o caso de forma sistemática. Use templates guiados ou crie sessões personalizadas.
         </CardDescription>
       </CardHeader>
@@ -515,8 +558,8 @@ export default function DiagnosticTimeoutComponent({
               <div 
                 className={`p-4 border rounded-lg cursor-pointer transition-all ${
                   !useCustomDuration 
-                    ? 'border-orange-500 bg-orange-50' 
-                    : 'border-gray-200 hover:border-orange-300'
+                    ? 'border-cyan-500 bg-cyan-50' 
+                    : 'border-gray-200 hover:border-cyan-300'
                 }`}
                 onClick={() => setUseCustomDuration(false)}
               >
@@ -527,7 +570,7 @@ export default function DiagnosticTimeoutComponent({
                     onChange={() => setUseCustomDuration(false)}
                     className="mr-2"
                   />
-                  <FileText className="h-4 w-4 mr-2 text-orange-500" />
+                  <FileText className="h-4 w-4 mr-2 text-cyan-500" />
                   <span className="font-medium">Templates Estruturados</span>
                 </div>
                 <p className="text-sm text-muted-foreground">
@@ -567,15 +610,15 @@ export default function DiagnosticTimeoutComponent({
                     key={template.id}
                     className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
                       selectedTemplate?.id === template.id
-                        ? 'border-orange-500 bg-orange-50'
-                        : 'border-gray-200 hover:border-orange-300'
+                        ? 'border-cyan-500 bg-cyan-50'
+                        : 'border-gray-200 hover:border-cyan-300'
                     }`}
                     onClick={() => handleTemplateSelect(template)}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-medium text-sm">{template.name}</h4>
                       {selectedTemplate?.id === template.id && (
-                        <CheckCircle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+                        <CheckCircle className="h-4 w-4 text-cyan-500 flex-shrink-0" />
                       )}
                     </div>
                     
@@ -652,16 +695,16 @@ export default function DiagnosticTimeoutComponent({
         {currentSession && (
           <div className="space-y-6">
             {/* Timer e Controles */}
-            <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 border border-orange-200 rounded-lg">
+            <div className="p-4 bg-gradient-to-r from-cyan-50 to-blue-50 border border-cyan-200 rounded-lg">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-orange-800">
+                <h3 className="text-lg font-semibold text-cyan-800">
                   {currentSession.template.name}
                 </h3>
                 <div className="flex items-center space-x-2">
-                  <div className="text-2xl font-mono font-bold text-orange-700">
+                  <div className="text-2xl font-mono font-bold text-cyan-700">
                     {formatTime(timeRemaining)}
                   </div>
-                  <Badge variant="outline" className={timeRemaining > 30 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}>
+                  <Badge variant="outline" className={timeRemaining > 30 ? 'bg-cyan-50 text-cyan-700' : 'bg-red-50 text-red-700'}>
                     {timeRemaining > 0 ? 'Ativo' : 'Finalizado'}
                   </Badge>
                 </div>
@@ -670,7 +713,7 @@ export default function DiagnosticTimeoutComponent({
               <Progress value={getProgressPercentage()} className="mb-4" />
               
               <div className="flex items-center justify-between">
-                <div className="text-sm text-orange-700">
+                <div className="text-sm text-cyan-700">
                   Pergunta {currentPromptIndex + 1} de {currentSession.template.prompts.length}
                 </div>
                 <div className="flex space-x-2">
@@ -766,10 +809,14 @@ export default function DiagnosticTimeoutComponent({
                 className="flex-1"
               >
                 {isLoading ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Analisando...
-                  </>
+                  <div className="flex items-center">
+                    <div className="relative mr-2">
+                      <div className="w-4 h-4 border-2 border-cyan-200 rounded-full animate-spin">
+                        <div className="absolute top-0 left-0 w-4 h-4 border-2 border-cyan-600 rounded-full animate-pulse border-t-transparent"></div>
+                      </div>
+                    </div>
+                    Analisando com Dr. Corvus...
+                  </div>
                 ) : (
                   <>
                     <Brain className="mr-2 h-4 w-4" />
@@ -805,120 +852,238 @@ export default function DiagnosticTimeoutComponent({
           </Alert>
         )}
 
+        {isLoading && !analysis && (
+          <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-cyan-200 rounded-full animate-spin">
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-cyan-600 rounded-full animate-pulse border-t-transparent"></div>
+              </div>
+              <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-cyan-600 animate-pulse" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está analisando seu timeout...</p>
+              <p className="text-sm text-gray-500">Identificando diagnósticos alternativos e verificações cognitivas</p>
+            </div>
+            <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+            </div>
+          </div>
+        )}
+
         {/* Resultados da Análise */}
         {analysis && (
-          <div className="mt-8 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Análise do Diagnostic Timeout</h3>
+          <div className="mt-8 space-y-6 animate-fade-in">
+            <div className="text-center space-y-2">
+              <h3 className="text-3xl font-bold bg-gradient-to-r from-cyan-800 to-blue-600 bg-clip-text text-transparent">
+                Análise do Diagnostic Timeout
+              </h3>
+              <p className="text-gray-600">Insights do Dr. Corvus sobre seu processo de timeout diagnóstico</p>
+              <div className="flex items-center justify-center space-x-2 mt-4">
+                <Zap className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm text-gray-500">Análise completa de alternativas e verificações</span>
+              </div>
+            </div>
 
             {/* Diagnósticos Alternativos */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-              <div className="flex items-center mb-3">
-                <Brain className="h-6 w-6 text-purple-600 mr-2" />
-                <h4 className="font-semibold text-purple-800">Diagnósticos Alternativos</h4>
-              </div>
-              <ul className="space-y-2">
-                {analysis.alternative_diagnoses_to_consider.map((diagnosis, index) => (
-                  <li key={index} className="text-purple-700 flex items-start">
-                    <ArrowRight className="h-4 w-4 mr-2 mt-0.5 text-purple-500 flex-shrink-0" />
-                    <span>{diagnosis}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-purple-400">
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-500/3 to-blue-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <CardContent className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <h4 className="text-xl font-semibold text-purple-800">Diagnósticos Alternativos</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-purple-500" />
+                      <span className="text-sm font-medium text-purple-700">
+                        {analysis.alternative_diagnoses_to_consider.length} alternativa(s)
+                      </span>
+                      <Brain className="h-4 w-4 text-purple-700" />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleSectionExpansion('alternatives')}
+                    className="hover:bg-purple-50 transition-colors"
+                  >
+                    <span className="text-sm mr-2">
+                      {expandedSections['alternatives'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['alternatives'] ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+
+                <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 border-l-4 border-purple-400 rounded-r-lg">
+                  <p className="font-semibold text-purple-800 mb-2 flex items-center">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Considerações Diagnósticas:
+                  </p>
+                  <p className="text-purple-700 leading-relaxed">
+                    Alternativas identificadas durante o timeout diagnóstico
+                  </p>
+                </div>
+
+                <Collapsible open={expandedSections['alternatives']} onOpenChange={() => toggleSectionExpansion('alternatives')}>
+                  <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <ul className="space-y-3">
+                      {analysis.alternative_diagnoses_to_consider.map((diagnosis, index) => (
+                        <li key={index} className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 border-l-4 border-purple-400 rounded-r-lg">
+                          <div className="flex items-start">
+                            <ArrowRight className="h-4 w-4 mr-3 mt-0.5 text-purple-500 flex-shrink-0" />
+                            <p className="text-purple-700 leading-relaxed">{diagnosis}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
 
             {/* Cognitive Checks */}
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h4 className="font-semibold text-orange-800 mb-3 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Verificações cognitivas importantes
-              </h4>
-              <ul className="space-y-2">
-                {analysis.cognitive_checks.map((check, index) => (
-                  <li key={index} className="text-orange-700 flex items-start">
-                    <span className="text-orange-500 mr-2 mt-1">⚠</span>
-                    <span>{check}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-cyan-400">
+              <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/3 to-red-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <CardContent className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <h4 className="text-xl font-semibold text-cyan-800">Verificações Cognitivas Importantes</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-cyan-500" />
+                      <span className="text-sm font-medium text-cyan-700">
+                        {analysis.cognitive_checks.length} verificação(ões)
+                      </span>
+                      <AlertTriangle className="h-4 w-4 text-cyan-700" />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleSectionExpansion('cognitive')}
+                    className="hover:bg-cyan-50 transition-colors"
+                  >
+                    <span className="text-sm mr-2">
+                      {expandedSections['cognitive'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['cognitive'] ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+
+                <div className="mb-4 p-4 bg-gradient-to-r from-cyan-50 to-cyan-100 border-l-4 border-cyan-400 rounded-r-lg">
+                  <p className="font-semibold text-cyan-800 mb-2 flex items-center">
+                    <Target className="h-4 w-4 mr-2" />
+                    Pontos de Verificação:
+                  </p>
+                  <p className="text-cyan-700 leading-relaxed">
+                    Verificações cognitivas críticas identificadas
+                  </p>
+                </div>
+
+                <Collapsible open={expandedSections['cognitive']} onOpenChange={() => toggleSectionExpansion('cognitive')}>
+                  <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <ul className="space-y-3">
+                      {analysis.cognitive_checks.map((check, index) => (
+                        <li key={index} className="p-3 bg-gradient-to-r from-cyan-50 to-red-50 border-l-4 border-cyan-400 rounded-r-lg">
+                          <div className="flex items-start">
+                            <span className="text-cyan-500 mr-3 mt-1 text-lg">⚠</span>
+                            <p className="text-cyan-700 leading-relaxed">{check}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
 
             {/* Perguntas Adicionais */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Perguntas a serem consideradas
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+                <MessageSquare className="h-6 w-6 mr-3 text-blue-600" />
+                Perguntas a Serem Consideradas
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {analysis.key_questions_to_ask.map((question, index) => (
-                  <li key={index} className="text-blue-700 flex items-start">
-                    <span className="text-blue-500 mr-2 mt-1">❓</span>
-                    <span>{question}</span>
+                  <li key={index} className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 rounded-r-lg">
+                    <div className="flex items-start">
+                      <span className="text-blue-500 mr-3 mt-1 text-lg">❓</span>
+                      <p className="text-blue-700 leading-relaxed">{question}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Proximos Passos */}
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-3 flex items-center">
-                <Clipboard className="h-4 w-4 mr-2" />
-                Proximos Passos
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-green-800 mb-4 flex items-center">
+                <Clipboard className="h-6 w-6 mr-3 text-green-600" />
+                Próximos Passos
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {analysis.next_steps_suggested.map((test, index) => (
-                  <li key={index} className="text-green-700 flex items-start">
-                    <CheckCircle className="h-4 w-4 mr-2 mt-0.5 text-green-500 flex-shrink-0" />
-                    <span>{test}</span>
+                  <li key={index} className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 rounded-r-lg">
+                    <div className="flex items-start">
+                      <CheckCircle className="h-4 w-4 mr-3 mt-0.5 text-green-500 flex-shrink-0" />
+                      <p className="text-green-700 leading-relaxed">{test}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Red Flags */}
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h4 className="font-semibold text-red-800 mb-3 flex items-center">
-                <AlertOctagon className="h-4 w-4 mr-2" />
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-red-800 mb-4 flex items-center">
+                <AlertOctagon className="h-6 w-6 mr-3 text-red-600" />
                 Red Flags a Considerar
               </h4>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {analysis.red_flags_to_check.map((flag, index) => (
-                  <li key={index} className="text-red-700 flex items-start">
-                    <span className="text-red-500 mr-2 mt-1">🚩</span>
-                    <span>{flag}</span>
+                  <li key={index} className="p-3 bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-400 rounded-r-lg">
+                    <div className="flex items-start">
+                      <span className="text-red-500 mr-3 mt-1 text-lg">🚩</span>
+                      <p className="text-red-700 leading-relaxed">{flag}</p>
+                    </div>
                   </li>
                 ))}
               </ul>
             </div>
 
             {/* Recomendações de Timeout */}
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <h4 className="font-semibold text-emerald-800 mb-3 flex items-center">
-                <TrendingUp className="h-4 w-4 mr-2" />
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-emerald-800 mb-4 flex items-center">
+                <TrendingUp className="h-6 w-6 mr-3 text-emerald-600" />
                 Recomendações de Timeout
               </h4>
               <p className="text-emerald-700 leading-relaxed">{analysis.timeout_recommendation}</p>
             </div>
 
             {/* Disclaimer */}
-            <div className="text-xs italic text-muted-foreground p-3 bg-gray-50 rounded-md">
-              <span>Disclaimer: </span>
-              <span>As recomendações de timeout não substituem a avaliação médica real. <br />
-              Nossos recursos visam auxiliar o processo de tomada de decisão e raciocínio diagnostico devendo ser utilizados como uma ferramenta de apoio.
-              </span>
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg shadow-sm">
+              <div className="flex items-center mb-2">
+                <Shield className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Aviso Importante</span>
+              </div>
+              <p className="text-xs italic text-gray-600 leading-relaxed">
+                As recomendações de timeout não substituem a avaliação médica real. Nossos recursos visam auxiliar o processo de tomada de decisão e raciocínio diagnóstico, devendo ser utilizados como ferramenta de apoio complementar.
+              </p>
             </div>
           </div>
         )}
 
         {/* Helper quando não há sessão ativa */}
         {!currentSession && !analysis && !error && (
-          <div className="mt-6 p-4 border rounded-md bg-orange-50 border-orange-200">
-            <div className="flex items-center">
-              <HelpCircle className="h-5 w-5 mr-2 text-orange-600" />
-              <h3 className="text-md font-semibold text-orange-700">Pronto para o Timeout?</h3>
+          <div className="mt-6 p-6 border rounded-xl bg-gradient-to-r from-cyan-50 to-blue-50 border-cyan-200 shadow-sm">
+            <div className="flex items-center mb-3">
+              <HelpCircle className="h-6 w-6 mr-3 text-cyan-600" />
+              <h3 className="text-lg font-semibold text-cyan-700">Pronto para o Timeout?</h3>
             </div>
-            <p className="text-sm text-orange-600 mt-1">
-              Configure seu caso e escolha um template. O diagnostic timeout ajudará você a reconsiderar o diagnóstico de forma sistemática e identificar pontos cegos.
+            <p className="text-cyan-600 leading-relaxed">
+              Configure seu caso e escolha um template. O diagnostic timeout ajudará você a reconsiderar o diagnóstico de forma sistemática e identificar pontos cegos no seu raciocínio clínico.
             </p>
+            <div className="mt-4 flex items-center text-sm text-cyan-500">
+              <Lightbulb className="h-4 w-4 mr-2" />
+              <span>Dica: Seja honesto sobre seu processo de raciocínio durante o timeout</span>
+            </div>
           </div>
         )}
       </CardContent>

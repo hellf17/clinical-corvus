@@ -62,7 +62,7 @@ class HttpRequest:
     
     def AnalyzeDifferentialDiagnoses_SNAPPS(
         self,
-        input: types.AnalyzeDifferentialDiagnosesSNAPPSInput,
+        input: types.AnalyzeDDxInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -85,7 +85,7 @@ class HttpRequest:
     
     def AnalyzeMedicalPaper(
         self,
-        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        paper_text: str,text_type: types.TextType,clinical_question: Optional[str],source_type: Optional[str],publication_year: Optional[int],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -98,7 +98,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "AnalyzeMedicalPaper",
         {
-          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+          "paper_text": paper_text,"text_type": text_type,"clinical_question": clinical_question,"source_type": source_type,"publication_year": publication_year,
         },
         self.__ctx_manager.get(),
         tb,
@@ -131,7 +131,7 @@ class HttpRequest:
     
     def AnswerProbeQuestions_SNAPPS(
         self,
-        input: types.AnswerProbeQuestionsSNAPPSInputModel,
+        input: types.AnswerProbeQuestionsInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -177,7 +177,7 @@ class HttpRequest:
     
     def EvaluateManagementPlan_SNAPPS(
         self,
-        input: types.EvaluateManagementPlanSNAPPSInputModel,
+        input: types.EvaluateManagementPlanInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -200,7 +200,7 @@ class HttpRequest:
     
     def EvaluateSummary_SNAPPS(
         self,
-        input: types.EvaluateSummarySNAPPSInputModel,
+        input: types.EvaluateSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -269,7 +269,7 @@ class HttpRequest:
     
     def FacilitateDDxAnalysis_SNAPPS(
         self,
-        input: types.FacilitateDDxAnalysisSNAPPSInputModel,
+        input: types.FacilitateDDxAnalysisInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -430,7 +430,7 @@ class HttpRequest:
     
     def GenerateEvidenceAppraisal(
         self,
-        extracted_data: types.EvidenceAnalysisData,
+        extracted_data: types.EvidenceAnalysisData,clinical_question: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -443,7 +443,7 @@ class HttpRequest:
       return self.__runtime.build_request_sync(
         "GenerateEvidenceAppraisal",
         {
-          "extracted_data": extracted_data,
+          "extracted_data": extracted_data,"clinical_question": clinical_question,
         },
         self.__ctx_manager.get(),
         tb,
@@ -543,6 +543,29 @@ class HttpRequest:
         False,
       )
     
+    def ProvideMatrixFeedback(
+        self,
+        input: types.CompareContrastMatrixInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ProvideMatrixFeedback",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def ProvideSelfReflectionFeedback(
         self,
         input: types.SelfReflectionInput,
@@ -568,7 +591,7 @@ class HttpRequest:
     
     def ProvideSessionSummary_SNAPPS(
         self,
-        input: types.ProvideSessionSummarySNAPPSInputModel,
+        input: types.ProvideSessionSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -809,7 +832,7 @@ class HttpStreamRequest:
     
     def AnalyzeDifferentialDiagnoses_SNAPPS(
         self,
-        input: types.AnalyzeDifferentialDiagnosesSNAPPSInput,
+        input: types.AnalyzeDDxInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -832,7 +855,7 @@ class HttpStreamRequest:
     
     def AnalyzeMedicalPaper(
         self,
-        paper_full_text: str,clinical_question_PICO: Union[str, Optional[None]],
+        paper_text: str,text_type: types.TextType,clinical_question: Optional[str],source_type: Optional[str],publication_year: Optional[int],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -845,7 +868,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "AnalyzeMedicalPaper",
         {
-          "paper_full_text": paper_full_text,"clinical_question_PICO": clinical_question_PICO,
+          "paper_text": paper_text,"text_type": text_type,"clinical_question": clinical_question,"source_type": source_type,"publication_year": publication_year,
         },
         self.__ctx_manager.get(),
         tb,
@@ -878,7 +901,7 @@ class HttpStreamRequest:
     
     def AnswerProbeQuestions_SNAPPS(
         self,
-        input: types.AnswerProbeQuestionsSNAPPSInputModel,
+        input: types.AnswerProbeQuestionsInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -924,7 +947,7 @@ class HttpStreamRequest:
     
     def EvaluateManagementPlan_SNAPPS(
         self,
-        input: types.EvaluateManagementPlanSNAPPSInputModel,
+        input: types.EvaluateManagementPlanInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -947,7 +970,7 @@ class HttpStreamRequest:
     
     def EvaluateSummary_SNAPPS(
         self,
-        input: types.EvaluateSummarySNAPPSInputModel,
+        input: types.EvaluateSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -1016,7 +1039,7 @@ class HttpStreamRequest:
     
     def FacilitateDDxAnalysis_SNAPPS(
         self,
-        input: types.FacilitateDDxAnalysisSNAPPSInputModel,
+        input: types.FacilitateDDxAnalysisInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -1177,7 +1200,7 @@ class HttpStreamRequest:
     
     def GenerateEvidenceAppraisal(
         self,
-        extracted_data: types.EvidenceAnalysisData,
+        extracted_data: types.EvidenceAnalysisData,clinical_question: Optional[str],
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)
@@ -1190,7 +1213,7 @@ class HttpStreamRequest:
       return self.__runtime.build_request_sync(
         "GenerateEvidenceAppraisal",
         {
-          "extracted_data": extracted_data,
+          "extracted_data": extracted_data,"clinical_question": clinical_question,
         },
         self.__ctx_manager.get(),
         tb,
@@ -1290,6 +1313,29 @@ class HttpStreamRequest:
         True,
       )
     
+    def ProvideMatrixFeedback(
+        self,
+        input: types.CompareContrastMatrixInput,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ProvideMatrixFeedback",
+        {
+          "input": input,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def ProvideSelfReflectionFeedback(
         self,
         input: types.SelfReflectionInput,
@@ -1315,7 +1361,7 @@ class HttpStreamRequest:
     
     def ProvideSessionSummary_SNAPPS(
         self,
-        input: types.ProvideSessionSummarySNAPPSInputModel,
+        input: types.ProvideSessionSummaryInput,
         baml_options: BamlCallOptions = {},
     ) -> baml_py.HTTPRequest:
       __tb__ = baml_options.get("tb", None)

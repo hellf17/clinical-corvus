@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
 import { Textarea } from '@/components/ui/Textarea';
 import { Badge } from '@/components/ui/Badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select';
@@ -28,17 +29,25 @@ import {
   Users,
   Clock,
   TrendingUp,
-  Lightbulb
+  Lightbulb,
+  Zap,
+  Shield,
+  Activity
 } from 'lucide-react';
 
-// Interfaces
-interface CognitiveBiasCaseAnalysis {
-  identified_bias_by_expert: string;
-  explanation_of_bias_in_case: string;
-  how_bias_impacted_decision: string;
-  strategies_to_mitigate_bias: string[];
-  feedback_on_user_identification?: string;
-  disclaimer: string;
+// Interfaces - Updated to match the '/analyze-cognitive-bias-translated' endpoint response
+interface DetectedBias {
+  bias_name: string;
+  description: string;
+  evidence_in_scenario: string;
+  potential_impact: string;
+  mitigation_strategy: string;
+}
+
+interface CognitiveBiasAnalysisOutput {
+  detected_biases: DetectedBias[];
+  overall_analysis: string;
+  educational_insights: string;
 }
 
 interface CaseVignette {
@@ -149,145 +158,75 @@ const caseVignettes: CaseVignette[] = [
 export default function CaseBiasAnalysisComponent({ 
   initialBias, 
   initialScenario, 
-  onBiasIdentified, 
-  onTransferToReflection, 
-  onTransferToTimeout 
+  onBiasIdentified,
 }: Props) {
-  const { getToken, isLoaded: authIsLoaded } = useAuth();
+  const { getToken } = useAuth();
   
-  // Estados principais
+  const [mode, setMode] = useState<'vignette' | 'custom'>(initialScenario ? 'custom' : 'vignette');
   const [selectedVignette, setSelectedVignette] = useState<CaseVignette | null>(null);
   const [customScenario, setCustomScenario] = useState(initialScenario || '');
   const [userIdentifiedBias, setUserIdentifiedBias] = useState(initialBias || '');
-  const [scenarioSource, setScenarioSource] = useState<'vignette' | 'custom'>('vignette');
   
-  // Estados de filtros para vinhetas
-  const [complexityFilter, setComplexityFilter] = useState<string>('all');
-  const [specialtyFilter, setSpecialtyFilter] = useState<string>('all');
-  const [biasFilter, setBiasFilter] = useState<string>('all');
-  
-  // Estados de análise
+  const [analysis, setAnalysis] = useState<CognitiveBiasAnalysisOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<CognitiveBiasCaseAnalysis | null>(null);
+
   const [showHints, setShowHints] = useState(false);
   const [hintsUsed, setHintsUsed] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedBiases, setExpandedBiases] = useState<{ [key: number]: boolean }>({});
 
-  // Efeitos
+  // Helper function to determine impact severity
+  const getImpactSeverity = (impact: string) => {
+    const lowerImpact = impact.toLowerCase();
+    if (lowerImpact.includes('crítico') || lowerImpact.includes('grave') || lowerImpact.includes('severo')) return 'high';
+    if (lowerImpact.includes('moderado') || lowerImpact.includes('significativo')) return 'medium';
+    return 'low';
+  };
+
+  // Helper function to get severity color and icon
+  const getSeverityIndicator = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return { color: 'bg-red-500', icon: AlertTriangle, text: 'Alto', textColor: 'text-red-700' };
+      case 'medium':
+        return { color: 'bg-yellow-500', icon: Activity, text: 'Moderado', textColor: 'text-yellow-700' };
+      default:
+        return { color: 'bg-green-500', icon: CheckCircle, text: 'Baixo', textColor: 'text-green-700' };
+    }
+  };
+
+  const toggleBiasExpansion = (index: number) => {
+    setExpandedBiases(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
   useEffect(() => {
     if (initialScenario) {
       setCustomScenario(initialScenario);
-      setScenarioSource('custom');
+      setMode('custom');
     }
     if (initialBias) {
       setUserIdentifiedBias(initialBias);
     }
   }, [initialScenario, initialBias]);
 
-  // Filtrar vinhetas disponíveis
-  const filteredVignettes = caseVignettes.filter(vignette => {
-    if (complexityFilter !== 'all' && vignette.complexity !== complexityFilter) return false;
-    if (specialtyFilter !== 'all' && vignette.specialty !== specialtyFilter) return false;
-    if (biasFilter !== 'all' && vignette.targetBias !== biasFilter) return false;
-    return true;
-  });
-
-  // Selecionar vinheta aleatória
   const selectRandomVignette = () => {
-    if (filteredVignettes.length > 0) {
-      const randomIndex = Math.floor(Math.random() * filteredVignettes.length);
-      setSelectedVignette(filteredVignettes[randomIndex]);
-      setScenarioSource('vignette');
-      setError(null);
-      setAnalysis(null);
-      setHintsUsed(0);
-      setShowHints(false);
-    }
+    const randomIndex = Math.floor(Math.random() * caseVignettes.length);
+    setSelectedVignette(caseVignettes[randomIndex]);
   };
 
-  // Obter cenário atual para análise
   const getCurrentScenario = (): string => {
-    if (scenarioSource === 'vignette' && selectedVignette) {
+    if (mode === 'vignette' && selectedVignette) {
       return selectedVignette.scenario;
     }
     return customScenario;
   };
 
-  const handleSubmitAnalysis = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setAnalysis(null);
-
-    const scenario = getCurrentScenario();
-    
-    if (!scenario.trim()) {
-      setError('Por favor, selecione uma vinheta ou insira um cenário personalizado.');
-      setIsLoading(false);
-      return;
-    }
-
-    const token = await getToken();
-    if (!token) {
-      setError('Erro de autenticação. Por favor, faça login novamente.');
-      setIsLoading(false);
-      return;
-    }
-
-    // Montar payload conforme esperado pelo backend
-    const biasPayload = {
-      scenario_description: scenario,
-      additional_context: selectedVignette ? `Especialidade: ${selectedVignette.specialty}. Complexidade: ${selectedVignette.complexity}. Dicas usadas: ${hintsUsed}.` : undefined,
-      user_identified_bias_optional: userIdentifiedBias.trim() || undefined
-    };
-    // Payload final para o backend
-    const payload = biasPayload;
-
-    try {
-      const response = await fetch('/api/clinical-assistant/assist-identifying-cognitive-biases-scenario-translated', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ 
-          detail: 'Falha ao processar a solicitação.',
-          error: 'Erro de conexão com o servidor.' 
-        }));
-        
-        const errorMessage = errorData.error || errorData.detail || errorData.message || 
-          `Falha ao analisar caso com viés (status: ${response.status}).`;
-        throw new Error(errorMessage);
-      }
-
-      const data: CognitiveBiasCaseAnalysis = await response.json();
-      setAnalysis(data);
-      
-      // Notificar componente pai
-      if (onBiasIdentified) {
-        onBiasIdentified({
-          biasName: data.identified_bias_by_expert,
-          strategies: data.strategies_to_mitigate_bias
-        });
-      }
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao processar sua solicitação.';
-      setError(errorMessage);
-      console.error("Error in handleSubmitAnalysis:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleShowHints = () => {
-    setShowHints(true);
-    setHintsUsed(prev => prev + 1);
+  const handleVignetteChange = (vignetteId: string) => {
+    const vignette = caseVignettes.find(v => v.id === vignetteId);
+    setSelectedVignette(vignette || null);
   };
 
   const handleClearForm = () => {
@@ -298,474 +237,336 @@ export default function CaseBiasAnalysisComponent({
     setError(null);
     setShowHints(false);
     setHintsUsed(0);
+    setMode('vignette');
   };
 
   const getComplexityColor = (complexity: string) => {
     switch (complexity) {
-      case 'Simples': return 'bg-green-100 text-green-800';
-      case 'Moderado': return 'bg-yellow-100 text-yellow-800';
-      case 'Complexo': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'Simples': return 'outline';
+      case 'Moderado': return 'secondary';
+      case 'Complexo': return 'destructive';
+      default: return 'default';
     }
   };
 
   const getBiasColor = (bias: string) => {
-    const colors: Record<string, string> = {
-      'Ancoragem': 'bg-blue-100 text-blue-800',
-      'Disponibilidade': 'bg-purple-100 text-purple-800',
-      'Confirmação': 'bg-orange-100 text-orange-800',
-      'Fechamento Prematuro': 'bg-red-100 text-red-800',
-      'Representatividade': 'bg-green-100 text-green-800'
+    const colors: { [key: string]: string } = {
+      'Ancoragem': 'text-blue-600',
+      'Disponibilidade': 'text-purple-600',
+      'Confirmação': 'text-orange-600',
+      'Fechamento Prematuro': 'text-red-600',
+      'Representatividade': 'text-green-600',
     };
-    return colors[bias] || 'bg-gray-100 text-gray-800';
+    return colors[bias] || 'text-gray-600';
+  };
+
+  const handleSubmitAnalysis = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setAnalysis(null);
+
+    // KGB-grade validation: scenario must exist
+    const scenario = getCurrentScenario();
+    if (!scenario || !scenario.trim()) {
+      setError('Por favor, forneça um cenário clínico para análise.');
+      setIsLoading(false);
+      return;
+    }
+
+    // The '-translated' endpoint expects a different payload.
+    // We adapt the component's data to fit the backend model.
+    const payload = {
+      scenario_description: scenario,
+      user_identified_bias_optional: userIdentifiedBias || null, // Pass as string or null
+    };
+
+    try {
+      const response = await fetch('/api/clinical-assistant/analyze-cognitive-bias-translated', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getToken()}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorMessage;
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            const errorData = await response.json();
+            errorMessage = errorData.detail || `HTTP error! status: ${response.status}`;
+        } else {
+            const errorText = await response.text();
+            console.error("Non-JSON error response:", errorText);
+            errorMessage = `O servidor retornou um erro inesperado. Verifique os logs para mais detalhes. Status: ${response.status}`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data: CognitiveBiasAnalysisOutput = await response.json();
+      setAnalysis(data);
+      
+      // The new endpoint returns a different structure.
+      // The logic below might need adjustment based on the actual response shape.
+      // For now, let's assume the response can be adapted or is already compatible.
+      if (onBiasIdentified && data.detected_biases && data.detected_biases.length > 0) {
+        const firstBias = data.detected_biases[0];
+        onBiasIdentified({ 
+          biasName: firstBias.bias_name, 
+          strategies: [firstBias.mitigation_strategy]
+        });
+      }
+      
+    } catch (error: any) {
+      setError(error.message || 'Ocorreu um erro desconhecido.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
-          <Search className="h-6 w-6 mr-2 text-green-500" />
-          Análise de Casos com Vieses Cognitivos
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="relative z-10">
+        <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <Search className="h-6 w-6 mr-2 text-blue-600" />
+          Análise de Vieses Cognitivos
         </CardTitle>
-        <CardDescription>
-          Analise casos clínicos reais ou personalizados para identificar vieses cognitivos e desenvolver estratégias de mitigação.
+        <CardDescription className="text-gray-600">
+          Selecione uma vinheta clínica ou descreva um caso para que o Dr. Corvus analise possíveis vieses cognitivos.
         </CardDescription>
       </CardHeader>
-      
-      <CardContent>
+      <CardContent className="p-6">
         <form onSubmit={handleSubmitAnalysis} className="space-y-6">
-          {/* Seleção do Tipo de Cenário */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div 
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                scenarioSource === 'vignette' 
-                  ? 'border-green-500 bg-green-50' 
-                  : 'border-gray-200 hover:border-green-300'
-              }`}
-              onClick={() => setScenarioSource('vignette')}
+          <div className="flex justify-center bg-gray-100 p-1 rounded-lg">
+            <Button 
+              type="button"
+              onClick={() => setMode('vignette')}
+              className={`flex-1 justify-center ${mode === 'vignette' ? 'bg-white text-gray-800 shadow' : 'bg-transparent text-gray-500'}`}
             >
-              <div className="flex items-center mb-2">
-                <input 
-                  type="radio" 
-                  name="scenarioSource"
-                  checked={scenarioSource === 'vignette'} 
-                  onChange={() => setScenarioSource('vignette')}
-                  className="mr-2"
-                />
-                <BookOpen className="h-4 w-4 mr-2 text-green-500" />
-                <span className="font-medium">Vinhetas Preparadas</span>
-                <Badge variant="outline" className="ml-2 text-xs">{filteredVignettes.length} disponíveis</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Casos clínicos estruturados com vieses específicos e objetivos de aprendizado definidos.
-              </p>
-            </div>
-            
-            <div 
-              className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                scenarioSource === 'custom' 
-                  ? 'border-purple-500 bg-purple-50' 
-                  : 'border-gray-200 hover:border-purple-300'
-              }`}
-              onClick={() => setScenarioSource('custom')}
+              <BookOpen className="mr-2 h-4 w-4" /> Vinhetas Preparadas
+            </Button>
+            <Button 
+              type="button"
+              onClick={() => setMode('custom')}
+              className={`flex-1 justify-center ${mode === 'custom' ? 'bg-white text-gray-800 shadow' : 'bg-transparent text-gray-500'}`}
             >
-              <div className="flex items-center mb-2">
-                <input 
-                  type="radio" 
-                  name="scenarioSource"
-                  checked={scenarioSource === 'custom'} 
-                  onChange={() => setScenarioSource('custom')}
-                  className="mr-2"
-                />
-                <Brain className="h-4 w-4 mr-2 text-purple-500" />
-                <span className="font-medium">Cenário Personalizado</span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Insira seu próprio caso clínico para análise de vieses cognitivos.
-              </p>
-            </div>
+              <Brain className="mr-2 h-4 w-4" /> Cenário Personalizado
+            </Button>
           </div>
 
-          {/* Seleção de Vinhetas */}
-          {scenarioSource === 'vignette' && (
+          {mode === 'vignette' ? (
             <div className="space-y-4">
-              {/* Filtros para Vinhetas */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Complexidade</label>
-                  <Select value={complexityFilter} onValueChange={setComplexityFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="Simples">Simples</SelectItem>
-                      <SelectItem value="Moderado">Moderado</SelectItem>
-                      <SelectItem value="Complexo">Complexo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Especialidade</label>
-                  <Select value={specialtyFilter} onValueChange={setSpecialtyFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      <SelectItem value="Medicina de Emergência">Emergência</SelectItem>
-                      <SelectItem value="Medicina Geral">Medicina Geral</SelectItem>
-                      <SelectItem value="Cardiologia">Cardiologia</SelectItem>
-                      <SelectItem value="Reumatologia">Reumatologia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Viés Alvo</label>
-                  <Select value={biasFilter} onValueChange={setBiasFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="Ancoragem">Ancoragem</SelectItem>
-                      <SelectItem value="Disponibilidade">Disponibilidade</SelectItem>
-                      <SelectItem value="Confirmação">Confirmação</SelectItem>
-                      <SelectItem value="Fechamento Prematuro">Fechamento Prematuro</SelectItem>
-                      <SelectItem value="Representatividade">Representatividade</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="flex items-end">
-                  <Button 
-                    variant="default"
-                    type="button"
-                    onClick={selectRandomVignette}
-                    disabled={filteredVignettes.length === 0}
-                    className="w-full"
-                  >
-                    <Shuffle className="h-4 w-4 mr-2" />
-                    Caso Aleatório
-                  </Button>
-                </div>
+              <div className="flex items-center space-x-2">
+                <Select onValueChange={handleVignetteChange} value={selectedVignette?.id || ''}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione uma vinheta clínica..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {caseVignettes.map(v => (
+                      <SelectItem key={v.id} value={v.id}>{v.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="outline" size="icon" onClick={selectRandomVignette}>
+                  <Shuffle className="h-4 w-4" />
+                </Button>
               </div>
-
-              {/* Lista de Vinhetas */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredVignettes.map((vignette) => (
-                  <div 
-                    key={vignette.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                      selectedVignette?.id === vignette.id 
-                        ? 'border-green-500 bg-green-50' 
-                        : 'border-gray-200 hover:border-green-300'
-                    }`}
-                    onClick={() => setSelectedVignette(vignette)}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-medium text-sm">{vignette.title}</h4>
-                      {selectedVignette?.id === vignette.id && (
-                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      <Badge variant="outline" className={getComplexityColor(vignette.complexity)}>
-                        {vignette.complexity}
-                      </Badge>
-                      <Badge variant="outline" className={getBiasColor(vignette.targetBias)}>
-                        {vignette.targetBias}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {vignette.specialty}
-                      </Badge>
-                    </div>
-                    
-                    <p className="text-xs text-gray-600 line-clamp-2">
-                      {vignette.scenario.substring(0, 150)}...
-                    </p>
-                    
-                    {vignette.timeToSolve && (
-                      <div className="flex items-center mt-2 text-xs text-gray-500">
-                        <Clock className="h-3 w-3 mr-1" />
-                        ~{vignette.timeToSolve} min para análise
-                      </div>
-                    )}
+              {selectedVignette && (
+                <div className="p-4 border rounded-md bg-gray-50 space-y-3 animate-fade-in">
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedVignette.scenario}</p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <Badge variant="outline">{selectedVignette.specialty}</Badge>
+                    <Badge variant={getComplexityColor(selectedVignette.complexity) as any}>{selectedVignette.complexity}</Badge>
                   </div>
-                ))}
-              </div>
-
-              {filteredVignettes.length === 0 && (
-                <div className="text-center py-6">
-                  <HelpCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">Nenhuma vinheta corresponde aos filtros selecionados.</p>
+                  <Collapsible onOpenChange={setShowHints}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="link" className="p-0 h-auto text-xs">
+                        <HelpCircle className="mr-1 h-3 w-3" />
+                        Precisa de uma dica? ({hintsUsed} de 2 usadas)
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 p-2 bg-yellow-50 border-l-4 border-yellow-400 text-sm text-yellow-800">
+                      <p><strong>Viés Alvo:</strong> {selectedVignette.targetBias}</p>
+                      <p><strong>Pistas Falsas (Red Herrings):</strong> {selectedVignette.redHerrings?.join(', ')}</p>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
               )}
             </div>
+          ) : (
+            <Textarea
+              placeholder="Descreva o caso clínico aqui..."
+              value={customScenario}
+              onChange={(e) => setCustomScenario(e.target.value)}
+              className="h-32"
+            />
           )}
-
-          {/* Cenário Personalizado */}
-          {scenarioSource === 'custom' && (
-            <div>
-              <label htmlFor="customScenario" className="block text-sm font-medium mb-1">
-                Descrição do Caso Clínico <span className="text-red-500">*</span>
-              </label>
-              <Textarea 
-                id="customScenario"
-                placeholder="Descreva detalhadamente o caso clínico, incluindo: apresentação do paciente, processo de raciocínio médico, decisões tomadas e desfecho..."
-                rows={6}
-                value={customScenario}
-                onChange={(e) => setCustomScenario(e.target.value)}
-                disabled={isLoading}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                <strong>Dica:</strong> Inclua detalhes sobre o raciocínio médico, dados considerados/ignorados e decisões tomadas
-              </p>
-            </div>
-          )}
-
-          {/* Exibição do Cenário Selecionado */}
-          {scenarioSource === 'vignette' && selectedVignette && (
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-blue-800">{selectedVignette.title}</h4>
-                <div className="flex space-x-2">
-                  <Badge className={getComplexityColor(selectedVignette.complexity)}>
-                    {selectedVignette.complexity}
-                  </Badge>
-                  <Badge className={getBiasColor(selectedVignette.targetBias)}>
-                    {selectedVignette.targetBias}
-                  </Badge>
-                </div>
-              </div>
-              
-              <div className="text-sm text-blue-700 leading-relaxed mb-4">
-                {selectedVignette.scenario}
-              </div>
-
-              {/* Sistema de Dicas */}
-              {!showHints && (
-                <div className="flex items-center justify-between pt-3 border-t border-blue-200">
-                  <div className="text-xs text-blue-600">
-                    Caso precise de ajuda, use o sistema de dicas.
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    type="button"
-                    onClick={handleShowHints}
-                    className="text-blue-600 border-blue-300"
-                  >
-                    <Lightbulb className="h-3 w-3 mr-1" />
-                    Mostrar Dicas
-                  </Button>
-                </div>
-              )}
-
-              {/* Dicas Expandidas */}
-              {showHints && selectedVignette.redHerrings && (
-                <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" type="button" className="w-full justify-between text-blue-700 mt-3 border-t border-blue-200 pt-3">
-                      <span className="flex items-center">
-                        <Target className="h-4 w-4 mr-2" />
-                        Dicas para Análise ({hintsUsed} dica{hintsUsed !== 1 ? 's' : ''} usada{hintsUsed !== 1 ? 's' : ''})
-                      </span>
-                      {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-3 mt-3">
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                      <h5 className="font-medium text-yellow-800 mb-1">🎯 Objetivos de Aprendizado:</h5>
-                      <ul className="text-sm text-yellow-700 space-y-1">
-                        {selectedVignette.learningObjectives.map((objective, index) => (
-                          <li key={index} className="flex items-start">
-                            <span className="mr-2">•</span>
-                            <span>{objective}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div className="p-3 bg-orange-50 border border-orange-200 rounded">
-                      <h5 className="font-medium text-orange-800 mb-1">⚠️ Possíveis Armadilhas:</h5>
-                      <ul className="text-sm text-orange-700 space-y-1">
-                        {selectedVignette.redHerrings?.map((herring, index) => (
-                          <li key={index} className="flex items-start">
-                            <span className="mr-2">•</span>
-                            <span>{herring}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
-          )}
-
-          {/* Campo de Identificação do Viés */}
-          <div>
-            <label htmlFor="userBias" className="block text-sm font-medium mb-1">
-              Seu Viés Identificado (Opcional)
-            </label>
-            <Input
-              id="userBias"
-              placeholder="Ex: Viés de ancoragem, Viés de confirmação, etc."
+          
+          <div className="space-y-2">
+            <Label htmlFor="user-bias">Qual(is) viés(es) cognitivo(s) você suspeita? (separe por vírgula)</Label>
+            <Input 
+              id="user-bias"
+              placeholder="Ex: Ancoragem, Viés de Confirmação..."
               value={userIdentifiedBias}
               onChange={(e) => setUserIdentifiedBias(e.target.value)}
-              disabled={isLoading}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Identifique qual viés você acredita estar presente. Dr. Corvus fornecerá feedback sobre sua análise.
-            </p>
           </div>
 
-          {/* Botões de Ação */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button 
-              type="submit"
-              disabled={isLoading || !authIsLoaded || (scenarioSource === 'vignette' && !selectedVignette) || (scenarioSource === 'custom' && !customScenario.trim())}
-              className="flex-1"
-            >
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="ghost" onClick={handleClearForm}>Limpar</Button>
+            <Button type="submit" disabled={isLoading || !getCurrentScenario().trim()}>
               {isLoading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Analisando...
-                </>
+                <div className="flex items-center">
+                  <div className="relative mr-2">
+                    <div className="w-4 h-4 border-2 border-blue-200 rounded-full animate-spin">
+                      <div className="absolute top-0 left-0 w-4 h-4 border-2 border-blue-600 rounded-full animate-pulse border-t-transparent"></div>
+                    </div>
+                  </div>
+                  Analisando com Dr. Corvus...
+                </div>
               ) : (
-                <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Analisar Caso
-                </>
+                <><Search className="mr-2 h-4 w-4" /> Analisar com Dr. Corvus</>
               )}
-            </Button>
-            
-            <Button 
-              variant="default" 
-              type="button"
-              onClick={handleClearForm}
-              disabled={isLoading}
-            >
-              Limpar
             </Button>
           </div>
         </form>
 
-        {/* Exibição de Erro */}
         {error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mt-6">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Erro na Análise</AlertTitle>
-            <AlertDescription className="mt-2">
-              {error}
-              <br />
-              <span className="text-sm mt-2 block">
-                Verifique se o caso está bem descrito e tente novamente.
-              </span>
+            <AlertDescription>
+              <span className="font-mono bg-red-100 p-1 rounded">{error}</span>
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Resultados da Análise */}
-        {analysis && (
-          <div className="mt-8 space-y-6">
-            {/* Header dos Resultados */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Análise Detalhada do Caso</h3>
-              {selectedVignette && hintsUsed > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {hintsUsed} dica{hintsUsed !== 1 ? 's' : ''} utilizada{hintsUsed !== 1 ? 's' : ''}
-                </Badge>
-              )}
-            </div>
-
-            {/* Viés Identificado */}
-            <div className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-              <div className="flex items-center mb-3">
-                <Brain className="h-6 w-6 text-purple-600 mr-2" />
-                <h4 className="font-semibold text-purple-800">Viés Cognitivo Identificado</h4>
+        {isLoading && !analysis && (
+          <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin">
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-600 rounded-full animate-pulse border-t-transparent"></div>
               </div>
-              <p className="text-purple-700 font-medium text-lg">{analysis.identified_bias_by_expert}</p>
+              <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-blue-600 animate-pulse" />
             </div>
-
-            {/* Explicação do Viés */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Como o Viés se Manifestou
-              </h4>
-              <p className="text-blue-700 leading-relaxed">{analysis.explanation_of_bias_in_case}</p>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está analisando o caso...</p>
+              <p className="text-sm text-gray-500">Identificando padrões de raciocínio e possíveis vieses cognitivos</p>
             </div>
-
-            {/* Impacto na Decisão */}
-            <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <h4 className="font-semibold text-orange-800 mb-2 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Impacto na Tomada de Decisão
-              </h4>
-              <p className="text-orange-700 leading-relaxed">{analysis.how_bias_impacted_decision}</p>
-            </div>
-
-            {/* Feedback sobre Identificação do Usuário */}
-            {analysis.feedback_on_user_identification && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h4 className="font-semibold text-green-800 mb-2 flex items-center">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Feedback sobre sua Identificação
-                </h4>
-                <p className="text-green-700 leading-relaxed">{analysis.feedback_on_user_identification}</p>
-              </div>
-            )}
-
-            {/* Estratégias de Mitigação */}
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <h4 className="font-semibold text-emerald-800 mb-3 flex items-center">
-                <Target className="h-4 w-4 mr-2" />
-                Estratégias para Mitigar este Viés
-              </h4>
-              <ul className="space-y-2">
-                {analysis.strategies_to_mitigate_bias.map((strategy, index) => (
-                  <li key={index} className="text-emerald-700 flex items-start">
-                    <ArrowRight className="h-4 w-4 mr-2 mt-0.5 text-emerald-500 flex-shrink-0" />
-                    <span>{strategy}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Ações de Transferência */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button 
-                onClick={() => onTransferToReflection?.(getCurrentScenario(), analysis.identified_bias_by_expert)}
-                variant="outline"
-                className="flex items-center"
-              >
-                <Brain className="mr-2 h-4 w-4" />
-                Refletir sobre seu Raciocínio
-              </Button>
-              
-              <Button 
-                onClick={() => onTransferToTimeout?.(getCurrentScenario(), selectedVignette?.correctDiagnosis || 'Diagnóstico a definir')}
-                variant="outline"
-                className="flex items-center"
-              >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Praticar Diagnostic Timeout
-              </Button>
-            </div>
-
-            {/* Disclaimer */}
-            <div className="text-xs italic text-muted-foreground p-3 bg-gray-50 rounded-md">
-              {analysis.disclaimer}
+            <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
             </div>
           </div>
         )}
 
-        {/* Helper quando não há resultados */}
+        {analysis && analysis.detected_biases && analysis.detected_biases.length > 0 && !isLoading && (
+          <div className="mt-6 space-y-6 animate-fade-in">
+            <div className="text-center space-y-2">
+              <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
+                Reflexões do Dr. Corvus sobre Possíveis Vieses
+              </h3>
+              <p className="text-gray-600">Analise as seguintes questões para aprimorar seu raciocínio clínico.</p>
+              <div className="flex items-center justify-center space-x-2 mt-4">
+                <Zap className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm text-gray-500">{analysis.detected_biases.length} viés(es) detectado(s)</span>
+              </div>
+            </div>
+            
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-gray-50 to-blue-50 shadow-sm">
+              <h4 className="text-xl font-semibold text-gray-800 mb-3 flex items-center">
+                <Brain className="h-6 w-6 mr-2 text-blue-600" />
+                Análise Geral
+              </h4>
+              <p className="text-gray-700 leading-relaxed">{analysis.overall_analysis}</p>
+            </div>
+
+            {analysis.detected_biases.map((bias: DetectedBias, index: number) => {
+              const severity = getImpactSeverity(bias.potential_impact);
+              const severityInfo = getSeverityIndicator(severity);
+              const SeverityIcon = severityInfo.icon;
+              const isExpanded = expandedBiases[index];
+
+              return (
+                <Card key={index} className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-blue-400">
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/3 to-purple-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  <CardContent className="relative z-10 p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3">
+                        <h4 className={`text-xl font-semibold ${getBiasColor(bias.bias_name)}`}>
+                          {bias.bias_name}
+                </h4>
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-3 h-3 rounded-full ${severityInfo.color}`} />
+                          <span className={`text-sm font-medium ${severityInfo.textColor}`}>
+                            Impacto: {severityInfo.text}
+                          </span>
+                          <SeverityIcon className={`h-4 w-4 ${severityInfo.textColor}`} />
+                        </div>
+                  </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleBiasExpansion(index)}
+                        className="hover:bg-blue-50 transition-colors"
+                      >
+                        <span className="text-sm mr-2">
+                          {isExpanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+                        </span>
+                        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                      </Button>
+                  </div>
+                    
+                    <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-400 rounded-r-lg">
+                      <p className="font-semibold text-blue-800 mb-2 flex items-center">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Descrição do Viés:
+                      </p>
+                      <p className="text-blue-700 leading-relaxed">{bias.description}</p>
+                  </div>
+
+                    <Collapsible open={isExpanded} onOpenChange={() => toggleBiasExpansion(index)}>
+                      <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                        <div className="p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-400 rounded-r-lg">
+                          <p className="font-semibold text-orange-800 mb-2 flex items-center">
+                            <Target className="h-4 w-4 mr-2" />
+                            Evidência no Cenário:
+                          </p>
+                          <p className="text-orange-700 leading-relaxed">{bias.evidence_in_scenario}</p>
+                  </div>
+                        <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-400 rounded-r-lg">
+                          <p className="font-semibold text-red-800 mb-2 flex items-center">
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Impacto Potencial:
+                          </p>
+                          <p className="text-red-700 leading-relaxed">{bias.potential_impact}</p>
+                </div>
+                        <div className="p-4 bg-gradient-to-r from-emerald-50 to-emerald-100 border-l-4 border-emerald-400 rounded-r-lg">
+                          <p className="font-semibold text-emerald-800 mb-2 flex items-center">
+                            <Shield className="h-4 w-4 mr-2" />
+                            Estratégia de Mitigação:
+                          </p>
+                          <p className="text-emerald-700 leading-relaxed">{bias.mitigation_strategy}</p>
+              </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border-l-4 border-indigo-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-indigo-800 mb-3 flex items-center">
+                <Lightbulb className="h-6 w-6 mr-2 text-indigo-600" />
+                Insights Educacionais
+              </h4>
+              <p className="text-indigo-700 leading-relaxed">{analysis.educational_insights}</p>
+            </div>
+          </div>
+        )}
+
         {!analysis && !isLoading && !error && (
           <div className="mt-6 p-4 border rounded-md bg-green-50 border-green-200">
             <div className="flex items-center">

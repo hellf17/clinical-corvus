@@ -20,11 +20,11 @@ const GlossaryTooltip = ({ term, definition, children }: {
   children: React.ReactNode 
 }) => {
   return (
-    <span className="relative group cursor-help">
-      <span className="underline decoration-dotted decoration-blue-400 text-blue-600">
+    <span className="relative inline-block">
+      <span className="underline decoration-dotted decoration-blue-400 text-blue-600 hover:decoration-blue-600 transition-colors cursor-help peer">
         {children}
       </span>
-      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10 w-64 text-center block">
+      <span className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 invisible peer-hover:opacity-100 peer-hover:visible transition-all duration-200 z-50 w-64 text-center block pointer-events-none">
         <strong>{term}:</strong> {definition}
         <span className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 inline-block"></span>
       </span>
@@ -465,17 +465,22 @@ export default function FundamentalDiagnosticReasoningPage() {
       </TabsList>
 
       <TabsContent value="reasoning-types">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Users className="h-6 w-6 mr-2 text-teal-500" />
+        <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+          <CardHeader className="relative z-10">
+            <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <Users className="h-6 w-6 mr-2 text-blue-500" />
               Raciocínio Abdutivo, Dedutivo e Indutivo na Prática
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-gray-600">
               Entenda os diferentes tipos de raciocínio diagnóstico e como aplicá-los na prática clínica.
             </CardDescription>
+            <div className="flex items-center justify-center space-x-2 mt-4">
+              <Brain className="h-5 w-5 text-yellow-500" />
+              <span className="text-sm text-gray-500">Modelos mentais do diagnóstico</span>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="relative z-10 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 border rounded-md">
                 <h3 className="font-semibold text-blue-700 mb-2 flex items-center">
@@ -645,18 +650,23 @@ export default function FundamentalDiagnosticReasoningPage() {
         </TabsContent>
 
         <TabsContent value="problem-representation">
-          <Card>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <form onSubmit={handleSubmitProblemRepresentation}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   <MessageSquareQuote className="h-6 w-6 mr-2 text-blue-500" />
                   Representação do Problema & Qualificadores Semânticos
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600">
                   Aprenda a criar um resumo conciso e identificar qualificadores semânticos essenciais para um diagnóstico preciso.
                 </CardDescription>
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <MessageSquareQuote className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm text-gray-500">Resumo e qualificação de casos</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative z-10 space-y-6">
                 <div>
                   <h3 className="font-semibold mb-2 text-primary">Teoria Breve: A Essência da Representação do Problema</h3>
                   <p className="text-sm text-muted-foreground mb-2">
@@ -868,18 +878,23 @@ export default function FundamentalDiagnosticReasoningPage() {
         </TabsContent>
 
         <TabsContent value="illness-scripts">
-          <Card>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <form onSubmit={handleSubmitIllnessScript}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="h-6 w-6 mr-2 text-green-500" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  <FileText className="h-6 w-6 mr-2 text-blue-500" />
                   Construção de "Illness Scripts"
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600">
                   Entenda e explore os "scripts de doença" para reconhecer padrões clínicos.
                 </CardDescription>
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <FileText className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm text-gray-500">Roteiros de doenças estruturados</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative z-10 space-y-6">
                 <div>
                   <h3 className="font-semibold mb-2 text-primary">Teoria Breve: O que são "Illness Scripts"?</h3>
                   <p className="text-sm text-muted-foreground">
@@ -1240,18 +1255,23 @@ export default function FundamentalDiagnosticReasoningPage() {
         </TabsContent>
 
         <TabsContent value="data-collection">
-          <Card>
+          <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <form onSubmit={handleSubmitAnamnesis}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Stethoscope className="h-6 w-6 mr-2 text-red-500" />
+              <CardHeader className="relative z-10">
+                <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  <Stethoscope className="h-6 w-6 mr-2 text-blue-500" />
                   Coleta de Dados Direcionada (Anamnese e Exame Físico)
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-gray-600">
                   Aprenda a realizar uma coleta de dados eficiente, guiada por hipóteses diagnósticas.
                 </CardDescription>
+                <div className="flex items-center justify-center space-x-2 mt-4">
+                  <Stethoscope className="h-5 w-5 text-yellow-500" />
+                  <span className="text-sm text-gray-500">Coleta de informações direcionada</span>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="relative z-10 space-y-6">
                 <div>
                   <h3 className="font-semibold mb-2 text-primary">Teoria Breve: Coleta de Dados Guiada por Hipóteses</h3>
                   <p className="text-sm text-muted-foreground mb-2">

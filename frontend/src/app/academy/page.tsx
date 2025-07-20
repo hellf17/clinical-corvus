@@ -114,41 +114,39 @@ const academyNews: AcademyNews[] = [
 ];
 
 interface ModuleCardProps {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  link: string;
-  disabled?: boolean;
+  module: AcademyModule; // Use the AcademyModule interface
 }
 
-const ModuleCard: React.FC<ModuleCardProps> = ({ title, description, icon, link, disabled }) => {
+const ModuleCard: React.FC<ModuleCardProps> = ({ module }) => {
   // Definir cores temáticas para cada módulo
-  const getModuleTheme = (title: string) => {
-    if (title.includes('Raciocínio Diagnóstico')) return 'border-l-blue-500';
-    if (title.includes('Diagnóstico Diferencial')) return 'border-l-purple-500';
-    if (title.includes('Metacognição')) return 'border-l-indigo-500';
-    if (title.includes('Medicina Baseada em Evidências') || title.includes('MBE')) return 'border-l-[#4d9e3f]';
-    if (title.includes('Simulação')) return 'border-l-cyan-500';
-    if (title.includes('Interpretação')) return 'border-l-orange-500';
-    if (title.includes('Comunicação')) return 'border-l-pink-500';
-    return 'border-l-gray-500';
+  const getModuleTheme = (id: string) => {
+    switch (id) {
+      case 'fundamental-diagnostic-reasoning': return 'border-l-blue-500';
+      case 'differential-diagnosis': return 'border-l-purple-500';
+      case 'metacognition-diagnostic-errors': return 'border-l-indigo-500';
+      case 'evidence-based': return 'border-l-[#4d9e3f]'; // Green for MBE
+      case 'clinical-simulation': return 'border-l-cyan-500'; // Cyan for Simulation
+      case 'lab-interpretation': return 'border-l-orange-500';
+      case 'communication': return 'border-l-pink-500';
+      default: return 'border-l-gray-500';
+    }
   };
 
   return (
-    <Card className={`flex flex-col h-full bg-white hover:shadow-lg transition-all duration-200 border-l-4 ${getModuleTheme(title)} shadow-md`}>
+    <Card className={`flex flex-col h-full bg-white hover:shadow-lg transition-all duration-200 border-l-4 ${getModuleTheme(module.id)} shadow-md`}>
       <CardHeader>
         <div className="flex items-center gap-3 mb-2">
-          <div className="text-primary">{icon}</div>
-          <CardTitle className="text-gray-900 text-lg">{title}</CardTitle>
+          <div className="text-primary">{module.icon}</div>
+          <CardTitle className="text-gray-900 text-lg">{module.title}</CardTitle>
         </div>
-        <CardDescription className="text-gray-600 leading-relaxed">{description}</CardDescription>
+        <CardDescription className="text-gray-600 leading-relaxed">{module.description}</CardDescription>
       </CardHeader>
       <CardContent className="flex-grow">
         {/* Additional content can go here if needed */}
       </CardContent>
       <CardFooter>
-        <Link href={link} passHref className="w-full">
-          {disabled ? (
+        <Link href={module.href} passHref className="w-full">
+          {module.status === 'soon' ? (
             <Button 
               disabled 
               className="w-full bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed"
@@ -178,7 +176,7 @@ interface LearningPathItemProps {
 
 const LearningPathItem: React.FC<LearningPathItemProps> = ({ title, category, link, icon }) => (
   <Link href={link} passHref>
-    <div className="flex items-center p-4 bg-white/80 hover:bg-white border border-blue-200 rounded-lg transition-all duration-200 cursor-pointer hover:translate-x-1 hover:shadow-md">
+    <div className="flex items-center p-4 bg-white/80 hover:bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] hover:shadow-md">
       <div className="text-blue-600 mr-3">
         {icon || <Lightbulb className="h-5 w-5" />}
       </div>
@@ -212,15 +210,15 @@ export default function AcademyPage() {
 
   return (
     <div className="container mx-auto p-4 md:p-8 space-y-12">
-      <section className="text-center py-12 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
+      <section className="text-center py-10 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white flex items-center justify-center mb-4">
-          <BookOpen className="h-12 w-12 mr-4" />
+          <BookOpen className="h-10 w-10 md:h-12 md:w-12 mr-4 text-white" />
           Academia Clínica Dr. Corvus
         </h1>
-        <p className="mt-4 text-xl text-blue-100 max-w-2xl mx-auto leading-relaxed">
+        <p className="mt-2 text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
           Bem-vindo(a) de volta à Academia, <span className="font-semibold text-white">{user?.firstName || 'meu caro'}</span>!
         </p>
-        <p className="text-lg text-blue-100/80">Pronto para aprimorar seu raciocínio clínico?</p>
+        <p className="text-base md:text-lg text-white/80">Pronto para aprimorar seu raciocínio clínico?</p>
         
         {/* Status Indicators */}
         <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -274,41 +272,22 @@ export default function AcademyPage() {
         </h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           <ModuleCard
-            title="Raciocínio Diagnóstico Fundamental"
-            description="Domine a representação do problema, qualificadores semânticos, illness scripts e coleta de dados direcionada."
-            icon={<Brain className="h-8 w-8 text-blue-600" />}
-            link="/academy/fundamental-diagnostic-reasoning"
+            module={academyModules.find(m => m.id === 'fundamental-diagnostic-reasoning')!}
           />
           <ModuleCard
-            title="Diagnóstico Diferencial"
-            description="Aprenda a construir e refinar diagnósticos diferenciais, testando hipóteses com precisão."
-            icon={<Search className="h-8 w-8 text-purple-600" />}
-            link="/academy/differential-diagnosis"
+            module={academyModules.find(m => m.id === 'differential-diagnosis')!}
           />
           <ModuleCard
-            title="Medicina Baseada em Evidências (MBE) na Prática"
-            description="Domine a arte de formular perguntas PICO, buscar e avaliar criticamente evidências científicas."
-            icon={<BookOpen className="h-8 w-8 text-[#4d9e3f]" />}
-            link="/academy/evidence-based-medicine"
+            module={academyModules.find(m => m.id === 'evidence-based')!}
           />
           <ModuleCard
-            title="Metacognição e Erros Diagnósticos"
-            description="Desenvolva autoconsciência, identifique vieses e pratique o 'diagnostic timeout' para decisões mais seguras."
-            icon={<Zap className="h-8 w-8 text-indigo-600" />}
-            link="/academy/metacognition-diagnostic-errors"
+            module={academyModules.find(m => m.id === 'metacognition-diagnostic-errors')!}
           />
           <ModuleCard
-            title="Simulação Clínica Integrada (Framework SNAPPS)"
-            description="Pratique o raciocínio clínico em casos simulados usando o método SNAPPS com feedback interativo."
-            icon={<Users className="h-8 w-8 text-cyan-600" />}
-            link="/academy/clinical-simulation"
+            module={academyModules.find(m => m.id === 'clinical-simulation')!}
           />
           <ModuleCard
-            title="Comunicação Efetiva em Saúde"
-            description="Desenvolva habilidades de comunicação com pacientes e colegas, incluindo como explicar achados complexos e discutir planos de tratamento. (Em Breve)"
-            icon={<Sparkles className="h-8 w-8 text-pink-600" />}
-            link="/academy/communication"
-            disabled={true}
+            module={academyModules.find(m => m.id === 'communication')!}
           />
         </div>
       </section>

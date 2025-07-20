@@ -3,6 +3,7 @@ import { auth } from '@clerk/nextjs/server';
 
 function getAPIUrl(): string {
   // In Docker development, use the backend service name
+  // This matches the pattern used by the MBE routes that work
   return 'http://backend-api:8000';
 }
 
@@ -23,16 +24,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validar dados obrigatórios
-    if (!body.questions || !body.student_answers) {
+    if (!body.scenario_description) {
       return NextResponse.json(
-        { detail: 'Missing required fields: questions and student_answers' },
+        { detail: 'Missing required field: scenario_description' },
         { status: 400 }
       );
     }
 
     // Fazer chamada para o backend
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/simulation/answer-probe-questions-snapps`, {
+    const response = await fetch(`${apiUrl}/api/clinical/analyze-cognitive-bias`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +54,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Error in answer probe questions SNAPPS API route:', error);
+    console.error('Error in cognitive bias scenario API route:', error);
     return NextResponse.json(
       { detail: 'Internal server error' },
       { status: 500 }

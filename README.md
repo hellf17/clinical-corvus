@@ -4,7 +4,7 @@
 
 Clinical Corvus is a digital platform for clinical data analysis, decision support, and patient monitoring, leveraging Artificial Intelligence (Dr. Corvus) in a secure, privacy-focused environment. The platform is designed for both physicians (management and analysis) and patients (health tracking and education). Our vision is to act as a **"Clinical Co-pilot"** for doctors, optimizing workflows, and empowering patients with health tracking and education tools. **Compliance with LGPD/HIPAA and data security are top priorities.**
 
-**Current Status:** The platform is functional, featuring *patient management, contextual AI chat, clinical data visualizations, clinical notes with a rich text editor*, a fully modernized Analysis page (`/analysis`) with redesigned UI, complete interface translation to Portuguese, advanced Dr. Corvus Insights system, elegant loading states, and robust error handling for both PDF exam uploads and manual data entry with backend abnormality checks. The "Clinical Academy" section (`/academy`) for clinical reasoning training uses dedicated BAML functions, with ALL 15 educational APIs 100% translated to Portuguese, eliminating language barriers. The scientific research system (`/academy/evidence-based-medicine`) has been expanded with new sources (Europe PMC, Lens.org) and a powerful quality and deduplication analysis system (CiteSource), operating on a unified bibliometric API architecture that provides rich, detailed metrics. Modern technologies include Next.js App Router, Clerk, Shadcn/UI, FastAPI, and Docker. The system features advanced exam processing via PDF upload, automatic extraction and enrichment of lab results, and expanded graphical and tabular data visualizations. We are migrating internal AI frameworks (ElizaOS > Langroid, LlamaParse > Marker) and advancing the implementation of the AI core (KG, AL).
+**Current Status:** The platform is functional, featuring *patient management, contextual AI chat, clinical data visualizations, clinical notes with a rich text editor*, a fully modernized Analysis page (`/analysis`) with redesigned UI, complete interface translation to Portuguese, advanced Dr. Corvus Insights system, elegant loading states, and robust error handling for both PDF exam uploads and manual data entry with backend abnormality checks. The "Clinical Academy" section (`/academy`) for clinical reasoning training uses dedicated BAML functions, with ALL 15 educational APIs 100% translated to Portuguese, eliminating language barriers. The scientific research system (`/academy/evidence-based-medicine`) has been expanded with new sources (Europe PMC, Lens.org) and a powerful quality and deduplication analysis system (CiteSource), operating on a unified bibliometric API architecture that provides rich, detailed metrics. Modern technologies include Next.js App Router, Clerk, Shadcn/UI, FastAPI, and Docker. The system features advanced exam processing via PDF upload, automatic extraction and enrichment of lab results, and expanded graphical and tabular data visualizations. We are migrating internal AI frameworks (ElizaOS > Langroid, LlamaParse > Marker) and advancing the implementation of the AI core with **hybrid GraphRAG architecture (KG + BM25/Vector) as our source of truth, populated with curated knowledge using Clinical RoBERTa for KG building and reranking, Mistral for query reformulation, and other SOTA LLMs for core medical reasoning.**
 
 ## API Routing and Proxy Pattern
 
@@ -149,10 +149,10 @@ Clinical Corvus is a digital platform for clinical data analysis, decision suppo
     *   **Lens.org:** Global coverage of academic research and patents.
     *   **Brave Search API:** Current clinical guidelines and web resources.
 3.  **Advanced Processing with CiteSource:**
-    *   **Smart Deduplication:** Eliminates redundancies between sources (DOI, PMID, title/author similarity), preserving unique metadata.
+    *   **Smart Deduplication:** Eliminates redundancies between sources.
     *   **Multidimensional Quality Analysis:** Assesses source coverage, study type diversity, recency of publications, and bibliometric impact.
     *   **Source Benchmarking:** Analyzes the performance and contribution of each database.
-    *   **Detailed Reports:** Generates executive summaries, in-depth analyses, and actionable recommendations to optimize future searches.
+    *   **Detailed Reports:** Generates executive summaries, in-depth analyses, and actionable recommendations.
 4.  **Unified Synthesis with BAML:** Research results and CiteSource analysis are consolidated and presented intelligently.
 
 **🔧 Quick Research:**
@@ -258,7 +258,7 @@ Clinical Corvus is a digital platform for clinical data analysis, decision suppo
 *   **Orchestration:** `clinical_assistant.baml` as the central hub
 *   **Robustness:** BAML functions with educational fallbacks and consistent error handling
 
-### Specialized BAML Functions
+### Specialized BAML Functions (partial list)
 
 #### Academy and Training
 *   **`AnalyzeDifferentialDiagnoses_SNAPPS`:** Structured framework for clinical cases
@@ -266,6 +266,8 @@ Clinical Corvus is a digital platform for clinical data analysis, decision suppo
 *   **`ProvideFeedbackOnProblemRepresentation`:** Personalized educational feedback
 *   **`ExpandDifferentialDiagnosis`:** Systematic expansion (VINDICATE and other mnemonics)
 *   **`AssistEvidenceAppraisal`:** Critical appraisal of scientific evidence
+*   **`AssistInIdentifyingCognitiveBiases`:** Cognitive bias analysis
+*   **
 
 #### Scientific Research
 *   **`FormulateDeepResearchStrategy`:** Optimized multi-source strategies
@@ -297,32 +299,32 @@ Clinical Corvus is a digital platform for clinical data analysis, decision suppo
 | - TipTap Editor     |      +---------------------+      |       (FastAPI)      |
 | - Sonner Toasts     |               |                     | - Context Generation |
 +---------------------+               |-------------------->| - KG Interaction     |
-                                      | (De-identified      | - RAG Pipeline       |
-                                      |  Data)              | - AL Logging         |
-                                      |                     | - CiteSource Engine  |
-                                      |                     +----------------------+
-                                      |
-                                      | LLM APIs (De-identified Data)
-                                      v
-                             +------------------------+
-                             | LLM APIs (OpenRouter/  |
-                             | Gemini Direct Fallback)|
-                             +------------------------+
-                                      |
-                                      | External Services (Bibliometrics, etc.)
-                                      v
-                             +------------------------+
-                             | PubMed, Europe PMC,    |
-                             | Lens.org, Brave Search,|
-                             | LlamaParse, etc.       |
-                             +------------------------+
+                                       | (De-identified      | - RAG Pipeline       |
+                                       |  Data)              | - AL Logging         |
+                                       |                     | - CiteSource Engine  |
+                                       |                     +----------------------+
+                                       |
+                                       | LLM APIs (De-identified Data)
+                                       v
+                              +------------------------+
+                              | LLM APIs (OpenRouter/  |
+                              | Gemini Direct Fallback)|
+                              +------------------------+
+                                       |
+                                       | External Services (Bibliometrics, etc.)
+                                       v
+                              +------------------------+
+                              | PubMed, Europe PMC,    |
+                              | Lens.org, Brave Search,|
+                              | LlamaParse, etc.       |
+                              +------------------------+
 ```
 
 ### Main Components:
 
 1.  **Frontend (Next.js App Router):** User interface, dashboards, interactions, and visualizations.
 2.  **Backend API (FastAPI):** Core business logic, data management, integration with BAML and external services.
-3.  **MCP Server (FastAPI):** Context generation for AI, RAG pipeline, Knowledge Graph interaction (future), and CiteSource engine.
+3.  **MCP Server (FastAPI):** Context generation for AI, hybrid GraphRAG pipeline (KG + BM25/Vector), Knowledge Graph interaction, and CiteSource engine.
 4.  **Database (PostgreSQL):** Persistent application data storage.
 5.  **Clerk:** Authentication and user management service.
 6.  **BAML (Boundary):** AI engine for clinical reasoning, research, and educational features.
@@ -406,7 +408,8 @@ Contributions are welcome! Please follow the style guide and commit standards.
 ### In Development
 
 *   **AI Migration:** ElizaOS → Langroid, LlamaParse → Marker
-*   **Knowledge Graph:** Neo4j implementation
+*   **Knowledge Graph:** Neo4j implementation with **hybrid GraphRAG architecture (KG + BM25/Vector)**
+*   **Specialized Models:** Clinical RoBERTa for KG building/updating and reranking, Mistral for query reformulation, other SOTA LLMs for core reasoning
 *   **Active Learning:** Continuous improvement pipeline
 *   **Advanced Testing:** Expanded E2E coverage
 
@@ -420,7 +423,8 @@ Contributions are welcome! Please follow the style guide and commit standards.
 ### Future Vision
 
 #### Complete AI
-- **Knowledge Graph:** Reliable medical sources
+- **Knowledge Graph:** Reliable medical sources with **hybrid GraphRAG (KG + BM25/Vector) as source of truth**
+- **Curated Knowledge:** Only curated knowledge populates KG, non-curated stays in BM25/Vector store
 - **Autonomous Agent:** Independent clinician and researcher, with access to all platform features
 - **Active Learning:** Continuous, validated fine-tuning
 

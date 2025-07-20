@@ -1,79 +1,36 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SimulationHeader } from './SimulationHeader';
 import { SimulationWorkspace } from './SimulationWorkspace';
 import { StepNavigation } from './StepNavigation';
-import { FeedbackDisplay } from './FeedbackDisplay';
+import { SimulationSummaryDashboard } from './SimulationSummaryDashboard';
 import { Button } from '@/components/ui/Button';
-import { Loader2, Send, Search, Brain, TrendingUp, Library, Target } from 'lucide-react';
+import { Loader2, Send, Search, Brain, CircleQuestionMark, Library, Target, Activity, Zap, Eye } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
 import { ClinicalCase } from './cases';
 
-// --- SNAPPS API Response Types ---
-interface SummaryFeedbackOutput {
-  feedback_strengths: string[];
-  feedback_improvements: string[];
-  missing_elements: string[];
-  overall_assessment: string;
-  next_step_guidance: string;
-  socratic_questions: string[];
+// --- Type definitions based on the new stateful API ---
+
+// From BAML: enum SNAPPSStep { SUMMARIZE, NARROW, ANALYZE, PROBE, PLAN, SELECT }
+enum SNAPPSStep {
+  SUMMARIZE = 'SUMMARIZE',
+  NARROW = 'NARROW',
+  ANALYZE = 'ANALYZE',
+  PROBE = 'PROBE',
+  PLAN = 'PLAN',
+  SELECT = 'SELECT',
 }
 
-interface DifferentialAnalysisOutput {
-  ddx_evaluation: {
-    diagnosis: string;
-    plausibility: 'Alta' | 'Moderada' | 'Baixa';
-    supporting_findings: string[];
-    contradicting_findings: string[];
-  }[];
-  missing_differentials: string[];
-  prioritization_feedback: string;
-  socratic_questions: string[];
-  next_step_guidance: string;
-}
-
-interface AnalysisFeedbackOutput {
-  response: string;
-}
-
-interface ProbeResponseOutput {
-  answers_to_questions: { question: string; answer: string; rationale: string }[];
-  additional_considerations: string[];
-  counter_questions: string[];
-  knowledge_gaps_identified: string[];
-  learning_resources: string[];
-}
-
-interface PlanEvaluationOutput {
-  plan_strengths: string[];
-  plan_gaps: string[];
-  investigation_priorities: string[];
-  management_considerations: string[];
-  safety_concerns: string[];
-  cost_effectiveness_notes: string[];
-  guidelines_alignment: string;
-  next_step_guidance: string;
-}
-
-interface SessionSummaryOutput {
-  overall_performance: string;
-  key_strengths: string[];
-  areas_for_development: string[];
-  learning_objectives_met: string[];
-  recommended_study_topics: string[];
-  metacognitive_insights: string[];
-  next_cases_suggestions: string[];
-}
-
-interface AllFeedback {
-  summary: SummaryFeedbackOutput | null;
-  differentials: DifferentialAnalysisOutput | null;
-  analysis: AnalysisFeedbackOutput | null;
-  probe: ProbeResponseOutput | null;
-  plan: PlanEvaluationOutput | null;
-  final: SessionSummaryOutput | null;
+interface SessionState {
+  case_context: ClinicalCase;
+  student_summary?: string;
+  student_ddx?: string[];
+  student_analysis?: string;
+  student_probe_questions?: string[];
+  student_management_plan?: string;
+  student_selected_topic?: string;
+  feedback_history: string[];
 }
 
 interface SimulationContainerProps {
@@ -82,214 +39,247 @@ interface SimulationContainerProps {
 }
 
 const snappsWorkflowSteps = [
-  { id: 'summary', title: 'Sumarizar (S)', description: 'Resuma o caso clínico.', icon: Search },
-  { id: 'differentials', title: 'Afunilar DDx (N)', description: 'Liste seus diagnósticos.', icon: Brain },
-  { id: 'analysis', title: 'Analisar DDx (A)', description: 'Compare e contraste seu DDx.', icon: TrendingUp },
-  { id: 'probe', title: 'Sondar Preceptor (P)', description: 'Faça perguntas ao preceptor.', icon: Library },
-  { id: 'plan', title: 'Planejar Manejo (P)', description: 'Descreva seu plano.', icon: Target },
-  { id: 'learningTopic', title: 'Selecionar Tópico (S)', description: 'Escolha um tópico para estudar.', icon: Library },
+  { id: SNAPPSStep.SUMMARIZE, title: 'Sumarizar (S)', description: 'Resuma o caso clínico em 1-2 frases.', icon: Search },
+  { id: SNAPPSStep.NARROW, title: 'Afunilar DDx (N)', description: 'Liste 2-3 diagnósticos diferenciais.', icon: Brain },
+  { id: SNAPPSStep.ANALYZE, title: 'Analisar DDx (A)', description: 'Compare e contraste seu DDx com base nos dados.', icon: CircleQuestionMark },
+  { id: SNAPPSStep.PROBE, title: 'Sondar Preceptor (P)', description: 'Faça 1-2 perguntas para esclarecer dúvidas.', icon: Library },
+  { id: SNAPPSStep.PLAN, title: 'Planejar Manejo (P)', description: 'Descreva seu plano de investigação e tratamento.', icon: Target },
+  { id: SNAPPSStep.SELECT, title: 'Selecionar Tópico (S)', description: 'Escolha um tópico deste caso para estudar.', icon: Library },
 ];
 
-// Helper to format the final feedback object into a markdown string
-const formatFeedbackForDisplay = (feedback: AllFeedback | null): string => {
-    if (!feedback || !feedback.final) return "## Feedback em Processamento\n\nAguarde um momento enquanto o Dr. Corvus prepara sua análise completa.";
-
-    const { summary, differentials, analysis, probe, plan, final } = feedback;
-    let markdown = `## Análise da Sessão de Simulação\n\n`;
-    markdown += `**Avaliação Geral de Desempenho:** ${final.overall_performance}\n\n`;
-    markdown += `### Principais Pontos Fortes\n${final.key_strengths.map(s => `- ${s}`).join('\n')}\n\n`;
-    markdown += `### Áreas para Desenvolvimento\n${final.areas_for_development.map(a => `- ${a}`).join('\n')}\n\n`;
-
-    if (summary) {
-        markdown += `--- \n### Etapa 1: Resumo do Caso\n**Avaliação:** ${summary.overall_assessment}\n\n`;
-    }
-    if (differentials) {
-        markdown += `--- \n### Etapa 2: Diagnósticos Diferenciais\n**Avaliação da Priorização:** ${differentials.prioritization_feedback}\n\n`;
-    }
-    if (analysis) {
-        markdown += `--- \n### Etapa 3: Análise do DDx\n**Feedback:** ${analysis.response}\n\n`;
-    }
-    if (probe) {
-        markdown += `--- \n### Etapa 4: Sondagem ao Preceptor\n**Insights sobre as Perguntas:**\n${probe.answers_to_questions.map(a => `- **Q:** ${a.question}\n  - **R:** ${a.answer}`).join('\n')}\n\n`;
-    }
-    if (plan) {
-        markdown += `--- \n### Etapa 5: Plano de Manejo\n**Pontos Fortes do Plano:**\n${plan.plan_strengths.map(s => `- ${s}`).join('\n')}\n\n**Lacunas no Plano:**\n${plan.plan_gaps.map(g => `- ${g}`).join('\n')}\n\n`;
-    }
-    if (final.recommended_study_topics.length > 0) {
-        markdown += `--- \n### Tópicos de Estudo Recomendados\n${final.recommended_study_topics.map(t => `- ${t}`).join('\n')}\n\n`;
-    }
-
-    return markdown;
-};
-
-const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase, onExit }) => {
-  const { getToken } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+export const SimulationContainer = ({ selectedCase, onExit }: SimulationContainerProps) => {
+  const [sessionState, setSessionState] = useState<SessionState | null>(null);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentInput, setCurrentInput] = useState('');
+  const [feedbackHistory, setFeedbackHistory] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
 
-  const [snappsInputs, setSnappsInputs] = useState({
-    summary: '',
-    differentials: '',
-    analysis: '',
-    probe: '',
-    plan: '',
-    learningTopic: '',
-  });
-
-  const [feedback, setFeedback] = useState<AllFeedback | null>(null);
-
-  const handleInputChange = (value: string) => {
-    const currentKey = snappsWorkflowSteps[currentStep].id as keyof typeof snappsInputs;
-    setSnappsInputs(prev => ({ ...prev, [currentKey]: value }));
-  };
-
-  const handleNext = () => {
-    if (currentStep < snappsWorkflowSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const handleBatchSubmit = async () => {
+  const initializeSession = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    const token = await getToken();
-
-    if (!token) {
-      setError('Authentication error. Please log in again.');
-      setIsLoading(false);
-      return;
-    }
-
-    const accumulatedFeedback: Partial<AllFeedback> = {};
-    let sessionContext: any = {};
-
     try {
-      const callSnappsApi = async (endpoint: string, payload: any) => {
-        const response = await fetch(`/api/clinical-simulation/${endpoint}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
+      console.log('[SimulationContainer] Iniciando simulação clínica...', { 
+        caseTitle: selectedCase.title,
+        caseId: selectedCase.id,
+      });
+      
+      const requestBody = { case_context: selectedCase };
+      console.log('[SimulationContainer] Corpo da requisição:', requestBody);
+      
+      const response = await fetch('/api/clinical-simulation/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
+      
+      console.log('[SimulationContainer] Resposta da API:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Sem detalhes do erro');
+        console.error('[SimulationContainer] Erro na API:', { 
+          status: response.status, 
+          error: errorText 
         });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred.' }));
-          throw new Error(`API Error at ${endpoint}: ${errorData.message || response.statusText}`);
-        }
-        return response.json();
-      };
-
-      // Step 1: Summarize
-      const summaryPayload = {
-        summary: snappsInputs.summary,
-        case_context: selectedCase.presentingHistory
-          ? `${selectedCase.fullDescription} ${selectedCase.presentingHistory}`
-          : selectedCase.fullDescription,
-      };
-      accumulatedFeedback.summary = await callSnappsApi('evaluate-summary-snapps', summaryPayload);
-      sessionContext.summary = snappsInputs.summary;
-
-      // Step 2: Narrow DDx
-      const differentialsList = snappsInputs.differentials.split(/,|\n/).map(dx => dx.trim()).filter(dx => dx);
-      const ddxPayload = {
-        case_summary: sessionContext.summary,
-        student_differential_diagnoses: differentialsList,
-        case_context: {
-          expected_differentials: selectedCase.expectedDifferentials || [],
-          learning_objectives: selectedCase.learningObjectives || [],
-        },
-      };
-      accumulatedFeedback.differentials = await callSnappsApi('analyze-differential-diagnoses-snapps', ddxPayload);
-      sessionContext.differentials = differentialsList;
-
-      // Step 3: Analyze DDx
-      const analysisPayload = {
-        case_summary: sessionContext.summary,
-        differential_diagnoses: sessionContext.differentials,
-        student_analysis: snappsInputs.analysis,
-        case_context: {
-          expert_analysis: selectedCase.expertAnalysis,
-        },
-      };
-      accumulatedFeedback.analysis = await callSnappsApi('facilitate-ddx-analysis-snapps', analysisPayload);
-      sessionContext.analysis = snappsInputs.analysis;
-
-      // Step 4: Probe Preceptor
-      const probePayload = {
-        case_summary: sessionContext.summary,
-        session_context: sessionContext,
-        student_questions: snappsInputs.probe,
-        case_data: selectedCase,
-      };
-      accumulatedFeedback.probe = await callSnappsApi('answer-probe-questions-snapps', probePayload);
-      sessionContext.probeQuestions = snappsInputs.probe;
-
-      // Step 5: Plan Management
-      const planPayload = {
-        case_summary: sessionContext.summary,
-        session_context: sessionContext,
-        student_plan: snappsInputs.plan,
-        case_data: selectedCase,
-      };
-      accumulatedFeedback.plan = await callSnappsApi('evaluate-management-plan-snapps', planPayload);
-      sessionContext.plan = snappsInputs.plan;
-
-      // Step 6: Select Learning Topic & Get Final Summary
-      const finalPayload = {
-        full_session_context: sessionContext,
-        student_selected_topic: snappsInputs.learningTopic,
-        case_data: selectedCase,
-        session_history: snappsInputs,
-      };
-      accumulatedFeedback.final = await callSnappsApi('provide-session-summary-snapps', finalPayload);
-
-      setFeedback(accumulatedFeedback as AllFeedback);
-      setIsCompleted(true);
-
+        throw new Error(`Falha ao iniciar a simulação (${response.status}): ${errorText}`);
+      }
+      
+      const initialSessionState: SessionState = await response.json();
+      console.log('[SimulationContainer] Estado inicial da sessão recebido:', initialSessionState);
+      setSessionState(initialSessionState);
     } catch (e: any) {
-      setError(e.message || 'An error occurred during submission. Please try again.');
-      console.error(e);
+      console.error('[SimulationContainer] Erro ao inicializar simulação:', e);
+      setError(e.message || 'Erro desconhecido ao iniciar simulação');
     } finally {
       setIsLoading(false);
+    }
+  }, [selectedCase]);
+
+  useEffect(() => {
+    initializeSession();
+  }, [initializeSession]);
+
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 p-4 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-lg shadow-lg">
+        <h3 className="text-lg font-semibold text-red-800">Ocorreu um Erro</h3>
+        <p className="text-red-600 mt-2 text-center font-medium">{error}</p>
+        <div className="mt-4 space-x-4">
+          <button 
+            onClick={initializeSession} 
+            className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors shadow-md"
+          >
+            <Zap className="inline mr-2 h-4 w-4" />
+            Tentar Novamente
+          </button>
+          <button 
+            onClick={onExit} 
+            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors shadow-md"
+          >
+            Sair da Simulação
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleSubmitStep = async () => {
+    if (!sessionState || !currentInput.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    const payload = {
+      session_state: sessionState,
+      current_step: snappsWorkflowSteps[currentStepIndex].id,
+      current_input: currentInput,
+    };
+
+    try {
+      const response = await fetch('/api/clinical-simulation/step', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erro do servidor: ${errorText}`);
+      }
+
+      const result = await response.json();
+      setSessionState(result.updated_session_state);
+      setFeedbackHistory(prev => [...prev, {
+        step: snappsWorkflowSteps[currentStepIndex].id,
+        userInput: currentInput, // Add user input here
+        feedback: result.feedback
+      }]);
+      setCurrentInput('');
+
+      if (currentStepIndex === snappsWorkflowSteps.length - 1) {
+        setIsCompleted(true);
+      } else {
+        setCurrentStepIndex(currentStepIndex + 1);
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleBack = () => {
+    if (currentStepIndex > 0) {
+      setCurrentStepIndex(currentStepIndex - 1);
     }
   };
 
   const resetSimulation = () => {
     setIsCompleted(false);
-    setCurrentStep(0);
-    setSnappsInputs({ summary: '', differentials: '', analysis: '', probe: '', plan: '', learningTopic: '' });
-    setFeedback(null);
+    setCurrentStepIndex(0);
+    setCurrentInput('');
+    setFeedbackHistory([]);
+    initializeSession();
   };
 
-  if (isCompleted && feedback) {
-    return (
-        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-            <FeedbackDisplay feedback={formatFeedbackForDisplay(feedback)} />
-            <div className="mt-6 flex justify-center space-x-4">
-                <Button onClick={resetSimulation} variant="outline">
-                    Reiniciar Simulação
-                </Button>
-                <Button onClick={onExit} variant="secondary">
-                    Sair para Academia
-                </Button>
+  // Pre-simulation start screen
+  if (!sessionState) {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-screen space-y-6 animate-fade-in">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-cyan-200 rounded-full animate-spin">
+              <div className="absolute top-0 left-0 w-16 h-16 border-4 border-cyan-600 rounded-full animate-pulse border-t-transparent"></div>
             </div>
+            <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-cyan-600 animate-pulse" />
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-2xl font-bold text-gray-700 animate-pulse">Iniciando simulação clínica...</p>
+            <p className="text-sm text-gray-500">Preparando ambiente de aprendizado avançado</p>
+          </div>
+          <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+          </div>
         </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="max-w-2xl mx-auto p-8 text-center bg-white rounded-lg shadow-xl border-l-4 border-red-500">
+          <Alert variant="destructive" className="bg-gradient-to-r from-red-50 to-pink-50 border-red-200">
+            <AlertDescription className="text-lg font-medium">{error}</AlertDescription>
+          </Alert>
+          <div className="mt-6 flex justify-center gap-4">
+            <Button onClick={initializeSession} size="lg" className="bg-cyan-600 hover:bg-cyan-700 transition-colors">
+              <Zap className="mr-2 h-4 w-4" />
+              Tentar Novamente
+            </Button>
+            <Button onClick={onExit} variant="outline" size="lg" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
+              Voltar
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-3xl mx-auto p-8 text-center bg-white rounded-2xl shadow-2xl border-t-4 border-cyan-500 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+        <div className="relative z-10">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+            {selectedCase.title}
+          </h2>
+          <p className="mt-4 text-lg text-gray-600 leading-relaxed">
+            {selectedCase.brief}
+          </p>
+          <div className="mt-8 flex items-center justify-center space-x-2 mb-6">
+            <Activity className="h-5 w-5 text-cyan-500" />
+            <span className="text-sm text-gray-500">Simulação Clínica Interativa</span>
+          </div>
+          <Button onClick={initializeSession} size="lg" className="text-xl px-10 py-6 bg-cyan-600 hover:bg-cyan-700 transition-all duration-200 shadow-lg hover:shadow-xl">
+            <Brain className="mr-3 h-6 w-6" />
+            Começar Simulação
+          </Button>
+        </div>
+      </div>
     );
   }
 
-  const currentWorkflowStep = snappsWorkflowSteps[currentStep];
-  const allInputsCollected = Object.values(snappsInputs).every(input => input.trim() !== '');
-  const completedSteps = Object.keys(snappsInputs).filter(key => snappsInputs[key as keyof typeof snappsInputs].trim() !== '');
+  if (isCompleted) {
+    const finalFeedback = feedbackHistory.find(f => f.step === SNAPPSStep.SELECT)?.feedback;
+    // Ensure we have a valid feedback object with default values
+    const safeFeedback = finalFeedback || {
+      key_strengths: [],
+      areas_for_development: [],
+      metacognitive_insight: 'Nenhum feedback final disponível.',
+      performance_metrics: []
+    };
+    return (
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <SimulationSummaryDashboard feedback={safeFeedback} />
+        <div className="mt-8 flex justify-center space-x-4">
+          <Button onClick={resetSimulation} variant="outline" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
+            <Brain className="mr-2 h-4 w-4" />
+            Reiniciar Simulação
+          </Button>
+          <Button onClick={onExit} className="bg-cyan-600 hover:bg-cyan-700 transition-colors shadow-lg">
+            <Target className="mr-2 h-4 w-4" />
+            Sair para Academia
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const currentWorkflowStep = snappsWorkflowSteps[currentStepIndex];
+  const lastFeedbackForStep = [...feedbackHistory].reverse().find(f => f.step === currentWorkflowStep.id);
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
@@ -300,16 +290,21 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
         onReset={resetSimulation}
       />
       <div className="mt-8 flex justify-end">
-          <Button onClick={onExit} variant="ghost">Sair da Simulação</Button>
+          <Button onClick={onExit} variant="ghost" className="text-cyan-600 hover:bg-cyan-50 transition-colors">
+            <Eye className="mr-2 h-4 w-4" />
+            Sair da Simulação
+          </Button>
       </div>
       <div className="mt-8 flex flex-col gap-8">
         <StepNavigation
-          steps={snappsWorkflowSteps}
-          currentStepIndex={currentStep}
-          completedSteps={completedSteps}
+          steps={snappsWorkflowSteps.map(({id, title, icon, description}) => ({id, title, icon, description}))}
+          currentStepIndex={currentStepIndex}
+          completedSteps={feedbackHistory.map(f => f.step)}
           onStepClick={(stepId) => {
               const stepIndex = snappsWorkflowSteps.findIndex(s => s.id === stepId);
-              if (stepIndex !== -1) setCurrentStep(stepIndex);
+              if (stepIndex !== -1 && stepIndex < currentStepIndex) {
+                  setCurrentStepIndex(stepIndex);
+              }
           }}
         />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -319,36 +314,43 @@ const SimulationContainer: React.FC<SimulationContainerProps> = ({ selectedCase,
                     id: currentWorkflowStep.id,
                     title: currentWorkflowStep.title,
                     description: currentWorkflowStep.description,
-                    completed: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs].trim() !== '',
-                    userInput: snappsInputs[currentWorkflowStep.id as keyof typeof snappsInputs],
+                    userInput: currentInput,
+                    completed: feedbackHistory.some(f => f.step === currentWorkflowStep.id),
                 }}
-                currentStepIndex={currentStep}
                 isLoading={isLoading}
-                showSubmitSuccess={false}
-                batchMode={true}
-                allInputsCollected={allInputsCollected}
-                onInputChange={handleInputChange}
-                onSubmitStep={() => {}} 
-                onBatchSubmit={handleBatchSubmit}
+                onInputChange={setCurrentInput}
+                onSubmitStep={handleSubmitStep}
                 clinicalCase={selectedCase}
+                feedback={lastFeedbackForStep?.feedback}
+                feedbackHistory={feedbackHistory}
               />
               <div className="mt-6 flex justify-between items-center">
-                <Button onClick={handleBack} disabled={currentStep === 0 || isLoading}>
+                <Button onClick={handleBack} disabled={currentStepIndex === 0 || isLoading} variant="outline" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
                   Anterior
                 </Button>
-                
-                {currentStep < snappsWorkflowSteps.length - 1 ? (
-                  <Button onClick={handleNext} disabled={isLoading}>
-                    Próximo
-                  </Button>
-                ) : (
-                  <Button onClick={handleBatchSubmit} disabled={isLoading || !allInputsCollected} className="bg-green-600 hover:bg-green-700">
-                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                    Analisar Caso Completo
-                  </Button>
-                )}
+                <Button onClick={handleSubmitStep} disabled={isLoading || !currentInput.trim()} className="bg-cyan-600 hover:bg-cyan-700 transition-colors shadow-lg">
+                  {isLoading ? (
+                    <div className="flex items-center">
+                      <div className="relative mr-2">
+                        <div className="w-4 h-4 border-2 border-cyan-200 rounded-full animate-spin">
+                          <div className="absolute top-0 left-0 w-4 h-4 border-2 border-cyan-600 rounded-full animate-pulse border-t-transparent"></div>
+                        </div>
+                      </div>
+                      Processando...
+                    </div>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      {currentStepIndex === snappsWorkflowSteps.length - 1 ? 'Finalizar Simulação' : 'Enviar e Próximo'}
+                    </>
+                  )}
+                </Button>
               </div>
-              {error && <Alert variant="destructive" className="mt-4"><AlertDescription>{error}</AlertDescription></Alert>}
+              {error && (
+                <Alert variant="destructive" className="mt-4 bg-gradient-to-r from-red-50 to-pink-50 border-red-200">
+                  <AlertDescription className="font-medium">{error}</AlertDescription>
+                </Alert>
+              )}
             </div>
         </div>
       </div>

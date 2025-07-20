@@ -21,7 +21,7 @@ services:
   backend-api:
     build:
       context: .
-      dockerfile: backend-api/Dockerfile.dev
+      dockerfile: backend-api/Dockerfile.prod
     image: clinical-corvus-backend-dev
     restart: always
     env_file:
@@ -56,7 +56,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.prod
       args:
         - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         - POSTGRES_URL=postgresql://${DB_USER:-clinical_corvus}:${DB_PASSWORD:-clinical_corvus_pass}@postgres:5432/${DB_NAME:-clinical_corvus}
@@ -81,7 +81,7 @@ services:
   mcp_server:
     build:
       context: .
-      dockerfile: mcp_server/Dockerfile.dev
+      dockerfile: mcp_server/Dockerfile.prod
     ports:
       - "8765:8765"
     env_file:

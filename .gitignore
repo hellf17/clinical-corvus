@@ -190,11 +190,13 @@ dist/
 *.tfstate
 *.tfstate.backup
 
-# Windsurf
-.windsurfrules
+# IDE
+.kilocode
 
-# Workspace
+# Other related files
 clinical-corvus.code-workspace
+*.png
+brand-guide-revised.md
 
 # Example files
 exemplos/

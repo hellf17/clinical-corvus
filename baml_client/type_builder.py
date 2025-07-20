@@ -22,19 +22,19 @@ from .globals import DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIM
 class TypeBuilder(_TypeBuilder):
     def __init__(self):
         super().__init__(classes=set(
-          ["AnalyzeDifferentialDiagnosesSNAPPSInput","AnswerProbeQuestionsSNAPPSInputModel","AnsweredQuestion","BAMLProblemRepresentationInput","BenchmarkComparison","BiasAnalysis","BiasReflectionPoint","CaseContext","CaseScenarioInput","CiteSourceAnalysisInput","CiteSourceAnalysisOutput","CiteSourceMetrics","CiteSourceReportInput","CiteSourceReportOutput","ClinicalDataInput","ClinicalFinding","ClinicalScenarioInput","ClinicalWorkflowQuestionsOutput","CognitiveBiasInput","CognitiveBiasReflectionOutput","CompareContrastExerciseInput","CompareContrastFeedbackOutput","DdxEvaluation","DdxQuestioningInput","DdxQuestioningOutput","DeduplicationAnalysis","DeduplicationSummary","DetectedCognitiveBias","DiagnosticTimeoutInput","DiagnosticTimeoutOutput","DifferentialAnalysisOutputModel","EvaluateManagementPlanSNAPPSInputModel","EvaluateSummarySNAPPSInputModel","EvidenceAnalysisData","EvidenceAppraisalOutput","EvidenceTheme","ExecutiveSummary","ExpandDifferentialDiagnosisInput","ExpandedDdxOutput","FacilitateDDxAnalysisOutputModel","FacilitateDDxAnalysisSNAPPSInputModel","FormulatedSearchStrategyOutput","HypothesisComparisonFeedback","IllnessScriptInput","IllnessScriptOutput","InterventionInfo","KeyResult","LabAnalysisInput","LabInsightsOutput","LabTestResult","PDFAnalysisInput","PDFAnalysisOutput","PICOFormulationOutput","PICOQuestion","PatientFollowUpChecklistOutput","PatientFollowUpInput","PlanEvaluationOutputModel","PopulationInfo","ProbeResponseOutputModel","ProblemRepresentationFeedbackOutputModel","ProcessingMetadata","ProvideSessionSummarySNAPPSInputModel","QualityFactor","QualityScores","QuestionCategory","RawSearchResultItem","ResearchMetrics","ResearchTaskInput","SearchParameters","SelfReflectionFeedbackOutput","SelfReflectionInput","SessionSummaryOutputModel","SimplifiedQueryOutput","SourceAnalysis","SourcePerformanceMetrics","StructuredSummaryOutput","StudentHypothesisAnalysis","SummaryFeedbackOutputModel","SynthesizedResearchOutput","TranslationOutput","VisualDataSummary",]
+          ["AnalyzeDDxInput","AnswerProbeQuestionsInput","AnsweredQuestion","BAMLProblemRepresentationInput","BenchmarkComparison","BiasAnalysis","BiasReflectionPoint","CaseContext","CaseScenarioInput","CiteSourceAnalysisInput","CiteSourceAnalysisOutput","CiteSourceMetrics","CiteSourceReportInput","CiteSourceReportOutput","ClinicalDataInput","ClinicalFinding","ClinicalScenarioInput","ClinicalWorkflowQuestionsOutput","CognitiveBiasInput","CognitiveBiasReflectionOutput","CompareContrastExerciseInput","CompareContrastFeedbackOutput","CompareContrastMatrixInput","DdxEvaluation","DdxQuestioningInput","DdxQuestioningOutput","DeduplicationAnalysis","DeduplicationSummary","DetectedCognitiveBias","DiagnosticTimeoutInput","DiagnosticTimeoutOutput","DifferentialAnalysisOutputModel","EvaluateManagementPlanInput","EvaluateSummaryInput","EvidenceAnalysisData","EvidenceAppraisalOutput","EvidenceTheme","ExecutiveSummary","ExpandDifferentialDiagnosisInput","ExpandedDdxOutput","ExpertHypothesisFindingAnalysis","FacilitateDDxAnalysisInput","FacilitateDDxAnalysisOutputModel","FormulatedSearchStrategyOutput","GradeSummary","HypothesisComparisonFeedback","HypothesisFindingAnalysis","IllnessScriptInput","IllnessScriptOutput","InterventionInfo","KeyResult","LabAnalysisInput","LabInsightsOutput","LabTestResult","MatrixFeedbackOutput","PDFAnalysisInput","PDFAnalysisOutput","PICOFormulationOutput","PICOQuestion","PatientFollowUpChecklistOutput","PatientFollowUpInput","PlanEvaluationOutputModel","PopulationInfo","PracticeRecommendations","ProbeResponseOutputModel","ProblemRepresentationFeedbackOutputModel","ProcessingMetadata","ProvideSessionSummaryInput","QualityFactor","QualityScores","QuestionCategory","RawSearchResultItem","ReasoningTag","RecommendationBalance","ResearchMetrics","ResearchTaskInput","SearchParameters","SelfReflectionFeedbackOutput","SelfReflectionInput","SessionState","SessionSummaryOutputModel","SimplifiedQueryOutput","SourceAnalysis","SourcePerformanceMetrics","StructuredSummaryOutput","StudentHypothesisAnalysis","SummaryFeedbackOutputModel","SynthesizedResearchOutput","TranslationOutput","VisualDataSummary",]
         ), enums=set(
-          ["AssessmentValue","GradeLevel","PossibleCognitiveBias","RecommendationStrength","ResearchSourceType","StudyDesignType","StudyTypeFilter","UserRole",]
+          ["AssessmentValue","GradeLevel","HypothesisFindingEvaluation","PossibleCognitiveBias","RecommendationStrength","ResearchSourceType","SNAPPSStep","StudyDesignType","StudyTypeFilter","TextType","UserRole",]
         ), runtime=DO_NOT_USE_DIRECTLY_UNLESS_YOU_KNOW_WHAT_YOURE_DOING_RUNTIME)
 
 
     @property
-    def AnalyzeDifferentialDiagnosesSNAPPSInput(self) -> "AnalyzeDifferentialDiagnosesSNAPPSInputAst":
-        return AnalyzeDifferentialDiagnosesSNAPPSInputAst(self)
+    def AnalyzeDDxInput(self) -> "AnalyzeDDxInputAst":
+        return AnalyzeDDxInputAst(self)
 
     @property
-    def AnswerProbeQuestionsSNAPPSInputModel(self) -> "AnswerProbeQuestionsSNAPPSInputModelAst":
-        return AnswerProbeQuestionsSNAPPSInputModelAst(self)
+    def AnswerProbeQuestionsInput(self) -> "AnswerProbeQuestionsInputAst":
+        return AnswerProbeQuestionsInputAst(self)
 
     @property
     def AnsweredQuestion(self) -> "AnsweredQuestionAst":
@@ -117,6 +117,10 @@ class TypeBuilder(_TypeBuilder):
         return CompareContrastFeedbackOutputAst(self)
 
     @property
+    def CompareContrastMatrixInput(self) -> "CompareContrastMatrixInputAst":
+        return CompareContrastMatrixInputAst(self)
+
+    @property
     def DdxEvaluation(self) -> "DdxEvaluationAst":
         return DdxEvaluationAst(self)
 
@@ -153,12 +157,12 @@ class TypeBuilder(_TypeBuilder):
         return DifferentialAnalysisOutputModelAst(self)
 
     @property
-    def EvaluateManagementPlanSNAPPSInputModel(self) -> "EvaluateManagementPlanSNAPPSInputModelAst":
-        return EvaluateManagementPlanSNAPPSInputModelAst(self)
+    def EvaluateManagementPlanInput(self) -> "EvaluateManagementPlanInputAst":
+        return EvaluateManagementPlanInputAst(self)
 
     @property
-    def EvaluateSummarySNAPPSInputModel(self) -> "EvaluateSummarySNAPPSInputModelAst":
-        return EvaluateSummarySNAPPSInputModelAst(self)
+    def EvaluateSummaryInput(self) -> "EvaluateSummaryInputAst":
+        return EvaluateSummaryInputAst(self)
 
     @property
     def EvidenceAnalysisData(self) -> "EvidenceAnalysisDataAst":
@@ -185,20 +189,32 @@ class TypeBuilder(_TypeBuilder):
         return ExpandedDdxOutputAst(self)
 
     @property
-    def FacilitateDDxAnalysisOutputModel(self) -> "FacilitateDDxAnalysisOutputModelAst":
-        return FacilitateDDxAnalysisOutputModelAst(self)
+    def ExpertHypothesisFindingAnalysis(self) -> "ExpertHypothesisFindingAnalysisAst":
+        return ExpertHypothesisFindingAnalysisAst(self)
 
     @property
-    def FacilitateDDxAnalysisSNAPPSInputModel(self) -> "FacilitateDDxAnalysisSNAPPSInputModelAst":
-        return FacilitateDDxAnalysisSNAPPSInputModelAst(self)
+    def FacilitateDDxAnalysisInput(self) -> "FacilitateDDxAnalysisInputAst":
+        return FacilitateDDxAnalysisInputAst(self)
+
+    @property
+    def FacilitateDDxAnalysisOutputModel(self) -> "FacilitateDDxAnalysisOutputModelAst":
+        return FacilitateDDxAnalysisOutputModelAst(self)
 
     @property
     def FormulatedSearchStrategyOutput(self) -> "FormulatedSearchStrategyOutputAst":
         return FormulatedSearchStrategyOutputAst(self)
 
     @property
+    def GradeSummary(self) -> "GradeSummaryAst":
+        return GradeSummaryAst(self)
+
+    @property
     def HypothesisComparisonFeedback(self) -> "HypothesisComparisonFeedbackAst":
         return HypothesisComparisonFeedbackAst(self)
+
+    @property
+    def HypothesisFindingAnalysis(self) -> "HypothesisFindingAnalysisAst":
+        return HypothesisFindingAnalysisAst(self)
 
     @property
     def IllnessScriptInput(self) -> "IllnessScriptInputAst":
@@ -227,6 +243,10 @@ class TypeBuilder(_TypeBuilder):
     @property
     def LabTestResult(self) -> "LabTestResultAst":
         return LabTestResultAst(self)
+
+    @property
+    def MatrixFeedbackOutput(self) -> "MatrixFeedbackOutputAst":
+        return MatrixFeedbackOutputAst(self)
 
     @property
     def PDFAnalysisInput(self) -> "PDFAnalysisInputAst":
@@ -261,6 +281,10 @@ class TypeBuilder(_TypeBuilder):
         return PopulationInfoAst(self)
 
     @property
+    def PracticeRecommendations(self) -> "PracticeRecommendationsAst":
+        return PracticeRecommendationsAst(self)
+
+    @property
     def ProbeResponseOutputModel(self) -> "ProbeResponseOutputModelAst":
         return ProbeResponseOutputModelAst(self)
 
@@ -273,8 +297,8 @@ class TypeBuilder(_TypeBuilder):
         return ProcessingMetadataAst(self)
 
     @property
-    def ProvideSessionSummarySNAPPSInputModel(self) -> "ProvideSessionSummarySNAPPSInputModelAst":
-        return ProvideSessionSummarySNAPPSInputModelAst(self)
+    def ProvideSessionSummaryInput(self) -> "ProvideSessionSummaryInputAst":
+        return ProvideSessionSummaryInputAst(self)
 
     @property
     def QualityFactor(self) -> "QualityFactorAst":
@@ -291,6 +315,14 @@ class TypeBuilder(_TypeBuilder):
     @property
     def RawSearchResultItem(self) -> "RawSearchResultItemAst":
         return RawSearchResultItemAst(self)
+
+    @property
+    def ReasoningTag(self) -> "ReasoningTagAst":
+        return ReasoningTagAst(self)
+
+    @property
+    def RecommendationBalance(self) -> "RecommendationBalanceAst":
+        return RecommendationBalanceAst(self)
 
     @property
     def ResearchMetrics(self) -> "ResearchMetricsAst":
@@ -311,6 +343,10 @@ class TypeBuilder(_TypeBuilder):
     @property
     def SelfReflectionInput(self) -> "SelfReflectionInputAst":
         return SelfReflectionInputAst(self)
+
+    @property
+    def SessionState(self) -> "SessionStateAst":
+        return SessionStateAst(self)
 
     @property
     def SessionSummaryOutputModel(self) -> "SessionSummaryOutputModelAst":
@@ -356,22 +392,22 @@ class TypeBuilder(_TypeBuilder):
 
 
 
-class AnalyzeDifferentialDiagnosesSNAPPSInputAst:
+class AnalyzeDDxInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("AnalyzeDifferentialDiagnosesSNAPPSInput")
-        self._properties: typing.Set[str] = set([ "case_summary",  "student_differential_diagnoses",  "case_context", ])
-        self._props = AnalyzeDifferentialDiagnosesSNAPPSInputProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("AnalyzeDDxInput")
+        self._properties: typing.Set[str] = set([ "session_state",  "student_differential_diagnoses", ])
+        self._props = AnalyzeDDxInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "AnalyzeDifferentialDiagnosesSNAPPSInputProperties":
+    def props(self) -> "AnalyzeDDxInputProperties":
         return self._props
 
 
-class AnalyzeDifferentialDiagnosesSNAPPSInputViewer(AnalyzeDifferentialDiagnosesSNAPPSInputAst):
+class AnalyzeDDxInputViewer(AnalyzeDDxInputAst):
     def __init__(self, tb: _TypeBuilder):
         super().__init__(tb)
 
@@ -381,7 +417,7 @@ class AnalyzeDifferentialDiagnosesSNAPPSInputViewer(AnalyzeDifferentialDiagnoses
 
 
 
-class AnalyzeDifferentialDiagnosesSNAPPSInputProperties:
+class AnalyzeDDxInputProperties:
     def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties
@@ -389,35 +425,31 @@ class AnalyzeDifferentialDiagnosesSNAPPSInputProperties:
     
 
     @property
-    def case_summary(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_summary"))
+    def session_state(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("session_state"))
 
     @property
     def student_differential_diagnoses(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("student_differential_diagnoses"))
 
-    @property
-    def case_context(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_context"))
-
     
 
-class AnswerProbeQuestionsSNAPPSInputModelAst:
+class AnswerProbeQuestionsInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("AnswerProbeQuestionsSNAPPSInputModel")
-        self._properties: typing.Set[str] = set([ "session_context",  "student_questions",  "case_data", ])
-        self._props = AnswerProbeQuestionsSNAPPSInputModelProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("AnswerProbeQuestionsInput")
+        self._properties: typing.Set[str] = set([ "session_state",  "student_questions", ])
+        self._props = AnswerProbeQuestionsInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "AnswerProbeQuestionsSNAPPSInputModelProperties":
+    def props(self) -> "AnswerProbeQuestionsInputProperties":
         return self._props
 
 
-class AnswerProbeQuestionsSNAPPSInputModelViewer(AnswerProbeQuestionsSNAPPSInputModelAst):
+class AnswerProbeQuestionsInputViewer(AnswerProbeQuestionsInputAst):
     def __init__(self, tb: _TypeBuilder):
         super().__init__(tb)
 
@@ -427,7 +459,7 @@ class AnswerProbeQuestionsSNAPPSInputModelViewer(AnswerProbeQuestionsSNAPPSInput
 
 
 
-class AnswerProbeQuestionsSNAPPSInputModelProperties:
+class AnswerProbeQuestionsInputProperties:
     def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties
@@ -435,16 +467,12 @@ class AnswerProbeQuestionsSNAPPSInputModelProperties:
     
 
     @property
-    def session_context(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("session_context"))
+    def session_state(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("session_state"))
 
     @property
     def student_questions(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("student_questions"))
-
-    @property
-    def case_data(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_data"))
 
     
 
@@ -594,7 +622,7 @@ class BiasAnalysisAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("BiasAnalysis")
-        self._properties: typing.Set[str] = set([ "selection_bias",  "performance_bias",  "reporting_bias",  "confirmation_bias", ])
+        self._properties: typing.Set[str] = set([ "id",  "bias_type",  "potential_impact",  "mitigation_strategies",  "actionable_suggestion", ])
         self._props = BiasAnalysisProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -623,20 +651,24 @@ class BiasAnalysisProperties:
     
 
     @property
-    def selection_bias(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("selection_bias"))
+    def id(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("id"))
 
     @property
-    def performance_bias(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("performance_bias"))
+    def bias_type(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("bias_type"))
 
     @property
-    def reporting_bias(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("reporting_bias"))
+    def potential_impact(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("potential_impact"))
 
     @property
-    def confirmation_bias(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("confirmation_bias"))
+    def mitigation_strategies(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("mitigation_strategies"))
+
+    @property
+    def actionable_suggestion(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("actionable_suggestion"))
 
     
 
@@ -1292,7 +1324,7 @@ class CognitiveBiasInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("CognitiveBiasInput")
-        self._properties: typing.Set[str] = set([ "case_summary_by_user",  "user_working_hypothesis",  "user_reasoning_summary", ])
+        self._properties: typing.Set[str] = set([ "case_summary_by_user",  "case_vignette_id",  "user_identified_biases", ])
         self._props = CognitiveBiasInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -1325,12 +1357,12 @@ class CognitiveBiasInputProperties:
         return ClassPropertyViewer(self.__bldr.property("case_summary_by_user"))
 
     @property
-    def user_working_hypothesis(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("user_working_hypothesis"))
+    def case_vignette_id(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("case_vignette_id"))
 
     @property
-    def user_reasoning_summary(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("user_reasoning_summary"))
+    def user_identified_biases(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("user_identified_biases"))
 
     
 
@@ -1457,6 +1489,52 @@ class CompareContrastFeedbackOutputProperties:
     @property
     def suggested_learning_focus(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("suggested_learning_focus"))
+
+    
+
+class CompareContrastMatrixInputAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("CompareContrastMatrixInput")
+        self._properties: typing.Set[str] = set([ "scenario",  "student_matrix_analysis",  "student_chosen_discriminator", ])
+        self._props = CompareContrastMatrixInputProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "CompareContrastMatrixInputProperties":
+        return self._props
+
+
+class CompareContrastMatrixInputViewer(CompareContrastMatrixInputAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class CompareContrastMatrixInputProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def scenario(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("scenario"))
+
+    @property
+    def student_matrix_analysis(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_matrix_analysis"))
+
+    @property
+    def student_chosen_discriminator(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_chosen_discriminator"))
 
     
 
@@ -1918,22 +1996,22 @@ class DifferentialAnalysisOutputModelProperties:
 
     
 
-class EvaluateManagementPlanSNAPPSInputModelAst:
+class EvaluateManagementPlanInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("EvaluateManagementPlanSNAPPSInputModel")
-        self._properties: typing.Set[str] = set([ "session_context",  "student_plan",  "case_data", ])
-        self._props = EvaluateManagementPlanSNAPPSInputModelProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("EvaluateManagementPlanInput")
+        self._properties: typing.Set[str] = set([ "session_state",  "student_plan", ])
+        self._props = EvaluateManagementPlanInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "EvaluateManagementPlanSNAPPSInputModelProperties":
+    def props(self) -> "EvaluateManagementPlanInputProperties":
         return self._props
 
 
-class EvaluateManagementPlanSNAPPSInputModelViewer(EvaluateManagementPlanSNAPPSInputModelAst):
+class EvaluateManagementPlanInputViewer(EvaluateManagementPlanInputAst):
     def __init__(self, tb: _TypeBuilder):
         super().__init__(tb)
 
@@ -1943,7 +2021,7 @@ class EvaluateManagementPlanSNAPPSInputModelViewer(EvaluateManagementPlanSNAPPSI
 
 
 
-class EvaluateManagementPlanSNAPPSInputModelProperties:
+class EvaluateManagementPlanInputProperties:
     def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties
@@ -1951,35 +2029,31 @@ class EvaluateManagementPlanSNAPPSInputModelProperties:
     
 
     @property
-    def session_context(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("session_context"))
+    def session_state(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("session_state"))
 
     @property
     def student_plan(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("student_plan"))
 
-    @property
-    def case_data(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_data"))
-
     
 
-class EvaluateSummarySNAPPSInputModelAst:
+class EvaluateSummaryInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("EvaluateSummarySNAPPSInputModel")
-        self._properties: typing.Set[str] = set([ "student_summary",  "case_description", ])
-        self._props = EvaluateSummarySNAPPSInputModelProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("EvaluateSummaryInput")
+        self._properties: typing.Set[str] = set([ "case_context",  "student_summary", ])
+        self._props = EvaluateSummaryInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "EvaluateSummarySNAPPSInputModelProperties":
+    def props(self) -> "EvaluateSummaryInputProperties":
         return self._props
 
 
-class EvaluateSummarySNAPPSInputModelViewer(EvaluateSummarySNAPPSInputModelAst):
+class EvaluateSummaryInputViewer(EvaluateSummaryInputAst):
     def __init__(self, tb: _TypeBuilder):
         super().__init__(tb)
 
@@ -1989,7 +2063,7 @@ class EvaluateSummarySNAPPSInputModelViewer(EvaluateSummarySNAPPSInputModelAst):
 
 
 
-class EvaluateSummarySNAPPSInputModelProperties:
+class EvaluateSummaryInputProperties:
     def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties
@@ -1997,12 +2071,12 @@ class EvaluateSummarySNAPPSInputModelProperties:
     
 
     @property
-    def student_summary(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("student_summary"))
+    def case_context(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("case_context"))
 
     @property
-    def case_description(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_description"))
+    def student_summary(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_summary"))
 
     
 
@@ -2076,7 +2150,7 @@ class EvidenceAppraisalOutputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("EvidenceAppraisalOutput")
-        self._properties: typing.Set[str] = set([ "overall_quality",  "quality_reasoning",  "recommendation_strength",  "strength_reasoning",  "quality_factors",  "bias_analysis",  "practice_recommendations", ])
+        self._properties: typing.Set[str] = set([ "grade_summary",  "quality_factors",  "bias_analysis",  "practice_recommendations", ])
         self._props = EvidenceAppraisalOutputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -2105,20 +2179,8 @@ class EvidenceAppraisalOutputProperties:
     
 
     @property
-    def overall_quality(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("overall_quality"))
-
-    @property
-    def quality_reasoning(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("quality_reasoning"))
-
-    @property
-    def recommendation_strength(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("recommendation_strength"))
-
-    @property
-    def strength_reasoning(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("strength_reasoning"))
+    def grade_summary(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("grade_summary"))
 
     @property
     def quality_factors(self) -> ClassPropertyViewer:
@@ -2330,6 +2392,98 @@ class ExpandedDdxOutputProperties:
 
     
 
+class ExpertHypothesisFindingAnalysisAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ExpertHypothesisFindingAnalysis")
+        self._properties: typing.Set[str] = set([ "finding_name",  "hypothesis_name",  "expert_evaluation",  "expert_rationale", ])
+        self._props = ExpertHypothesisFindingAnalysisProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ExpertHypothesisFindingAnalysisProperties":
+        return self._props
+
+
+class ExpertHypothesisFindingAnalysisViewer(ExpertHypothesisFindingAnalysisAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class ExpertHypothesisFindingAnalysisProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def finding_name(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("finding_name"))
+
+    @property
+    def hypothesis_name(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("hypothesis_name"))
+
+    @property
+    def expert_evaluation(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("expert_evaluation"))
+
+    @property
+    def expert_rationale(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("expert_rationale"))
+
+    
+
+class FacilitateDDxAnalysisInputAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("FacilitateDDxAnalysisInput")
+        self._properties: typing.Set[str] = set([ "session_state",  "student_analysis", ])
+        self._props = FacilitateDDxAnalysisInputProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "FacilitateDDxAnalysisInputProperties":
+        return self._props
+
+
+class FacilitateDDxAnalysisInputViewer(FacilitateDDxAnalysisInputAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class FacilitateDDxAnalysisInputProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def session_state(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("session_state"))
+
+    @property
+    def student_analysis(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_analysis"))
+
+    
+
 class FacilitateDDxAnalysisOutputModelAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
@@ -2365,56 +2519,6 @@ class FacilitateDDxAnalysisOutputModelProperties:
     @property
     def response(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("response"))
-
-    
-
-class FacilitateDDxAnalysisSNAPPSInputModelAst:
-    def __init__(self, tb: _TypeBuilder):
-        _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("FacilitateDDxAnalysisSNAPPSInputModel")
-        self._properties: typing.Set[str] = set([ "case_summary",  "differential_diagnoses",  "student_analysis",  "case_context", ])
-        self._props = FacilitateDDxAnalysisSNAPPSInputModelProperties(self._bldr, self._properties)
-
-    def type(self) -> FieldType:
-        return self._bldr.field()
-
-    @property
-    def props(self) -> "FacilitateDDxAnalysisSNAPPSInputModelProperties":
-        return self._props
-
-
-class FacilitateDDxAnalysisSNAPPSInputModelViewer(FacilitateDDxAnalysisSNAPPSInputModelAst):
-    def __init__(self, tb: _TypeBuilder):
-        super().__init__(tb)
-
-    
-    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
-        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
-
-
-
-class FacilitateDDxAnalysisSNAPPSInputModelProperties:
-    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
-        self.__bldr = bldr
-        self.__properties = properties
-
-    
-
-    @property
-    def case_summary(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_summary"))
-
-    @property
-    def differential_diagnoses(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("differential_diagnoses"))
-
-    @property
-    def student_analysis(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("student_analysis"))
-
-    @property
-    def case_context(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_context"))
 
     
 
@@ -2465,6 +2569,60 @@ class FormulatedSearchStrategyOutputProperties:
     @property
     def expected_evidence_types(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("expected_evidence_types"))
+
+    
+
+class GradeSummaryAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("GradeSummary")
+        self._properties: typing.Set[str] = set([ "overall_quality",  "recommendation_strength",  "summary_of_findings",  "recommendation_balance",  "reasoning_tags", ])
+        self._props = GradeSummaryProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "GradeSummaryProperties":
+        return self._props
+
+
+class GradeSummaryViewer(GradeSummaryAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class GradeSummaryProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def overall_quality(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("overall_quality"))
+
+    @property
+    def recommendation_strength(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("recommendation_strength"))
+
+    @property
+    def summary_of_findings(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("summary_of_findings"))
+
+    @property
+    def recommendation_balance(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("recommendation_balance"))
+
+    @property
+    def reasoning_tags(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("reasoning_tags"))
 
     
 
@@ -2519,6 +2677,56 @@ class HypothesisComparisonFeedbackProperties:
     @property
     def expert_comparison_points(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("expert_comparison_points"))
+
+    
+
+class HypothesisFindingAnalysisAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("HypothesisFindingAnalysis")
+        self._properties: typing.Set[str] = set([ "finding_name",  "hypothesis_name",  "student_evaluation",  "student_rationale", ])
+        self._props = HypothesisFindingAnalysisProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "HypothesisFindingAnalysisProperties":
+        return self._props
+
+
+class HypothesisFindingAnalysisViewer(HypothesisFindingAnalysisAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class HypothesisFindingAnalysisProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def finding_name(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("finding_name"))
+
+    @property
+    def hypothesis_name(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("hypothesis_name"))
+
+    @property
+    def student_evaluation(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_evaluation"))
+
+    @property
+    def student_rationale(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_rationale"))
 
     
 
@@ -2884,6 +3092,68 @@ class LabTestResultProperties:
 
     
 
+class MatrixFeedbackOutputAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("MatrixFeedbackOutput")
+        self._properties: typing.Set[str] = set([ "overall_matrix_feedback",  "discriminator_feedback",  "expert_matrix_analysis",  "expert_recommended_discriminator",  "expert_discriminator_rationale",  "learning_focus_suggestions",  "matrix_accuracy_score", ])
+        self._props = MatrixFeedbackOutputProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "MatrixFeedbackOutputProperties":
+        return self._props
+
+
+class MatrixFeedbackOutputViewer(MatrixFeedbackOutputAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class MatrixFeedbackOutputProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def overall_matrix_feedback(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("overall_matrix_feedback"))
+
+    @property
+    def discriminator_feedback(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("discriminator_feedback"))
+
+    @property
+    def expert_matrix_analysis(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("expert_matrix_analysis"))
+
+    @property
+    def expert_recommended_discriminator(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("expert_recommended_discriminator"))
+
+    @property
+    def expert_discriminator_rationale(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("expert_discriminator_rationale"))
+
+    @property
+    def learning_focus_suggestions(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("learning_focus_suggestions"))
+
+    @property
+    def matrix_accuracy_score(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("matrix_accuracy_score"))
+
+    
+
 class PDFAnalysisInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
@@ -3000,7 +3270,7 @@ class PICOFormulationOutputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("PICOFormulationOutput")
-        self._properties: typing.Set[str] = set([ "structured_pico_question",  "explanation",  "pico_derivation_reasoning",  "search_terms_suggestions",  "boolean_search_strategies",  "alternative_pico_formulations",  "recommended_study_types", ])
+        self._properties: typing.Set[str] = set([ "structured_pico_question",  "structured_question",  "explanation",  "pico_derivation_reasoning",  "search_terms_suggestions",  "boolean_search_strategies",  "alternative_pico_formulations",  "recommended_study_types", ])
         self._props = PICOFormulationOutputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -3031,6 +3301,10 @@ class PICOFormulationOutputProperties:
     @property
     def structured_pico_question(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("structured_pico_question"))
+
+    @property
+    def structured_question(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("structured_question"))
 
     @property
     def explanation(self) -> ClassPropertyViewer:
@@ -3320,6 +3594,52 @@ class PopulationInfoProperties:
 
     
 
+class PracticeRecommendationsAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("PracticeRecommendations")
+        self._properties: typing.Set[str] = set([ "clinical_application",  "monitoring_points",  "evidence_caveats", ])
+        self._props = PracticeRecommendationsProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "PracticeRecommendationsProperties":
+        return self._props
+
+
+class PracticeRecommendationsViewer(PracticeRecommendationsAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class PracticeRecommendationsProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def clinical_application(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("clinical_application"))
+
+    @property
+    def monitoring_points(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("monitoring_points"))
+
+    @property
+    def evidence_caveats(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("evidence_caveats"))
+
+    
+
 class ProbeResponseOutputModelAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
@@ -3482,22 +3802,22 @@ class ProcessingMetadataProperties:
 
     
 
-class ProvideSessionSummarySNAPPSInputModelAst:
+class ProvideSessionSummaryInputAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
-        self._bldr = _tb.class_("ProvideSessionSummarySNAPPSInputModel")
-        self._properties: typing.Set[str] = set([ "session_history",  "case_context",  "student_selected_topic", ])
-        self._props = ProvideSessionSummarySNAPPSInputModelProperties(self._bldr, self._properties)
+        self._bldr = _tb.class_("ProvideSessionSummaryInput")
+        self._properties: typing.Set[str] = set([ "session_state", ])
+        self._props = ProvideSessionSummaryInputProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
         return self._bldr.field()
 
     @property
-    def props(self) -> "ProvideSessionSummarySNAPPSInputModelProperties":
+    def props(self) -> "ProvideSessionSummaryInputProperties":
         return self._props
 
 
-class ProvideSessionSummarySNAPPSInputModelViewer(ProvideSessionSummarySNAPPSInputModelAst):
+class ProvideSessionSummaryInputViewer(ProvideSessionSummaryInputAst):
     def __init__(self, tb: _TypeBuilder):
         super().__init__(tb)
 
@@ -3507,7 +3827,7 @@ class ProvideSessionSummarySNAPPSInputModelViewer(ProvideSessionSummarySNAPPSInp
 
 
 
-class ProvideSessionSummarySNAPPSInputModelProperties:
+class ProvideSessionSummaryInputProperties:
     def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
         self.__bldr = bldr
         self.__properties = properties
@@ -3515,16 +3835,8 @@ class ProvideSessionSummarySNAPPSInputModelProperties:
     
 
     @property
-    def session_history(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("session_history"))
-
-    @property
-    def case_context(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("case_context"))
-
-    @property
-    def student_selected_topic(self) -> ClassPropertyViewer:
-        return ClassPropertyViewer(self.__bldr.property("student_selected_topic"))
+    def session_state(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("session_state"))
 
     
 
@@ -3532,7 +3844,7 @@ class QualityFactorAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.class_("QualityFactor")
-        self._properties: typing.Set[str] = set([ "factor_name",  "assessment",  "justification", ])
+        self._properties: typing.Set[str] = set([ "id",  "factor_name",  "assessment",  "justification", ])
         self._props = QualityFactorProperties(self._bldr, self._properties)
 
     def type(self) -> FieldType:
@@ -3559,6 +3871,10 @@ class QualityFactorProperties:
         self.__properties = properties
 
     
+
+    @property
+    def id(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("id"))
 
     @property
     def factor_name(self) -> ClassPropertyViewer:
@@ -3765,6 +4081,98 @@ class RawSearchResultItemProperties:
     @property
     def academic_source_name(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("academic_source_name"))
+
+    
+
+class ReasoningTagAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("ReasoningTag")
+        self._properties: typing.Set[str] = set([ "tag",  "reference_id", ])
+        self._props = ReasoningTagProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "ReasoningTagProperties":
+        return self._props
+
+
+class ReasoningTagViewer(ReasoningTagAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class ReasoningTagProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def tag(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("tag"))
+
+    @property
+    def reference_id(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("reference_id"))
+
+    
+
+class RecommendationBalanceAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("RecommendationBalance")
+        self._properties: typing.Set[str] = set([ "positive_factors",  "negative_factors",  "overall_balance",  "reasoning_tags", ])
+        self._props = RecommendationBalanceProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "RecommendationBalanceProperties":
+        return self._props
+
+
+class RecommendationBalanceViewer(RecommendationBalanceAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class RecommendationBalanceProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def positive_factors(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("positive_factors"))
+
+    @property
+    def negative_factors(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("negative_factors"))
+
+    @property
+    def overall_balance(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("overall_balance"))
+
+    @property
+    def reasoning_tags(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("reasoning_tags"))
 
     
 
@@ -4063,6 +4471,72 @@ class SelfReflectionInputProperties:
     @property
     def user_reasoning_summary(self) -> ClassPropertyViewer:
         return ClassPropertyViewer(self.__bldr.property("user_reasoning_summary"))
+
+    
+
+class SessionStateAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.class_("SessionState")
+        self._properties: typing.Set[str] = set([ "case_context",  "student_summary",  "student_ddx",  "student_analysis",  "student_probe_questions",  "student_management_plan",  "student_selected_topic",  "feedback_history", ])
+        self._props = SessionStateProperties(self._bldr, self._properties)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def props(self) -> "SessionStateProperties":
+        return self._props
+
+
+class SessionStateViewer(SessionStateAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    
+    def list_properties(self) -> typing.List[typing.Tuple[str, ClassPropertyViewer]]:
+        return [(name, ClassPropertyViewer(self._bldr.property(name))) for name in self._properties]
+
+
+
+class SessionStateProperties:
+    def __init__(self, bldr: ClassBuilder, properties: typing.Set[str]):
+        self.__bldr = bldr
+        self.__properties = properties
+
+    
+
+    @property
+    def case_context(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("case_context"))
+
+    @property
+    def student_summary(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_summary"))
+
+    @property
+    def student_ddx(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_ddx"))
+
+    @property
+    def student_analysis(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_analysis"))
+
+    @property
+    def student_probe_questions(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_probe_questions"))
+
+    @property
+    def student_management_plan(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_management_plan"))
+
+    @property
+    def student_selected_topic(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("student_selected_topic"))
+
+    @property
+    def feedback_history(self) -> ClassPropertyViewer:
+        return ClassPropertyViewer(self.__bldr.property("feedback_history"))
 
     
 
@@ -4600,7 +5074,7 @@ class AssessmentValueAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.enum("AssessmentValue")
-        self._values: typing.Set[str] = set([ "POSITIVO",  "NEUTRO",  "NEGATIVO", ])
+        self._values: typing.Set[str] = set([ "POSITIVE",  "NEUTRAL",  "NEGATIVE", ])
         self._vals = AssessmentValueValues(self._bldr, self._values)
 
     def type(self) -> FieldType:
@@ -4627,18 +5101,18 @@ class AssessmentValueValues:
     
 
     @property
-    def POSITIVO(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("POSITIVO"))
+    def POSITIVE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("POSITIVE"))
     
 
     @property
-    def NEUTRO(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("NEUTRO"))
+    def NEUTRAL(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("NEUTRAL"))
     
 
     @property
-    def NEGATIVO(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("NEGATIVO"))
+    def NEGATIVE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("NEGATIVE"))
     
 
     
@@ -4647,7 +5121,7 @@ class GradeLevelAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.enum("GradeLevel")
-        self._values: typing.Set[str] = set([ "ALTA",  "MODERADA",  "BAIXA",  "MUITO_BAIXA", ])
+        self._values: typing.Set[str] = set([ "HIGH",  "MODERATE",  "LOW",  "VERY_LOW", ])
         self._vals = GradeLevelValues(self._bldr, self._values)
 
     def type(self) -> FieldType:
@@ -4674,23 +5148,70 @@ class GradeLevelValues:
     
 
     @property
-    def ALTA(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("ALTA"))
+    def HIGH(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("HIGH"))
     
 
     @property
-    def MODERADA(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("MODERADA"))
+    def MODERATE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("MODERATE"))
     
 
     @property
-    def BAIXA(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("BAIXA"))
+    def LOW(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("LOW"))
     
 
     @property
-    def MUITO_BAIXA(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("MUITO_BAIXA"))
+    def VERY_LOW(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("VERY_LOW"))
+    
+
+    
+
+class HypothesisFindingEvaluationAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("HypothesisFindingEvaluation")
+        self._values: typing.Set[str] = set([ "SUPPORTS",  "NEUTRAL",  "REFUTES", ])
+        self._vals = HypothesisFindingEvaluationValues(self._bldr, self._values)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "HypothesisFindingEvaluationValues":
+        return self._vals
+
+
+class HypothesisFindingEvaluationViewer(HypothesisFindingEvaluationAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    def list_values(self) -> typing.List[typing.Tuple[str, EnumValueViewer]]:
+        return [(name, EnumValueViewer(self._bldr.value(name))) for name in self._values]
+
+
+class HypothesisFindingEvaluationValues:
+    def __init__(self, enum_bldr: EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values
+
+    
+
+    @property
+    def SUPPORTS(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("SUPPORTS"))
+    
+
+    @property
+    def NEUTRAL(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("NEUTRAL"))
+    
+
+    @property
+    def REFUTES(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("REFUTES"))
     
 
     
@@ -4756,7 +5277,7 @@ class RecommendationStrengthAst:
     def __init__(self, tb: _TypeBuilder):
         _tb = tb._tb # type: ignore (we know how to use this private attribute)
         self._bldr = _tb.enum("RecommendationStrength")
-        self._values: typing.Set[str] = set([ "FORTE",  "FRACA", ])
+        self._values: typing.Set[str] = set([ "STRONG",  "WEAK", ])
         self._vals = RecommendationStrengthValues(self._bldr, self._values)
 
     def type(self) -> FieldType:
@@ -4783,13 +5304,13 @@ class RecommendationStrengthValues:
     
 
     @property
-    def FORTE(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("FORTE"))
+    def STRONG(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("STRONG"))
     
 
     @property
-    def FRACA(self) -> EnumValueViewer:
-        return EnumValueViewer(self.__bldr.value("FRACA"))
+    def WEAK(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("WEAK"))
     
 
     
@@ -4882,6 +5403,68 @@ class ResearchSourceTypeValues:
     @property
     def PREPRINT(self) -> EnumValueViewer:
         return EnumValueViewer(self.__bldr.value("PREPRINT"))
+    
+
+    
+
+class SNAPPSStepAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("SNAPPSStep")
+        self._values: typing.Set[str] = set([ "SUMMARIZE",  "NARROW",  "ANALYZE",  "PROBE",  "PLAN",  "SELECT", ])
+        self._vals = SNAPPSStepValues(self._bldr, self._values)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "SNAPPSStepValues":
+        return self._vals
+
+
+class SNAPPSStepViewer(SNAPPSStepAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    def list_values(self) -> typing.List[typing.Tuple[str, EnumValueViewer]]:
+        return [(name, EnumValueViewer(self._bldr.value(name))) for name in self._values]
+
+
+class SNAPPSStepValues:
+    def __init__(self, enum_bldr: EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values
+
+    
+
+    @property
+    def SUMMARIZE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("SUMMARIZE"))
+    
+
+    @property
+    def NARROW(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("NARROW"))
+    
+
+    @property
+    def ANALYZE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("ANALYZE"))
+    
+
+    @property
+    def PROBE(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("PROBE"))
+    
+
+    @property
+    def PLAN(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("PLAN"))
+    
+
+    @property
+    def SELECT(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("SELECT"))
     
 
     
@@ -5026,6 +5609,48 @@ class StudyTypeFilterValues:
     @property
     def REVIEW(self) -> EnumValueViewer:
         return EnumValueViewer(self.__bldr.value("REVIEW"))
+    
+
+    
+
+class TextTypeAst:
+    def __init__(self, tb: _TypeBuilder):
+        _tb = tb._tb # type: ignore (we know how to use this private attribute)
+        self._bldr = _tb.enum("TextType")
+        self._values: typing.Set[str] = set([ "FULL_TEXT",  "ABSTRACT_ONLY", ])
+        self._vals = TextTypeValues(self._bldr, self._values)
+
+    def type(self) -> FieldType:
+        return self._bldr.field()
+
+    @property
+    def values(self) -> "TextTypeValues":
+        return self._vals
+
+
+class TextTypeViewer(TextTypeAst):
+    def __init__(self, tb: _TypeBuilder):
+        super().__init__(tb)
+
+    def list_values(self) -> typing.List[typing.Tuple[str, EnumValueViewer]]:
+        return [(name, EnumValueViewer(self._bldr.value(name))) for name in self._values]
+
+
+class TextTypeValues:
+    def __init__(self, enum_bldr: EnumBuilder, values: typing.Set[str]):
+        self.__bldr = enum_bldr
+        self.__values = values
+
+    
+
+    @property
+    def FULL_TEXT(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("FULL_TEXT"))
+    
+
+    @property
+    def ABSTRACT_ONLY(self) -> EnumValueViewer:
+        return EnumValueViewer(self.__bldr.value("ABSTRACT_ONLY"))
     
 
     

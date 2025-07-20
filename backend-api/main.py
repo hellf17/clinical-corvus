@@ -8,7 +8,7 @@ from typing import Optional
 # O código Python simplesmente as usa, esperando que existam no ambiente.
 from baml_client import b
 from config import get_settings
-from routers import auth, patients, me, lab_analysis, alerts, files, stored_analyses, vital_signs, scores, clinical_assistant, research_assistant_router, translator_router, clinical_simulation_router
+from routers import auth, patients, me, lab_analysis, alerts, files, stored_analyses, vital_signs, scores, clinical_assistant_router, research_assistant_router, translator_router, clinical_simulation_router
 from clients.mcp_client import MCPClient
 
 # Setup logging
@@ -59,10 +59,10 @@ app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(stored_analyses.router, prefix="/api/stored-analyses", tags=["Stored Analyses"])  # CLEAR: CRUD for analyses
 app.include_router(vital_signs.router, prefix="/api/vital-signs", tags=["Vital Signs"])
 app.include_router(scores.router, prefix="/api/scores", tags=["Scores"])
-app.include_router(clinical_assistant.router, prefix="/api/clinical", tags=["Clinical Assistant"]) # Simplified prefix
 app.include_router(research_assistant_router.router, prefix="/api/research", tags=["Research with Dr. Corvus"])
 app.include_router(translator_router.router, prefix="/api/translate", tags=["Translation"])
 app.include_router(clinical_simulation_router.router, prefix="/api/simulation", tags=["Clinical Simulation"])
+app.include_router(clinical_assistant_router.router, prefix="/api/clinical")
 
 # Root endpoint
 @app.get("/", tags=["Root"])

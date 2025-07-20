@@ -22,30 +22,44 @@ export async function POST(request: NextRequest) {
 
     // Obter dados da requisição
     const body = await request.json();
-
+    
     // Validar dados obrigatórios
-    if (!body.user_reasoning_process_description) {
+    if (!body.scenario_description) {
       return NextResponse.json(
-        { detail: 'Missing required field: user_reasoning_process_description' },
+        { detail: 'Missing required field: scenario_description' },
         { status: 400 }
       );
     }
 
-    // Fazer chamada para o backend
+    // Map frontend two-field payload to backend three-field payload
+    const payload: {
+      scenario_description: string;
+      user_identified_bias_optional?: string;
+      case_summary_by_user: string;
+      user_working_hypothesis: string;
+      user_reasoning_summary: string;
+    } = {
+      scenario_description: body.scenario_description,
+      ...(body.user_identified_bias_optional ? { user_identified_bias_optional: body.user_identified_bias_optional } : {}),
+      case_summary_by_user: body.case_and_hypothesis,
+      user_working_hypothesis: body.case_and_hypothesis,
+      user_reasoning_summary: body.reasoning_summary,
+    };
+
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/api/clinical/critique-reasoning-path-translated`, {
+    const response = await fetch(`${apiUrl}/api/clinical/analyze-cognitive-bias-translated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return NextResponse.json(
-        { detail: errorData.detail || `Backend error: ${response.status}` },
+        { detail: errorData.detail || `Backend translated error: ${response.status}` },
         { status: response.status }
       );
     }
@@ -54,7 +68,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('Error in reasoning critique translated API route:', error);
+    console.error('Error in cognitive bias translated API route:', error);
     return NextResponse.json(
       { detail: 'Internal server error' },
       { status: 500 }

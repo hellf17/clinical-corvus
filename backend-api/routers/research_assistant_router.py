@@ -29,7 +29,8 @@ from baml_client.types import (
     RecommendationStrength,
     AssessmentValue,
     QualityFactor,
-    BiasAnalysis
+    BiasAnalysis,
+    PracticeRecommendations
 )
 
 # Importar os serviços unificados
@@ -84,8 +85,11 @@ class DeepResearchRequest(BaseModel):
     research_mode: Optional[str] = 'quick'  # 'quick' ou 'expanded'
     
 class UnifiedEvidenceAnalysisRequest(BaseModel):
-    paper_full_text: str
-    clinical_question_PICO: Optional[str] = None
+    paper_text: str
+    text_type: str = "FULL_TEXT"  # Default to FULL_TEXT, can be "ABSTRACT_ONLY"
+    clinical_question: Optional[str] = None
+    source_type: Optional[str] = None  # Type of source (e.g., 'journal_article', 'clinical_guideline', 'preprint')
+    publication_year: Optional[int] = None  # Year of publication
 
 class PDFAnalysisRequest(BaseModel):
     analysis_focus: Optional[str] = None
@@ -370,6 +374,25 @@ async def formulate_pico_question(request: PICOFormulationRequest):
         logger.info("Formulando questão PICO com Dr. Corvus")
         pico_output: PICOFormulationOutput = await b.FormulateEvidenceBasedPICOQuestion(scenario_input)
         
+        # Construct the structured_question string from the PICOQuestion object
+        pico_q = pico_output.structured_pico_question
+        structured_question_parts = []
+        if pico_q.patient_population:
+            structured_question_parts.append(f"Em {pico_q.patient_population}")
+        if pico_q.intervention:
+            structured_question_parts.append(f"a intervenção {pico_q.intervention}")
+        if pico_q.comparison:
+            structured_question_parts.append(f"comparada a {pico_q.comparison}")
+        if pico_q.outcome:
+            structured_question_parts.append(f"resulta em {pico_q.outcome}")
+        if pico_q.time_frame:
+            structured_question_parts.append(f"no período de {pico_q.time_frame}")
+        if pico_q.study_type:
+            structured_question_parts.append(f"com estudos do tipo {pico_q.study_type}")
+
+        # Join parts to form the structured question string
+        pico_output.structured_question = ", ".join(structured_question_parts) + "?"
+        
         logger.info("Formulação PICO concluída")
         return pico_output
         
@@ -404,31 +427,211 @@ async def formulate_search_strategy(
 
 
 # === TRANSLATION HELPERS FOR RESEARCH OUTPUTS ===
-async def _translate_pdf_analysis_output(output: PDFAnalysisOutput, target_lang="PT") -> PDFAnalysisOutput:
+async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOutput, target_lang="PT") -> GradeEvidenceAppraisalOutput:
     """
-    Translates the user-facing fields of a PDFAnalysisOutput object using BAML as primary service.
+    Translates the user-facing fields of an EvidenceAppraisalOutput object using batch translation.
+    This function manually deconstructs the object, translates text fields, and reconstructs it to avoid pydantic errors.
+    Handles both object and list forms of practice_recommendations.
     """
     if not output:
         return output
 
-    logger.info(f"🌐 Starting translation of PDF analysis output to {target_lang}")
-    
-    try:
-        # _translate_field can handle nested Pydantic models recursively
-        translated_output = await _translate_field(output, target_lang, "PDFAnalysisOutput")
-        
-        # Verify translation was successful by checking a key field
-        if hasattr(translated_output, 'key_findings') and translated_output.key_findings:
-            if translated_output.key_findings == output.key_findings and target_lang == "PT":
-                logger.warning("PDF analysis translation may have failed - key_findings unchanged")
-                
-        logger.info(f"✅ PDF analysis translation completed successfully")
-        return translated_output
-    except Exception as e:
-        logger.error(f"❌ Failed to translate PDFAnalysisOutput: {e}", exc_info=True)
+    # Mapeamento de termos fixos para tradução
+    fixed_term_translations = {
+        "HIGH": "ALTA",
+        "MODERATE": "MODERADA",
+        "LOW": "BAIXA",
+        "VERY_LOW": "MUITO BAIXA",
+        "STRONG": "FORTE",
+        "WEAK": "FRACA",
+        "Risk of Bias": "Risco de Viés",
+        "Inconsistency": "Inconsistência",
+        "Indirectness": "Indiretividade",
+        "Imprecision": "Imprecisão",
+        "Publication Bias": "Viés de Publicação",
+        "Selection Bias": "Viés de Seleção",
+        "Performance Bias": "Viés de Performance",
+        "Detection Bias": "Viés de Detecção",
+        "Attrition Bias": "Viés de Atrição",
+        "Reporting Bias": "Viés de Relato"
+    }
+    """
+    Translates the user-facing fields of an EvidenceAppraisalOutput object using batch translation.
+    This function manually deconstructs the object, translates text fields, and reconstructs it to avoid pydantic errors.
+    Handles both object and list forms of practice_recommendations.
+    """
+    if not output:
         return output
 
-# Enhanced appraisal translation function removed (deprecated)
+    try:
+        from copy import deepcopy
+        logger.info(f"🌐 Translating enhanced appraisal output to {target_lang}")
+        
+        # Create a deep copy to avoid modifying the original object
+        translated_output = deepcopy(output)
+
+        # Apply fixed term translations first
+        # For enums, access the value directly
+        if translated_output.grade_summary.overall_quality.value in fixed_term_translations:
+            translated_output.grade_summary.overall_quality = fixed_term_translations[translated_output.grade_summary.overall_quality.value]
+        if translated_output.grade_summary.recommendation_strength.value in fixed_term_translations:
+            translated_output.grade_summary.recommendation_strength = fixed_term_translations[translated_output.grade_summary.recommendation_strength.value]
+
+        for factor in translated_output.quality_factors:
+            if factor.factor_name in fixed_term_translations:
+                factor.factor_name = fixed_term_translations[factor.factor_name]
+        
+        for bias in translated_output.bias_analysis:
+            if bias.bias_type in fixed_term_translations:
+                bias.bias_type = fixed_term_translations[bias.bias_type]
+
+        # 1. Deconstruct the output and gather all strings to be translated
+        texts_to_translate = []
+        # GradeSummary fields
+        texts_to_translate.append(translated_output.grade_summary.summary_of_findings)
+        texts_to_translate.extend(translated_output.grade_summary.recommendation_balance.positive_factors)
+        texts_to_translate.extend(translated_output.grade_summary.recommendation_balance.negative_factors)
+        texts_to_translate.append(translated_output.grade_summary.recommendation_balance.overall_balance)
+        # QualityFactors justifications
+        texts_to_translate.extend([factor.justification for factor in translated_output.quality_factors])
+        # BiasAnalysis fields
+        texts_to_translate.extend([bias.potential_impact for bias in translated_output.bias_analysis])
+        texts_to_translate.extend([bias.mitigation_strategies for bias in translated_output.bias_analysis])
+        texts_to_translate.extend([bias.actionable_suggestion for bias in translated_output.bias_analysis])
+        
+        # PracticeRecommendations fields - handle both object and list forms
+        practice_recs_texts = []
+        practice_recs_indices = {}
+        
+        # Check if practice_recommendations is a list or an object
+        if isinstance(translated_output.practice_recommendations, list):
+            logger.info("Practice recommendations is a list - processing each item")
+            for i, rec in enumerate(translated_output.practice_recommendations):
+                if isinstance(rec, str):
+                    # If it's a simple string recommendation
+                    practice_recs_texts.append(rec)
+                    practice_recs_indices[f"list_item_{i}"] = len(practice_recs_texts) - 1
+                else:
+                    # If it's an object with attributes
+                    try:
+                        if hasattr(rec, 'clinical_application') and rec.clinical_application:
+                            practice_recs_texts.append(rec.clinical_application)
+                            practice_recs_indices[f"clinical_application_{i}"] = len(practice_recs_texts) - 1
+                        
+                        if hasattr(rec, 'monitoring_points') and rec.monitoring_points:
+                            for j, point in enumerate(rec.monitoring_points):
+                                practice_recs_texts.append(point)
+                                practice_recs_indices[f"monitoring_point_{i}_{j}"] = len(practice_recs_texts) - 1
+                        
+                        if hasattr(rec, 'evidence_caveats') and rec.evidence_caveats:
+                            practice_recs_texts.append(rec.evidence_caveats)
+                            practice_recs_indices[f"evidence_caveats_{i}"] = len(practice_recs_texts) - 1
+                    except Exception as e:
+                        logger.warning(f"Error processing practice recommendation item {i}: {e}")
+        else:
+            # Original object form with attributes
+            logger.info("Practice recommendations is an object - processing attributes")
+            try:
+                if hasattr(translated_output.practice_recommendations, 'clinical_application'):
+                    practice_recs_texts.append(translated_output.practice_recommendations.clinical_application)
+                    practice_recs_indices["clinical_application"] = len(practice_recs_texts) - 1
+                
+                if hasattr(translated_output.practice_recommendations, 'monitoring_points'):
+                    for j, point in enumerate(translated_output.practice_recommendations.monitoring_points):
+                        practice_recs_texts.append(point)
+                        practice_recs_indices[f"monitoring_point_{j}"] = len(practice_recs_texts) - 1
+                
+                if hasattr(translated_output.practice_recommendations, 'evidence_caveats'):
+                    practice_recs_texts.append(translated_output.practice_recommendations.evidence_caveats)
+                    practice_recs_indices["evidence_caveats"] = len(practice_recs_texts) - 1
+            except Exception as e:
+                logger.warning(f"Error processing practice recommendations object: {e}")
+        
+        # Add practice recommendations texts to the main translation list
+        texts_to_translate.extend(practice_recs_texts)
+
+        # 2. Perform batch translation
+        translated_texts = await translate_with_fallback(texts_to_translate, target_lang, field_name="EvidenceAppraisal")
+
+        # 3. Reconstruct the object with translated text
+        i = 0
+        # GradeSummary
+        translated_output.grade_summary.summary_of_findings = translated_texts[i]; i += 1
+        len_pos = len(translated_output.grade_summary.recommendation_balance.positive_factors)
+        translated_output.grade_summary.recommendation_balance.positive_factors = translated_texts[i:i+len_pos]; i += len_pos
+        len_neg = len(translated_output.grade_summary.recommendation_balance.negative_factors)
+        translated_output.grade_summary.recommendation_balance.negative_factors = translated_texts[i:i+len_neg]; i += len_neg
+        translated_output.grade_summary.recommendation_balance.overall_balance = translated_texts[i]; i += 1
+        
+        # QualityFactors
+        for factor in translated_output.quality_factors:
+            factor.justification = translated_texts[i]; i += 1
+        
+        # BiasAnalysis
+        for bias in translated_output.bias_analysis:
+            bias.potential_impact = translated_texts[i]; i += 1
+            bias.mitigation_strategies = translated_texts[i]; i += 1
+            bias.actionable_suggestion = translated_texts[i]; i += 1
+        
+        # PracticeRecommendations - update with translated texts
+        practice_recs_base_index = i
+        
+        # Update practice recommendations with translated texts
+        if isinstance(translated_output.practice_recommendations, list):
+            for i, rec in enumerate(translated_output.practice_recommendations):
+                if isinstance(rec, str):
+                    # Update string recommendation
+                    idx = practice_recs_indices.get(f"list_item_{i}")
+                    if idx is not None:
+                        translated_output.practice_recommendations[i] = translated_texts[practice_recs_base_index + idx]
+                else:
+                    # Update object recommendation
+                    try:
+                        if hasattr(rec, 'clinical_application'):
+                            idx = practice_recs_indices.get(f"clinical_application_{i}")
+                            if idx is not None:
+                                rec.clinical_application = translated_texts[practice_recs_base_index + idx]
+                        
+                        if hasattr(rec, 'monitoring_points'):
+                            for j, _ in enumerate(rec.monitoring_points):
+                                idx = practice_recs_indices.get(f"monitoring_point_{i}_{j}")
+                                if idx is not None:
+                                    rec.monitoring_points[j] = translated_texts[practice_recs_base_index + idx]
+                        
+                        if hasattr(rec, 'evidence_caveats'):
+                            idx = practice_recs_indices.get(f"evidence_caveats_{i}")
+                            if idx is not None:
+                                rec.evidence_caveats = translated_texts[practice_recs_base_index + idx]
+                    except Exception as e:
+                        logger.warning(f"Error updating translated practice recommendation item {i}: {e}")
+        else:
+            # Update original object form
+            try:
+                if hasattr(translated_output.practice_recommendations, 'clinical_application'):
+                    idx = practice_recs_indices.get("clinical_application")
+                    if idx is not None:
+                        translated_output.practice_recommendations.clinical_application = translated_texts[practice_recs_base_index + idx]
+                
+                if hasattr(translated_output.practice_recommendations, 'monitoring_points'):
+                    for j, _ in enumerate(translated_output.practice_recommendations.monitoring_points):
+                        idx = practice_recs_indices.get(f"monitoring_point_{j}")
+                        if idx is not None:
+                            translated_output.practice_recommendations.monitoring_points[j] = translated_texts[practice_recs_base_index + idx]
+                
+                if hasattr(translated_output.practice_recommendations, 'evidence_caveats'):
+                    idx = practice_recs_indices.get("evidence_caveats")
+                    if idx is not None:
+                        translated_output.practice_recommendations.evidence_caveats = translated_texts[practice_recs_base_index + idx]
+            except Exception as e:
+                logger.warning(f"Error updating translated practice recommendations object: {e}")
+
+        logger.info(f"✅ Evidence appraisal translation completed successfully")
+        return translated_output
+
+    except Exception as e:
+        logger.error(f"❌ Failed to translate evidence appraisal output: {e}", exc_info=True)
+        # Fallback to original output on any error
+        return output
 
 async def _translate_pico_formulation_output(output: PICOFormulationOutput, target_lang="PT") -> PICOFormulationOutput:
     """
@@ -470,6 +673,10 @@ async def _translate_pico_formulation_output(output: PICOFormulationOutput, targ
                             translated_output.formulated_question = translated_question
                 except Exception as retry_error:
                     logger.error(f"Retry translation of formulated_question also failed: {retry_error}")
+        
+        # Note: PICOFormulationOutput doesn't have practice_recommendations field
+        # This was incorrectly trying to normalize a field that doesn't exist
+        # The practice_recommendations field only exists in EvidenceAppraisalOutput
         
         logger.info(f"✅ PICO formulation translation completed successfully")
         return translated_output
@@ -1024,49 +1231,126 @@ async def cite_source_analysis(request: CiteSourceAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Erro na análise CiteSource: {str(e)}")
 
 
+def _normalize_practice_recommendations(appraisal_output: GradeEvidenceAppraisalOutput) -> GradeEvidenceAppraisalOutput:
+    """
+    Ensures practice_recommendations is a valid PracticeRecommendations object,
+    handling cases where the LLM might return an incomplete or incorrect structure.
+    """
+    # If practice_recommendations is None or not an object, initialize it
+    if not hasattr(appraisal_output, 'practice_recommendations') or \
+       not isinstance(appraisal_output.practice_recommendations, PracticeRecommendations):
+        appraisal_output.practice_recommendations = PracticeRecommendations(
+            clinical_application="",
+            monitoring_points=[],
+            evidence_caveats=""
+        )
+        logger.warning("Practice recommendations was not a valid object, initialized to default.")
+        return appraisal_output
+
+    # Ensure clinical_application is a string
+    if not isinstance(appraisal_output.practice_recommendations.clinical_application, str):
+        appraisal_output.practice_recommendations.clinical_application = str(appraisal_output.practice_recommendations.clinical_application)
+        logger.warning("clinical_application was not a string, converted to string.")
+
+    # Ensure monitoring_points is a list of strings
+    if not isinstance(appraisal_output.practice_recommendations.monitoring_points, list):
+        appraisal_output.practice_recommendations.monitoring_points = [str(appraisal_output.practice_recommendations.monitoring_points)]
+        logger.warning("monitoring_points was not a list, converted to list with string.")
+    else:
+        appraisal_output.practice_recommendations.monitoring_points = [
+            str(item) for item in appraisal_output.practice_recommendations.monitoring_points
+        ]
+
+    # Ensure evidence_caveats is a string
+    if not isinstance(appraisal_output.practice_recommendations.evidence_caveats, str):
+        appraisal_output.practice_recommendations.evidence_caveats = str(appraisal_output.practice_recommendations.evidence_caveats)
+        logger.warning("evidence_caveats was not a string, converted to string.")
+
+    return appraisal_output
+
+async def _map_and_validate_appraisal(extracted_data: EvidenceAnalysisData, clinical_question: Optional[str] = None) -> GradeEvidenceAppraisalOutput:
+    """Helper to stream the appraisal and return the validated output."""
+    stream = b.stream.GenerateEvidenceAppraisal(
+        extracted_data=extracted_data,
+        clinical_question=clinical_question
+    )
+    # The stream is an async generator. We need to iterate through it to get the final response.
+    async for _ in stream:
+        pass
+
+    # After the stream is exhausted, we can get the final parsed and validated response.
+    final_response = await stream.get_final_response()
+    if not final_response:
+        raise ValueError("Failed to get a parsed response from the LLM stream.")
+
+    # CRITICAL FIX: Normalize practice_recommendations to always be a list of strings
+    normalized_response = _normalize_practice_recommendations(final_response)
+    logger.info("✅ Practice recommendations normalized to ensure consistent data structure")
+
+    return normalized_response
+
+def ensure_bias_analysis_present(appraisal: GradeEvidenceAppraisalOutput) -> GradeEvidenceAppraisalOutput:
+    # If bias_analysis is missing, empty, or not a list, add a default message
+    if not hasattr(appraisal, 'bias_analysis') or not appraisal.bias_analysis or \
+       (isinstance(appraisal.bias_analysis, list) and len(appraisal.bias_analysis) == 0):
+        appraisal.bias_analysis = [{
+            "bias_type": "N/A",
+            "potential_impact": "No bias analysis available for this study.",
+            "mitigation_strategies": "",
+            "actionable_suggestion": ""
+        }]
+    return appraisal
+
 @router.post("/unified-evidence-analysis", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis(request: UnifiedEvidenceAnalysisRequest):
     """
-    Endpoint unificado para análise de evidências médicas usando o pipeline de duas etapas:
-    1. Extração de fatos (AnalyzeMedicalPaper)
-    2. Avaliação crítica (GenerateEvidenceAppraisal)
+    Receives raw text, extracts structured data, and then performs evidence appraisal.
     """
     try:
-        logger.info(f"🔬 Iniciando análise unificada de evidências")
+        logger.info("Starting unified evidence analysis...")
         
-        # Extrair dados do request
-        paper_full_text = request.paper_full_text
-        clinical_question_PICO = request.clinical_question_PICO
-        
-        if not paper_full_text:
-            raise HTTPException(status_code=400, detail="Texto do artigo não fornecido")
-        
-        # Etapa 1: Extração de fatos
-        logger.info("📑 Etapa 1: Extraindo fatos do artigo")
+        # Etapa 1: Extrair dados estruturados do texto bruto
         extracted_data = await b.AnalyzeMedicalPaper(
-            paper_full_text=paper_full_text,
-            clinical_question_PICO=clinical_question_PICO
+            paper_text=request.paper_text,
+            text_type=request.text_type,
+            clinical_question=request.clinical_question,
+            source_type=request.source_type,
+            publication_year=request.publication_year
         )
-        
-        # Etapa 2: Avaliação crítica
-        logger.info("⚖️ Etapa 2: Realizando avaliação crítica")
-        appraisal_result = await b.GenerateEvidenceAppraisal(
-            extracted_data=extracted_data
-        )
-        
-        logger.info("✅ Análise unificada de evidências concluída com sucesso")
-        return appraisal_result
-        
-    except Exception as e:
-        logger.error(f"❌ Erro na análise unificada de evidências: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro na análise: {str(e)}")
+        logger.info(f"Data extraction complete. Study type: {extracted_data.study_design}")
 
+        # Etapa 2: Formular a pergunta PICO (se houver)
+        pico_question_obj = None
+        if request.clinical_question:
+            logger.info(f"Formulating PICO for: {request.clinical_question}")
+            pico_output = await b.FormulateEvidenceBasedPICOQuestion(
+                input={"clinical_scenario": request.clinical_question}
+            )
+            pico_question_obj = pico_output.structured_pico_question
+
+        # Etapa 3: Avaliar a evidência extraída
+        logger.info("Starting evidence appraisal...")
+        appraisal_output = await _map_and_validate_appraisal(
+            extracted_data=extracted_data,
+            clinical_question=request.clinical_question
+        )
+        logger.info(f"Evidence appraisal complete. Overall quality: {appraisal_output.grade_summary.overall_quality}")
+        # Ensure bias_analysis is always present and non-empty
+        appraisal_output = ensure_bias_analysis_present(appraisal_output)
+        return appraisal_output
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error in unified evidence analysis endpoint: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred during evidence analysis: {str(e)}")
 
 @router.post("/unified-evidence-analysis-from-pdf", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis_from_pdf(
     file: UploadFile = File(...),
     clinical_question: Optional[str] = Form(None),
-    extraction_mode: Optional[str] = Form("balanced")
+    extraction_mode: Optional[str] = Form("balanced"),
+    source_type: Optional[str] = Form(None),
+    publication_year: Optional[int] = Form(None)
 ):
     """
     Analyzes a PDF document by extracting its text and running it through the
@@ -1090,14 +1374,18 @@ async def unified_evidence_analysis_from_pdf(
         # 2. Call the unified evidence analysis logic with the extracted text
         logger.info(f"🔬 Passing extracted text to unified analysis pipeline.")
         analysis_request = UnifiedEvidenceAnalysisRequest(
-            paper_full_text=extracted_text,
-            clinical_question_PICO=clinical_question
+            paper_text=extracted_text,
+            clinical_question=clinical_question,
+            source_type=source_type,
+            publication_year=publication_year
         )
 
         # Call the existing function for text-based analysis
         appraisal_result = await unified_evidence_analysis(analysis_request)
 
         logger.info(f"✅ PDF analysis and appraisal completed for: {file.filename}")
+        # Ensure bias_analysis is always present and non-empty
+        appraisal_result = ensure_bias_analysis_present(appraisal_result)
         return appraisal_result
 
     except Exception as e:
@@ -1366,43 +1654,34 @@ async def cite_source_quick_demo(
         logger.error(f"❌ Erro na demo CiteSource: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na demo CiteSource: {str(e)}")
 
-async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOutput, target_lang="PT") -> GradeEvidenceAppraisalOutput:
+async def _translate_synthesized_output(output: SynthesizedResearchOutput, target_lang="PT") -> SynthesizedResearchOutput:
     """
-    Translates the user-facing fields of an EvidenceAppraisalOutput object using BAML as primary service.
+    Translates the user-facing fields of a SynthesizedOutput object using BAML as primary service, using full batching for all strings.
     """
     if not output:
         return output
-        
-    logger.info(f"🌐 Starting translation of evidence appraisal output to {target_lang}")
-    
+    logger.info(f"🌐 Starting batched translation of synthesized output to {target_lang}")
     try:
-        # _translate_field can handle nested Pydantic models recursively
-        translated_output = await _translate_field(output, target_lang, "GradeEvidenceAppraisalOutput")
-        
-        # Verify translation was successful by checking a key field
-        if hasattr(translated_output, 'summary') and translated_output.summary:
-            if translated_output.summary == output.summary and target_lang == "PT":
-                logger.warning("Evidence appraisal translation may have failed - summary unchanged")
-                # Try direct translation of summary as fallback
-                try:
-                    if output.summary:
-                        translated_summary = await translate_with_fallback(output.summary, target_lang=target_lang, field_name="summary")
-                        if translated_summary:
-                            translated_output.summary = translated_summary
-                except Exception as retry_error:
-                    logger.error(f"Retry translation of summary also failed: {retry_error}")
-        
-        logger.info(f"✅ Evidence appraisal translation completed successfully")
-        return translated_output
+        from copy import deepcopy
+        result = deepcopy(output)
+        translated_result = await _translate_field(
+            result,
+            target_lang=target_lang,
+            field_name="SynthesizedResearchOutput"
+        )
+        logger.info(f"✅ Synthesized research output translation completed successfully")
+        return translated_result
     except Exception as e:
-        logger.error(f"❌ Failed to translate EvidenceAppraisalOutput: {e}", exc_info=True)
+        logger.error(f"❌ Failed to batch translate SynthesizedResearchOutput: {e}", exc_info=True)
         return output
 
 @router.post("/unified-evidence-analysis-from-pdf-translated", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis_from_pdf_translated(
     file: UploadFile = File(...),
     clinical_question: Optional[str] = Form(None),
-    extraction_mode: Optional[str] = Form("balanced")
+    extraction_mode: Optional[str] = Form("balanced"),
+    source_type: Optional[str] = Form(None),
+    publication_year: Optional[int] = Form(None)
 ):
     """
     Analyzes a PDF, appraises it, and returns the results translated to Portuguese.
@@ -1423,7 +1702,9 @@ async def unified_evidence_analysis_from_pdf_translated(
         analysis_output = await unified_evidence_analysis_from_pdf(
             file=temp_file,
             clinical_question=clinical_question,
-            extraction_mode=extraction_mode
+            extraction_mode=extraction_mode,
+            source_type=source_type,
+            publication_year=publication_year
         )
 
         # Translate the results
@@ -1431,6 +1712,8 @@ async def unified_evidence_analysis_from_pdf_translated(
         translated_output = await _translate_enhanced_appraisal_output(analysis_output, target_lang="PT")
         logger.info(f"✅ Translation of unified evidence analysis (from PDF) complete")
 
+        # Ensure bias_analysis is always present and non-empty
+        translated_output = ensure_bias_analysis_present(translated_output)
         return translated_output
     except HTTPException:
         raise

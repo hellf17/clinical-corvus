@@ -1,5 +1,27 @@
 // baml_src/clinical_simulation.baml
 
+// --------- ENUMS E CLASSES DE ESTADO DA SESSÃO ---------
+
+enum SNAPPSStep {
+  SUMMARIZE
+  NARROW
+  ANALYZE
+  PROBE
+  PLAN
+  SELECT
+}
+
+class SessionState {
+  case_context CaseContext
+  student_summary string?
+  student_ddx string[]?
+  student_analysis string?
+  student_probe_questions string[]?
+  student_management_plan string?
+  student_selected_topic string?
+  feedback_history string[] @description("A log of all feedback given so far to provide context.")
+}
+
 // --------- DATA CLASSES PARA INPUTS E OUTPUTS ---------
 class ClinicalFinding {
   finding_name string
@@ -20,9 +42,9 @@ class CaseContext {
 }
 
 // --- Step 1: Evaluate Summary ---
-class EvaluateSummarySNAPPSInputModel {
-  student_summary string @description("Student's summary of the case.")
-  case_description string @description("The full context of the clinical case.")
+class EvaluateSummaryInput {
+  case_context CaseContext
+  student_summary string
 }
 
 class SummaryFeedbackOutputModel {
@@ -35,10 +57,9 @@ class SummaryFeedbackOutputModel {
 }
 
 // --- Step 2: Analyze Differential Diagnoses ---
-class AnalyzeDifferentialDiagnosesSNAPPSInput {
-  case_summary string
+class AnalyzeDDxInput {
+  session_state SessionState
   student_differential_diagnoses string[]
-  case_context string
 }
 
 class DdxEvaluation {
@@ -57,11 +78,9 @@ class DifferentialAnalysisOutputModel {
 }
 
 // --- Step 3: Facilitate DDx Analysis ---
-class FacilitateDDxAnalysisSNAPPSInputModel {
-  case_summary string
-  differential_diagnoses string[]
+class FacilitateDDxAnalysisInput {
+  session_state SessionState
   student_analysis string @description("The student's free-text analysis comparing and contrasting the DDx.")
-  case_context string
 }
 
 class FacilitateDDxAnalysisOutputModel {
@@ -69,10 +88,9 @@ class FacilitateDDxAnalysisOutputModel {
 }
 
 // --- Step 4: Answer Probe Questions ---
-class AnswerProbeQuestionsSNAPPSInputModel {
-  session_context string @description("Context from previous steps: summary, differentials, etc.")
-  student_questions string @description("The questions the student is asking.")
-  case_data string @description("The full clinical case data.")
+class AnswerProbeQuestionsInput {
+  session_state SessionState
+  student_questions string[] @description("The questions the student is asking.")
 }
 
 class AnsweredQuestion {
@@ -90,10 +108,9 @@ class ProbeResponseOutputModel {
 }
 
 // --- Step 5: Evaluate Management Plan ---
-class EvaluateManagementPlanSNAPPSInputModel {
-  session_context string
+class EvaluateManagementPlanInput {
+  session_state SessionState
   student_plan string
-  case_data string
 }
 
 class PlanEvaluationOutputModel {
@@ -108,10 +125,8 @@ class PlanEvaluationOutputModel {
 }
 
 // --- Step 6: Provide Session Summary ---
-class ProvideSessionSummarySNAPPSInputModel {
-  session_history string[] @description("Complete session history")
-  case_context string @description("Original case context")
-  student_selected_topic string? @description("Topic the student selected for further study")
+class ProvideSessionSummaryInput {
+  session_state SessionState
 }
 
 class SessionSummaryOutputModel {
@@ -127,7 +142,7 @@ class SessionSummaryOutputModel {
 // --------- BAML FUNCTIONS PARA CADA ENDPOINT SNAPPS ---------
 
 // 1. /evaluate-summary-snapps
-function EvaluateSummary_SNAPPS(input: EvaluateSummarySNAPPSInputModel) -> SummaryFeedbackOutputModel {
+function EvaluateSummary_SNAPPS(input: EvaluateSummaryInput) -> SummaryFeedbackOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
@@ -135,7 +150,7 @@ function EvaluateSummary_SNAPPS(input: EvaluateSummarySNAPPSInputModel) -> Summa
     The goal is to teach them to be concise, accurate, and clinically relevant.
 
     FULL CASE:
-    {{ input.case_description }}
+    {{ input.case_context.full_description }}
 
     STUDENT'S SUMMARY:
     "{{ input.student_summary }}"
@@ -153,7 +168,7 @@ function EvaluateSummary_SNAPPS(input: EvaluateSummarySNAPPSInputModel) -> Summa
 }
 
 // 2. /analyze-differential-diagnoses-snapps
-function AnalyzeDifferentialDiagnoses_SNAPPS(input: AnalyzeDifferentialDiagnosesSNAPPSInput) -> DifferentialAnalysisOutputModel {
+function AnalyzeDifferentialDiagnoses_SNAPPS(input: AnalyzeDDxInput) -> DifferentialAnalysisOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
@@ -161,7 +176,10 @@ function AnalyzeDifferentialDiagnoses_SNAPPS(input: AnalyzeDifferentialDiagnoses
     The goal is to teach prioritization and clinical reasoning, not just listing possibilities.
 
     CASE SUMMARY (provided by student in previous step):
-    "{{ input.case_summary }}"
+    "{{ input.session_state.student_summary }}"
+
+    FULL CASE FOR CONTEXT:
+    {{ input.session_state.case_context.full_description }}
 
     STUDENT'S DDx LIST:
     {% for dx in input.student_differential_diagnoses %}
@@ -187,7 +205,7 @@ function AnalyzeDifferentialDiagnoses_SNAPPS(input: AnalyzeDifferentialDiagnoses
 }
 
 // 3. /facilitate-ddx-analysis-snapps
-function FacilitateDDxAnalysis_SNAPPS(input: FacilitateDDxAnalysisSNAPPSInputModel) -> FacilitateDDxAnalysisOutputModel {
+function FacilitateDDxAnalysis_SNAPPS(input: FacilitateDDxAnalysisInput) -> FacilitateDDxAnalysisOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
@@ -195,9 +213,10 @@ function FacilitateDDxAnalysis_SNAPPS(input: FacilitateDDxAnalysisSNAPPSInputMod
     The goal is to guide them in comparing and contrasting, using evidence from the case.
 
     CONTEXT:
-    The student is analyzing these diagnoses: {{ input.differential_diagnoses | join(", ") }}
-    Based on this summary: "{{ input.case_summary }}"
-    Full case context: {{ input.case_context }}
+    The student has provided a summary and a list of differential diagnoses. Now they are analyzing them.
+    - Summary: {{ input.session_state.student_summary }}
+    - DDx: {{ input.session_state.student_ddx }}
+    - Full Case: {{ input.session_state.case_context.full_description }}
 
     STUDENT'S ANALYSIS:
     "{{ input.student_analysis }}"
@@ -217,7 +236,7 @@ function FacilitateDDxAnalysis_SNAPPS(input: FacilitateDDxAnalysisSNAPPSInputMod
 }
 
 // 4. /answer-probe-questions-snapps
-function AnswerProbeQuestions_SNAPPS(input: AnswerProbeQuestionsSNAPPSInputModel) -> ProbeResponseOutputModel {
+function AnswerProbeQuestions_SNAPPS(input: AnswerProbeQuestionsInput) -> ProbeResponseOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
@@ -225,13 +244,16 @@ function AnswerProbeQuestions_SNAPPS(input: AnswerProbeQuestionsSNAPPSInputModel
     The goal is to answer directly but also stimulate further thinking.
 
     STUDENT'S QUESTIONS:
-    "{{ input.student_questions }}"
+    {% for q in input.student_questions %}
+    - {{ q }}
+    {% endfor %}
 
-    CASE CONTEXT:
-    {{ input.case_data }}
-    
     SESSION CONTEXT:
-    {{ input.session_context }}
+    This is the history of feedback given to the student so far:
+    {{ input.session_state.feedback_history | join("\n---\n") }}
+
+    FULL CASE DATA:
+    {{ input.session_state.case_context.full_description }}
 
     YOUR TASK: Provide a structured response.
     1.  **Answers (answers_to_questions):** For each question asked by the student:
@@ -248,7 +270,7 @@ function AnswerProbeQuestions_SNAPPS(input: AnswerProbeQuestionsSNAPPSInputModel
 }
 
 // 5. /evaluate-management-plan-snapps
-function EvaluateManagementPlan_SNAPPS(input: EvaluateManagementPlanSNAPPSInputModel) -> PlanEvaluationOutputModel {
+function EvaluateManagementPlan_SNAPPS(input: EvaluateManagementPlanInput) -> PlanEvaluationOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
@@ -257,13 +279,14 @@ function EvaluateManagementPlan_SNAPPS(input: EvaluateManagementPlanSNAPPSInputM
 
     CONTEXT:
     The student has analyzed the case and is now proposing a plan.
-    {{ input.session_context }}
+    This is the history of feedback given to the student so far:
+    {{ input.session_state.feedback_history | join("\n---\n") }}
 
     STUDENT'S PLAN:
     "{{ input.student_plan }}"
     
-    CASE DATA:
-    {{ input.case_data }}
+    FULL CASE DATA:
+    {{ input.session_state.case_context.full_description }}
 
     YOUR TASK: Provide structured feedback on the plan.
     1.  **Strengths (plan_strengths):** What parts of the plan are appropriate and well-justified?
@@ -282,21 +305,21 @@ function EvaluateManagementPlan_SNAPPS(input: EvaluateManagementPlanSNAPPSInputM
 }
 
 // 6. /provide-session-summary-snapps
-function ProvideSessionSummary_SNAPPS(input: ProvideSessionSummarySNAPPSInputModel) -> SessionSummaryOutputModel {
+function ProvideSessionSummary_SNAPPS(input: ProvideSessionSummaryInput) -> SessionSummaryOutputModel {
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
     You are a preceptor providing a final summary and feedback on a completed SNAPPS session (Step 'S' - Select of SNAPPS).
     The goal is to consolidate learning and encourage self-directed study.
 
-    CASE CONTEXT:
-    {{ input.case_context }}
+    FULL CASE CONTEXT:
+    {{ input.session_state.case_context.full_description }}
     
     SESSION HISTORY:
-    {{ input.session_history }}
+    {{ input.session_state.feedback_history | join("\n---\n") }}
     
     STUDENT'S SELECTED LEARNING TOPIC (if provided):
-    "{{ input.student_selected_topic if input.student_selected_topic else "No specific topic selected" }}"
+    "{{ input.session_state.student_selected_topic if input.session_state.student_selected_topic else "No specific topic selected" }}"
 
     YOUR TASK: Provide a comprehensive session summary.
     1.  **Overall Performance (overall_performance):** Give a brief, encouraging summary of their work throughout the simulation.

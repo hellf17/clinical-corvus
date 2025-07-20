@@ -6,18 +6,10 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Alert, AlertDescription } from '@/components/ui/Alert';
-import { ArrowRight, PlayCircle } from 'lucide-react';
-import { sampleCases, ClinicalCase } from '@/components/academy/clinical-simulation/cases';
+import { ArrowRight, PlayCircle, BookOpen, Search, FileText, HelpCircle, Stethoscope, CheckCircle, Brain } from 'lucide-react';
+import { clinicalCases, ClinicalCase } from '@/components/academy/clinical-simulation/cases';
 import SimulationContainer from '@/components/academy/clinical-simulation/SimulationContainer';
-
-function getDifficultyBorderColor(difficulty: 'Básico' | 'Intermediário' | 'Avançado'): string {
-  switch (difficulty) {
-    case 'Básico': return 'border-l-green-500';
-    case 'Intermediário': return 'border-l-yellow-500';
-    case 'Avançado': return 'border-l-red-500';
-    default: return 'border-l-gray-300';
-  }
-}
+import { CaseSelector } from '@/components/academy/clinical-simulation/CaseSelector';
 
 export default function ClinicalSimulationPage() {
   const [selectedCase, setSelectedCase] = useState<ClinicalCase | null>(null);
@@ -46,37 +38,126 @@ export default function ClinicalSimulationPage() {
         </p>
       </section>
 
-      <div>
-        <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">Biblioteca de Casos Clínicos</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
-          {sampleCases.map((clinicalCase) => (
-            <Card key={clinicalCase.id} className={`flex flex-col overflow-hidden rounded-lg shadow-lg hover:shadow-2xl transition-shadow duration-300 border-l-4 ${getDifficultyBorderColor(clinicalCase.difficulty)}`}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-xl font-bold text-gray-800">{clinicalCase.title}</CardTitle>
-                  <Badge variant={clinicalCase.difficulty === 'Básico' ? 'default' : clinicalCase.difficulty === 'Intermediário' ? 'secondary' : 'destructive'}>
-                    {clinicalCase.difficulty}
-                  </Badge>
-                </div>
-                <CardDescription>{clinicalCase.brief}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <div className="flex flex-wrap gap-2">
-                    {clinicalCase.tags?.map((tag, index) => (
-                      <Badge key={index} variant="outline">{tag}</Badge>
-                    ))}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button className="w-full" onClick={() => handleSelectCase(clinicalCase)}>
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Iniciar Simulação
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+      {/* SNAPPS Framework Explanation Section */}
+      <section className="my-12">
+        <h2 className="text-3xl font-bold text-gray-800 text-center mb-8">O que é o Framework SNAPPS?</h2>
+        <p className="text-lg text-gray-600 max-w-4xl mx-auto mb-10 text-center">
+          SNAPPS é um método validado de apresentação de casos que estrutura o raciocínio clínico e promove o aprendizado ativo.
+          Desenvolvido para estudantes e residentes, ele transforma a apresentação de casos em uma oportunidade de aprendizado.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+          {/* S - Summarize */}
+          <Card className="border-l-4 border-l-blue-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                <FileText className="h-5 w-5 text-blue-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-blue-700">S</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Summarize</h4>
+              <p className="text-sm text-gray-600">Resuma concisamente os dados relevantes do paciente</p>
+            </CardContent>
+          </Card>
+          
+          {/* N - Narrow */}
+          <Card className="border-l-4 border-l-purple-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+                <Search className="h-5 w-5 text-purple-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-purple-700">N</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Narrow</h4>
+              <p className="text-sm text-gray-600">Delimite o diagnóstico diferencial às hipóteses mais prováveis</p>
+            </CardContent>
+          </Card>
+          
+          {/* A - Analyze */}
+          <Card className="border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                <Brain className="h-5 w-5 text-green-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-green-700">A</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Analyze</h4>
+              <p className="text-sm text-gray-600">Analise as evidências que apoiam ou refutam cada hipótese</p>
+            </CardContent>
+          </Card>
+          
+          {/* P - Probe */}
+          <Card className="border-l-4 border-l-amber-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mb-2">
+                <HelpCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-amber-700">P</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Probe</h4>
+              <p className="text-sm text-gray-600">Questione o preceptor sobre incertezas e lacunas de conhecimento</p>
+            </CardContent>
+          </Card>
+          
+          {/* P - Plan */}
+          <Card className="border-l-4 border-l-red-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mb-2">
+                <Stethoscope className="h-5 w-5 text-red-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-red-700">P</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Plan</h4>
+              <p className="text-sm text-gray-600">Planeje a conduta diagnóstica e terapêutica para o paciente</p>
+            </CardContent>
+          </Card>
+          
+          {/* S - Select */}
+          <Card className="border-l-4 border-l-indigo-500 hover:shadow-lg transition-all duration-300">
+            <CardHeader className="pb-2">
+              <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center mb-2">
+                <CheckCircle className="h-5 w-5 text-indigo-600" />
+              </div>
+              <CardTitle className="text-lg font-bold text-indigo-700">S</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <h4 className="font-medium text-gray-800 mb-1">Select</h4>
+              <p className="text-sm text-gray-600">Selecione um tópico para aprofundar seu conhecimento</p>
+            </CardContent>
+          </Card>
         </div>
-      </div>
+        
+        <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 max-w-4xl mx-auto">
+          <h3 className="font-bold text-blue-800 flex items-center mb-3">
+            <BookOpen className="h-5 w-5 mr-2" /> Benefícios Comprovados
+          </h3>
+          <p className="text-sm text-gray-700 mb-4">
+            Estudos demonstram que o método SNAPPS promove maior expressão de raciocínio clínico, aumenta a discussão de incertezas 
+            e estimula o aprendizado autodirigido, quando comparado a métodos tradicionais de apresentação de casos.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="text-blue-600 font-bold text-lg">+33%</div>
+              <div className="text-xs text-gray-600">Expressão de raciocínio clínico</div>
+            </div>
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="text-blue-600 font-bold text-lg">+44%</div>
+              <div className="text-xs text-gray-600">Discussão de incertezas</div>
+            </div>
+            <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="text-blue-600 font-bold text-lg">+200%</div>
+              <div className="text-xs text-gray-600">Aprendizado autodirigido</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <CaseSelector cases={clinicalCases} onSelectCase={handleSelectCase} />
 
       {/* Dica de Integração - Movida para antes dos próximos passos */}
       <div className="mt-12 p-6 border rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 border-amber-200 shadow-sm">

@@ -30,13 +30,22 @@ import {
   Lightbulb,
   FileText,
   Clipboard,
-  MessageCircle
+  MessageCircle,
+  Zap,
+  Shield,
+  Activity,
+  Eye
 } from 'lucide-react';
 
 // Interfaces
+interface BiasReflectionPoint {
+  bias_type: string;
+  reflection_question: string;
+}
+
 interface ReasoningCritiqueOutput {
   identified_reasoning_pattern: string;
-  bias_reflection_points: string[];
+  bias_reflection_points: BiasReflectionPoint[];
   devils_advocate_challenge: string[];
   suggested_next_reflective_action: string[];
 }
@@ -176,6 +185,17 @@ const reflectionExamples: ReflectionExample[] = [
   }
 ];
 
+// Mapeamento dos tipos de viés do backend para rótulos amigáveis
+const biasTypeToLabel: Record<string, string> = {
+  ANCHORING: 'Viés de Ancoragem',
+  PREMATURE_CLOSURE: 'Fechamento Prematuro',
+  CONFIRMATION_BIAS: 'Viés de Confirmação',
+  AVAILABILITY: 'Viés de Disponibilidade',
+  REPRESENTATIVENESS: 'Viés de Representatividade',
+  FUNDAMENTAL_ATTRIBUTION_ERROR: 'Erro de Atribuição Fundamental',
+  // Outros vieses podem ser adicionados aqui conforme necessário
+};
+
 export default function SelfReflectionComponent({ 
   initialScenario, 
   initialBiasName, 
@@ -200,6 +220,34 @@ export default function SelfReflectionComponent({
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<ReasoningCritiqueOutput | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({});
+
+  // Helper function to determine analysis section severity
+  const getAnalysisSeverity = (content: string) => {
+    const lowerContent = content.toLowerCase();
+    if (lowerContent.includes('crítico') || lowerContent.includes('grave') || lowerContent.includes('urgente')) return 'high';
+    if (lowerContent.includes('moderado') || lowerContent.includes('significativo') || lowerContent.includes('importante')) return 'medium';
+    return 'low';
+  };
+
+  // Helper function to get severity indicator
+  const getSeverityIndicator = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return { color: 'bg-red-500', icon: AlertTriangle, text: 'Alto', textColor: 'text-red-700' };
+      case 'medium':
+        return { color: 'bg-yellow-500', icon: Activity, text: 'Moderado', textColor: 'text-yellow-700' };
+      default:
+        return { color: 'bg-green-500', icon: CheckCircle, text: 'Normal', textColor: 'text-green-700' };
+    }
+  };
+
+  const toggleSectionExpansion = (sectionId: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
+  };
 
   // Efeitos
   useEffect(() => {
@@ -349,7 +397,7 @@ export default function SelfReflectionComponent({
       // Notificar componente pai
       if (onInsightsGenerated) {
         onInsightsGenerated({
-          strengths: adaptedData.bias_reflection_points,
+          strengths: adaptedData.bias_reflection_points.map(p => `${p.bias_type}: ${p.reflection_question}`),
           biases: adaptedData.devils_advocate_challenge,
           improvements: adaptedData.suggested_next_reflective_action
         });
@@ -410,13 +458,14 @@ export default function SelfReflectionComponent({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center">
+    <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300">
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <CardHeader className="relative z-10">
+        <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
           <UserCheck className="h-6 w-6 mr-2 text-purple-500" />
           Ferramenta de Auto-Reflexão Avançada
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-gray-600">
           Reflita sobre seu processo de raciocínio clínico com templates estruturados, exemplos práticos e análise metacognitiva personalizada.
         </CardDescription>
       </CardHeader>
@@ -451,11 +500,6 @@ export default function SelfReflectionComponent({
                 />
                 <span className="text-sm font-medium">Incluir contexto do caso clínico</span>
               </label>
-              {initialBiasName && (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  Contexto: {initialBiasName}
-                </Badge>
-              )}
             </div>
             
             {useContextualCase && (
@@ -693,10 +737,14 @@ export default function SelfReflectionComponent({
             className="flex-1"
           >
             {isLoading ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Analisando...
-              </>
+              <div className="flex items-center">
+                <div className="relative mr-2">
+                  <div className="w-4 h-4 border-2 border-purple-200 rounded-full animate-spin">
+                    <div className="absolute top-0 left-0 w-4 h-4 border-2 border-purple-600 rounded-full animate-pulse border-t-transparent"></div>
+                  </div>
+                </div>
+                Analisando com Dr. Corvus...
+              </div>
             ) : (
               <>
                 <Brain className="mr-2 h-4 w-4" />
@@ -729,83 +777,241 @@ export default function SelfReflectionComponent({
           </Alert>
         )}
 
+        {isLoading && !analysis && (
+          <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin">
+                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-pulse border-t-transparent"></div>
+              </div>
+              <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-purple-600 animate-pulse" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está realizando análise metacognitiva...</p>
+              <p className="text-sm text-gray-500">Identificando padrões de raciocínio e oportunidades de melhoria</p>
+            </div>
+            <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+            </div>
+          </div>
+        )}
+
         {/* Resultados da Análise */}
         {analysis && (
-          <div className="mt-8 space-y-6">
-            <h3 className="text-lg font-semibold text-gray-900">Análise Metacognitiva Personalizada</h3>
+          <div className="mt-8 space-y-6 animate-fade-in">
+            <div className="text-center space-y-2">
+              <h3 className="text-3xl font-bold bg-gradient-to-r from-purple-800 to-blue-600 bg-clip-text text-transparent">
+                Análise Metacognitiva Personalizada
+              </h3>
+              <p className="text-gray-600">Insights profundos sobre seu processo de raciocínio clínico</p>
+              <div className="flex items-center justify-center space-x-2 mt-4">
+                <Zap className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm text-gray-500">Análise completa de padrões cognitivos</span>
+              </div>
+            </div>
 
             {/* Análise Metacognitiva */}
-            <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center mb-3">
-                <Brain className="h-6 w-6 text-blue-600 mr-2" />
-                <h4 className="font-semibold text-blue-800">Padrão de Raciocínio Identificado</h4>
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 shadow-sm">
+              <div className="flex items-center mb-4">
+                <Brain className="h-6 w-6 text-purple-600 mr-3" />
+                <h4 className="text-xl font-semibold text-purple-800">Padrão de Raciocínio Identificado</h4>
               </div>
-              <p className="text-blue-700 leading-relaxed">{analysis.identified_reasoning_pattern || ''}</p>
+              <p className="text-purple-700 leading-relaxed">{analysis.identified_reasoning_pattern || ''}</p>
             </div>
 
             {/* Pontos Fortes do Raciocínio */}
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <h4 className="font-semibold text-green-800 mb-3 flex items-center">
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Pontos para Reflexão
-              </h4>
-              <ul className="space-y-2">
-                {(analysis.bias_reflection_points || []).map((point: string, index: number) => (
-                  <li key={index} className="text-green-700 flex items-start">
-                    <span className="text-green-500 mr-2 mt-1">✓</span>
-                    <span>{point}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-400">
+              <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <CardContent className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <h4 className="text-xl font-semibold text-green-800">Pontos para Reflexão</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-sm font-medium text-green-700">
+                        {(Array.isArray(analysis.bias_reflection_points) ? analysis.bias_reflection_points : []).length} item(s)
+                      </span>
+                      <CheckCircle className="h-4 w-4 text-green-700" />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleSectionExpansion('reflection_points')}
+                    className="hover:bg-green-50 transition-colors"
+                  >
+                    <span className="text-sm mr-2">
+                      {expandedSections['reflection_points'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['reflection_points'] ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+
+                <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-400 rounded-r-lg">
+                  <p className="font-semibold text-green-800 mb-2 flex items-center">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Reflexões Estratégicas:
+                  </p>
+                  <p className="text-green-700 leading-relaxed">
+                    {(Array.isArray(analysis.bias_reflection_points) ? analysis.bias_reflection_points : []).length} pontos identificados para análise metacognitiva
+                  </p>
+                </div>
+
+                <Collapsible open={expandedSections['reflection_points']} onOpenChange={() => toggleSectionExpansion('reflection_points')}>
+                  <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <ul className="space-y-3">
+                      {(Array.isArray(analysis.bias_reflection_points) ? analysis.bias_reflection_points : []).map((point: BiasReflectionPoint, index: number) => {
+                        const biasLabel = biasTypeToLabel[point.bias_type] || point.bias_type;
+                        return (
+                          <li key={index} className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400 rounded-r-lg">
+                            <div className="flex items-start">
+                              <span className="text-green-500 mr-3 mt-1">✓</span>
+                              <div>
+                                <span className="font-semibold text-green-800">{biasLabel}:</span>
+                                <p className="text-green-700 leading-relaxed mt-1">{point.reflection_question}</p>
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
 
             {/* Vieses Cognitivos Identificados */}
             {(analysis.devils_advocate_challenge || []).length > 0 && (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <h4 className="font-semibold text-orange-800 mb-3 flex items-center">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Desafios de Raciocínio
-                </h4>
-                <ul className="space-y-2">
-                  {(analysis.devils_advocate_challenge || []).map((challenge: string, index: number) => (
-                    <li key={index} className="text-orange-700 flex items-start">
-                      <span className="text-orange-500 mr-2 mt-1">⚠</span>
-                      <span>{challenge}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-orange-400">
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-500/3 to-red-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                <CardContent className="relative z-10 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <h4 className="text-xl font-semibold text-orange-800">Desafios de Raciocínio</h4>
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full bg-orange-500" />
+                        <span className="text-sm font-medium text-orange-700">
+                          {(analysis.devils_advocate_challenge || []).length} desafio(s)
+                        </span>
+                        <AlertTriangle className="h-4 w-4 text-orange-700" />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSectionExpansion('challenges')}
+                      className="hover:bg-orange-50 transition-colors"
+                    >
+                      <span className="text-sm mr-2">
+                        {expandedSections['challenges'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['challenges'] ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </div>
+
+                  <div className="mb-4 p-4 bg-gradient-to-r from-orange-50 to-orange-100 border-l-4 border-orange-400 rounded-r-lg">
+                    <p className="font-semibold text-orange-800 mb-2 flex items-center">
+                      <Target className="h-4 w-4 mr-2" />
+                      Pontos de Questionamento:
+                    </p>
+                    <p className="text-orange-700 leading-relaxed">
+                      Aspectos do seu raciocínio que merecem análise mais profunda
+                    </p>
+                  </div>
+
+                  <Collapsible open={expandedSections['challenges']} onOpenChange={() => toggleSectionExpansion('challenges')}>
+                    <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                      <ul className="space-y-3">
+                        {(analysis.devils_advocate_challenge || []).map((challenge: string, index: number) => (
+                          <li key={index} className="p-3 bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-400 rounded-r-lg">
+                            <div className="flex items-start">
+                              <span className="text-orange-500 mr-3 mt-1">⚠</span>
+                              <p className="text-orange-700 leading-relaxed">{challenge}</p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </CardContent>
+              </Card>
             )}
 
             {/* Áreas para Melhoria */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-3 flex items-center">
-                <TrendingUp className="h-4 w-4 mr-2" />
-                Ações Reflexivas Recomendadas
-              </h4>
-              <ul className="space-y-2">
-                {(analysis.suggested_next_reflective_action || []).map((action: string, index: number) => (
-                  <li key={index} className="text-blue-700 flex items-start">
-                    <ArrowRight className="h-4 w-4 mr-2 mt-0.5 text-blue-500 flex-shrink-0" />
-                    <span>{action}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-blue-400">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/3 to-indigo-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+              <CardContent className="relative z-10 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <h4 className="text-xl font-semibold text-blue-800">Ações Reflexivas Recomendadas</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span className="text-sm font-medium text-blue-700">
+                        {(analysis.suggested_next_reflective_action || []).length} recomendação(ões)
+                      </span>
+                      <TrendingUp className="h-4 w-4 text-blue-700" />
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleSectionExpansion('actions')}
+                    className="hover:bg-blue-50 transition-colors"
+                  >
+                    <span className="text-sm mr-2">
+                      {expandedSections['actions'] ? 'Ocultar detalhes' : 'Ver detalhes'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${expandedSections['actions'] ? 'rotate-180' : ''}`} />
+                  </Button>
+                </div>
+
+                <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-400 rounded-r-lg">
+                  <p className="font-semibold text-blue-800 mb-2 flex items-center">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Próximos Passos:
+                  </p>
+                  <p className="text-blue-700 leading-relaxed">
+                    Ações específicas para aprimorar seu raciocínio clínico
+                  </p>
+                </div>
+
+                <Collapsible open={expandedSections['actions']} onOpenChange={() => toggleSectionExpansion('actions')}>
+                  <CollapsibleContent className="space-y-0 overflow-hidden data-[state=closed]:animate-slideUp data-[state=open]:animate-slideDown">
+                    <ul className="space-y-3">
+                      {(analysis.suggested_next_reflective_action || []).map((action: string, index: number) => (
+                        <li key={index} className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-400 rounded-r-lg">
+                          <div className="flex items-start">
+                            <ArrowRight className="h-4 w-4 mr-3 mt-0.5 text-blue-500 flex-shrink-0" />
+                            <p className="text-blue-700 leading-relaxed">{action}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
 
             {/* Estratégias de Auto-Correção - Adding this back but using bias_reflection_points in a different way */}
-            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <h4 className="font-semibold text-emerald-800 mb-3 flex items-center">
-                <RefreshCw className="h-4 w-4 mr-2" />
+            <div className="p-6 border rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 border-l-4 border-emerald-400 shadow-sm">
+              <h4 className="text-xl font-semibold text-emerald-800 mb-4 flex items-center">
+                <RefreshCw className="h-6 w-6 mr-3 text-emerald-600" />
                 Estratégias de Metacognição
               </h4>
-              <ul className="space-y-2">
-                {(analysis.bias_reflection_points || []).map((point: string, index: number) => (
-                  <li key={index} className="text-emerald-700 flex items-start">
-                    <span className="text-emerald-500 mr-2 mt-1">🔄</span>
-                    <span>{point}</span>
-                  </li>
-                ))}
+              <ul className="space-y-3">
+                {(Array.isArray(analysis.bias_reflection_points) ? analysis.bias_reflection_points : []).map((point: BiasReflectionPoint, index: number) => {
+                  const biasLabel = biasTypeToLabel[point.bias_type] || point.bias_type;
+                  return (
+                    <li key={index} className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-l-4 border-emerald-400 rounded-r-lg">
+                      <div className="flex items-start">
+                        <span className="text-emerald-500 mr-3 mt-1 text-lg">🔄</span>
+                        <div>
+                          <span className="font-semibold text-emerald-800">{biasLabel}:</span>
+                          <p className="text-emerald-700 leading-relaxed mt-1">{point.reflection_question}</p>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
 
@@ -814,30 +1020,40 @@ export default function SelfReflectionComponent({
               <Button 
                 onClick={() => onTransferToTimeout?.(caseContext, analysis.suggested_next_reflective_action)}
                 variant="default"
-                className="flex items-center"
+                className="flex items-center bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
               >
-                <Clock className="mr-2 h-4 w-4" />
+                <Clock className="mr-3 h-5 w-5" />
                 Praticar Diagnostic Timeout com estes Insights
               </Button>
             </div>
 
             {/* Disclaimer */}
-            <div className="text-xs italic text-muted-foreground p-3 bg-gray-50 rounded-md">
-              Esta análise é um apoio ao raciocínio clínico e não substitui o julgamento profissional.
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg shadow-sm">
+              <div className="flex items-center mb-2">
+                <Shield className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Aviso Importante</span>
+              </div>
+              <p className="text-xs italic text-gray-600 leading-relaxed">
+                Esta análise é um apoio ao raciocínio clínico e não substitui o julgamento profissional. Use estas reflexões como ferramenta complementar em sua prática médica.
+              </p>
             </div>
           </div>
         )}
 
         {/* Helper quando não há resultados */}
         {!analysis && !isLoading && !error && (
-          <div className="mt-6 p-4 border rounded-md bg-purple-50 border-purple-200">
-            <div className="flex items-center">
-              <HelpCircle className="h-5 w-5 mr-2 text-purple-600" />
-              <h3 className="text-md font-semibold text-purple-700">Pronto para refletir?</h3>
+          <div className="mt-6 p-6 border rounded-xl bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 shadow-sm">
+            <div className="flex items-center mb-3">
+              <HelpCircle className="h-6 w-6 mr-3 text-purple-600" />
+              <h3 className="text-lg font-semibold text-purple-700">Pronto para refletir?</h3>
             </div>
-            <p className="text-sm text-purple-600 mt-1">
-              Escolha um modo de reflexão e descreva seu processo de raciocínio. Dr. Corvus fornecerá uma análise metacognitiva detalhada e personalizada.
+            <p className="text-purple-600 leading-relaxed">
+              Escolha um modo de reflexão e descreva seu processo de raciocínio. Dr. Corvus fornecerá uma análise metacognitiva detalhada e personalizada para aprimorar suas habilidades clínicas.
             </p>
+            <div className="mt-4 flex items-center text-sm text-purple-500">
+              <Lightbulb className="h-4 w-4 mr-2" />
+              <span>Dica: Seja específico sobre seus pensamentos e sentimentos durante o caso</span>
+            </div>
           </div>
         )}
       </CardContent>

@@ -26,8 +26,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiUrl = getAPIUrl().replace(/\/?api\/?$/, ''); // Remove trailing /api if present
-    const response = await fetch(`${apiUrl}/api/clinical/teach-question-prioritization-translated`, {
+    const apiUrl = getAPIUrl();
+    
+    const response = await fetch(`${apiUrl}/clinical/teach-question-prioritization-translated`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
