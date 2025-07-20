@@ -41,7 +41,7 @@ interface SimulationContainerProps {
 const snappsWorkflowSteps = [
   { id: SNAPPSStep.SUMMARIZE, title: 'Sumarizar (S)', description: 'Resuma o caso clínico em 1-2 frases.', icon: Search },
   { id: SNAPPSStep.NARROW, title: 'Afunilar DDx (N)', description: 'Liste 2-3 diagnósticos diferenciais.', icon: Brain },
-  { id: SNAPPSStep.ANALYZE, title: 'Analisar DDx (A)', description: 'Compare e contraste seu DDx com base nos dados.', icon: CircleQuestionMark },
+  { id: SNAPPSStep.ANALYZE, title: 'Analisar DDx (A)', description: 'Compare e contraste seu DDx com base nos dados.', icon: Eye },
   { id: SNAPPSStep.PROBE, title: 'Sondar Preceptor (P)', description: 'Faça 1-2 perguntas para esclarecer dúvidas.', icon: Library },
   { id: SNAPPSStep.PLAN, title: 'Planejar Manejo (P)', description: 'Descreva seu plano de investigação e tratamento.', icon: Target },
   { id: SNAPPSStep.SELECT, title: 'Selecionar Tópico (S)', description: 'Escolha um tópico deste caso para estudar.', icon: Library },
@@ -111,15 +111,15 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
         <h3 className="text-lg font-semibold text-red-800">Ocorreu um Erro</h3>
         <p className="text-red-600 mt-2 text-center font-medium">{error}</p>
         <div className="mt-4 space-x-4">
-          <button 
-            onClick={initializeSession} 
+          <button
+            onClick={initializeSession}
             className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors shadow-md"
           >
             <Zap className="inline mr-2 h-4 w-4" />
             Tentar Novamente
           </button>
-          <button 
-            onClick={onExit} 
+          <button
+            onClick={onExit}
             className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors shadow-md"
           >
             Sair da Simulação
