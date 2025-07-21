@@ -25,7 +25,7 @@ export function SimulationHeader({ title, description, showReset = false, onRese
       {showReset && (
         <Button 
           onClick={onReset}
-          variant="outline" 
+          variant="default" 
           className="absolute top-4 right-4 bg-white/10 text-white hover:bg-white/20 border-white/30"
         >
           <RefreshCw className="mr-2 h-4 w-4" />

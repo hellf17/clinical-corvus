@@ -161,7 +161,8 @@ export function CaseSelector({ cases, onSelectCase }: CaseSelectorProps) {
               <CardFooter className="mt-auto relative z-10">
                 <Button
                   onClick={() => onSelectCase(clinicalCase)}
-                  className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
+                  variant='default'
+                  className="w-full hover:bg-blue-700 text-white font-bold py-3 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105"
                   size="lg"
                 >
                   <PlayCircle className="mr-2 h-5 w-5" />

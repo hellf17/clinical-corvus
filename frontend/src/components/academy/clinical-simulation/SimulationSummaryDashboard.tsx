@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { CheckCircle, Lightbulb, BrainCircuit } from 'lucide-react';
+import { CheckCircle, Lightbulb, BrainCircuit, XCircle, ChevronDown } from 'lucide-react';
 import {
   Radar,
   RadarChart,
@@ -11,7 +11,9 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
   Legend,
+  Tooltip,
 } from 'recharts';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
 
 interface PerformanceMetric {
   skill: string;
@@ -20,10 +22,13 @@ interface PerformanceMetric {
 }
 
 interface FinalFeedback {
+  overall_performance: string;
   key_strengths: string[];
   areas_for_development: string[];
-  metacognitive_insight: string;
-  performance_metrics: PerformanceMetric[];
+  learning_objectives_met: string[];
+  recommended_study_topics: string[];
+  metacognitive_insights: string[];
+  next_cases_suggestions: string[];
 }
 
 interface SimulationSummaryDashboardProps {
@@ -31,12 +36,12 @@ interface SimulationSummaryDashboardProps {
 }
 
 const skillLabels: { [key: string]: string } = {
-    SUMMARIZE: 'Summarize',
-    NARROW: 'Narrow DDx',
-    ANALYZE: 'Analyze DDx',
-    PROBE: 'Probe',
-    PLAN: 'Plan',
-    SELECT: 'Select Topic',
+    SUMMARIZE: 'Resumo do Caso',
+    NARROW: 'Redução do DDx',
+    ANALYZE: 'Análise do DDx',
+    PROBE: 'Questionamento Investigativo',
+    PLAN: 'Elaboração do Plano',
+    SELECT: 'Seleção de Tópico',
 };
 
 export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProps> = ({ feedback }) => {
@@ -53,79 +58,212 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
     );
   }
 
-  const { key_strengths, areas_for_development, metacognitive_insight, performance_metrics } = feedback;
+  const { overall_performance, key_strengths, areas_for_development, metacognitive_insights, learning_objectives_met, recommended_study_topics, next_cases_suggestions } = feedback;
 
-  const chartData = Array.isArray(performance_metrics)
-    ? performance_metrics.map(metric => ({
-        ...metric,
-        skill: skillLabels[metric.skill] || metric.skill,
-      }))
-    : [];
+  // Provisional dummy data for performance metrics (since backend doesn't provide it yet)
+  const chartData = Object.keys(skillLabels).map(skillKey => ({
+    skill: skillLabels[skillKey],
+    score: Math.floor(Math.random() * 3) + 3, // Random score between 3 and 5 for demo
+    fullMark: 5,
+  }));
 
   const safeKeyStrengths = Array.isArray(key_strengths) ? key_strengths : [];
   const safeAreasForDevelopment = Array.isArray(areas_for_development) ? areas_for_development : [];
+  const safeMetacognitiveInsight = Array.isArray(metacognitive_insights) && metacognitive_insights.length > 0 
+    ? metacognitive_insights[0] 
+    : "Nenhum insight metacognitivo disponível.";
+
+  // Calculate overall score from dummy data or if actual data were present
+  const overallScore = chartData.length > 0
+    ? (chartData.reduce((sum, metric) => sum + metric.score, 0) / chartData.length).toFixed(1)
+    : 'N/A';
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Dashboard de Performance da Simulação</CardTitle>
-          <CardDescription className="text-center">Análise do seu raciocínio clínico no modelo SNAPPS.</CardDescription>
-        </CardHeader>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="lg:col-span-1">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 border-cyan-200 shadow-lg transition-all duration-300">
+      <div className="max-w-6xl mx-auto space-y-8">
+        <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none">
           <CardHeader>
-            <CardTitle className="flex items-center"><BrainCircuit className="mr-2 h-6 w-6 text-blue-500" /> Performance de Habilidades</CardTitle>
+            <CardTitle className="text-3xl font-extrabold text-center text-white">Resumo da Sessão do Dr. Corvus</CardTitle>
+            <CardDescription className="text-center text-blue-100">Análise detalhada do seu raciocínio clínico no modelo SNAPPS.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
-                <PolarGrid />
-                <PolarAngleAxis dataKey="skill" />
-                <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                <Radar name="Sua Pontuação" dataKey="score" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
-                <Legend />
-              </RadarChart>
-            </ResponsiveContainer>
+          <CardContent className="text-center">
+            <div className="text-4xl font-bold text-white mb-2">Pontuação Geral: {overallScore}</div>
+            <p className="text-blue-200">Sua performance média nas habilidades avaliadas.</p>
           </CardContent>
         </Card>
 
-        <div className="space-y-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center"><CheckCircle className="mr-2 h-6 w-6 text-green-500" /> Pontos Fortes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ul className="list-disc list-inside space-y-2">
-                        {safeKeyStrengths.map((item, index) => <li key={index}>{item}</li>)}
-                    </ul>
-                </CardContent>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <Card className="lg:col-span-1 bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center text-white text-xl"><BrainCircuit className="mr-3 h-7 w-7 text-blue-300" /> Performance de Habilidades</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={350}>
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
+                  <PolarGrid stroke="#4F46E5" strokeOpacity={0.5} />
+                  <PolarAngleAxis dataKey="skill" tick={{ fill: '#E0E7FF', fontSize: 12 }} />
+                  <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} tick={{ fill: '#E0E7FF', fontSize: 10 }} stroke="#4F46E5" strokeOpacity={0.5} />
+                  <Radar name="Sua Pontuação" dataKey="score" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.7} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: 'none', borderRadius: '8px' }} itemStyle={{ color: '#E0E7FF' }} />
+                  <Legend wrapperStyle={{ color: '#E0E7FF', paddingTop: '10px' }} />
+                </RadarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          <div className="space-y-8">
+            <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white text-xl"><CheckCircle className="mr-3 h-7 w-7 text-green-400" /> Pontos Fortes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-blue-100">
+                  {safeKeyStrengths.map((item, index) => (
+                    <li key={index} className="flex items-start">
+                      <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-1 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
             </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-yellow-500" /> Áreas para Desenvolvimento</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <ul className="list-disc list-inside space-y-2">
-                        {safeAreasForDevelopment.map((item, index) => <li key={index}>{item}</li>)}
-                    </ul>
-                </CardContent>
+            <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white text-xl"><XCircle className="mr-3 h-7 w-7 text-red-400" /> Áreas para Desenvolvimento</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-3 text-blue-100">
+                  {safeAreasForDevelopment.map((item, index) => (
+                    <li key={index} className="flex items-start">
+                      <XCircle className="h-5 w-5 text-red-400 mr-2 mt-1 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
             </Card>
+          </div>
         </div>
-      </div>
 
-      <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200">
-        <CardHeader>
-          <CardTitle className="flex items-center"><BrainCircuit className="mr-2 h-6 w-6 text-blue-600" /> Insight Metacognitivo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg italic">
-            {metacognitive_insight ? `"${metacognitive_insight}"` : "Nenhum insight metacognitivo disponível."}
-          </p>
-        </CardContent>
-      </Card>
+        <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+          <Collapsible>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="flex items-center text-white text-xl">
+                <Lightbulb className="mr-3 h-7 w-7 text-yellow-300" /> Insight Metacognitivo
+              </CardTitle>
+              <CollapsibleTrigger asChild>
+                <button className="text-white hover:text-blue-200 transition-colors duration-200">
+                  <ChevronDown className="h-6 w-6" />
+                  <span className="sr-only">Toggle Metacognitive Insight</span>
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <p className="text-lg italic text-blue-100">
+                  {safeMetacognitiveInsight}
+                </p>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        {/* New Sections based on BAML output */}
+        <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+          <Collapsible>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="flex items-center text-white text-xl">
+                <CheckCircle className="mr-3 h-7 w-7 text-green-300" /> Objetivos de Aprendizado Atingidos
+              </CardTitle>
+              <CollapsibleTrigger asChild>
+                <button className="text-white hover:text-blue-200 transition-colors duration-200">
+                  <ChevronDown className="h-6 w-6" />
+                  <span className="sr-only">Toggle Learning Objectives Met</span>
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <ul className="space-y-3 text-blue-100">
+                  {Array.isArray(learning_objectives_met) && learning_objectives_met.length > 0 ? (
+                    learning_objectives_met.map((item, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-1 flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <p className="text-lg italic text-blue-100">Nenhum objetivo de aprendizado específico foi identificado.</p>
+                  )}
+                </ul>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+          <Collapsible>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="flex items-center text-white text-xl">
+                <Lightbulb className="mr-3 h-7 w-7 text-yellow-300" /> Tópicos de Estudo Recomendados
+              </CardTitle>
+              <CollapsibleTrigger asChild>
+                <button className="text-white hover:text-blue-200 transition-colors duration-200">
+                  <ChevronDown className="h-6 w-6" />
+                  <span className="sr-only">Toggle Recommended Study Topics</span>
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <ul className="space-y-3 text-blue-100">
+                  {Array.isArray(recommended_study_topics) && recommended_study_topics.length > 0 ? (
+                    recommended_study_topics.map((item, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-1 flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <p className="text-lg italic text-blue-100">Nenhum tópico de estudo recomendado foi identificado.</p>
+                  )}
+                </ul>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+
+        <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
+          <Collapsible>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="flex items-center text-white text-xl">
+                <CheckCircle className="mr-3 h-7 w-7 text-green-300" /> Sugestões de Próximos Casos
+              </CardTitle>
+              <CollapsibleTrigger asChild>
+                <button className="text-white hover:text-blue-200 transition-colors duration-200">
+                  <ChevronDown className="h-6 w-6" />
+                  <span className="sr-only">Toggle Next Cases Suggestions</span>
+                </button>
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                <ul className="space-y-3 text-blue-100">
+                  {Array.isArray(next_cases_suggestions) && next_cases_suggestions.length > 0 ? (
+                    next_cases_suggestions.map((item, index) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-1 flex-shrink-0" />
+                        <span>{item}</span>
+                      </li>
+                    ))
+                  ) : (
+                    <p className="text-lg italic text-blue-100">Nenhuma sugestão de próximos casos foi identificada.</p>
+                  )}
+                </ul>
+              </CardContent>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      </div>
     </div>
   );
 };

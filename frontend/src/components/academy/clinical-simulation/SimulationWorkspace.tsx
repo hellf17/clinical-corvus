@@ -1,7 +1,7 @@
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
-import { RefreshCw, CheckCircle, Send, User, Bot, ChevronDown, ChevronUp, Brain, Activity, Zap, Eye } from 'lucide-react';
+import { User, ChevronDown, ChevronUp, Brain, Activity, Zap} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from "react";
 
@@ -200,11 +200,13 @@ export function SimulationWorkspace({
       });
     }
 
-    // Add current step instruction
-    messages.push({
-      sender: 'ai',
-      content: <div className="font-bold text-cyan-700 border-t border-cyan-200 pt-2 mt-2">Passo Atual: {currentStep.description}</div>
-    });
+    // Only add current step instruction if not in review mode
+    if (!(currentStep.id === 'REVIEW' && currentStep.completed)) {
+      messages.push({
+        sender: 'ai',
+        content: <div className="font-bold text-cyan-700 border-t border-cyan-200 pt-2 mt-2">Passo Atual: {currentStep.description}</div>
+      });
+    }
 
     return (
       <div className="mt-4 space-y-6 flex flex-col">
@@ -235,7 +237,7 @@ export function SimulationWorkspace({
           </div>
         ))}
 
-        {!currentStep.completed && (
+        {!(currentStep.id === 'REVIEW' && currentStep.completed) && !currentStep.completed && (
           <div className="mt-4 flex w-full items-center space-x-2 self-center pt-4 border-t-2 border-cyan-200">
             <Textarea
               placeholder={getPlaceholderText(currentStep.id)}

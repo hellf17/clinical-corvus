@@ -55,6 +55,7 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showChatHistory, setShowChatHistory] = useState(false);
 
   const initializeSession = useCallback(async () => {
     setIsLoading(true);
@@ -113,14 +114,13 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
         <div className="mt-4 space-x-4">
           <button
             onClick={initializeSession}
-            className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors shadow-md"
+            className=""
           >
             <Zap className="inline mr-2 h-4 w-4" />
             Tentar Novamente
           </button>
           <button
             onClick={onExit}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors shadow-md"
           >
             Sair da Simulação
           </button>
@@ -142,7 +142,7 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
     };
 
     try {
-      const response = await fetch('/api/clinical-simulation/step', {
+      const response = await fetch('/api/clinical-simulation/step-translated', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -164,6 +164,7 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
 
       if (currentStepIndex === snappsWorkflowSteps.length - 1) {
         setIsCompleted(true);
+        setShowChatHistory(true); // Show chat history first upon completion
       } else {
         setCurrentStepIndex(currentStepIndex + 1);
       }
@@ -182,6 +183,7 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
 
   const resetSimulation = () => {
     setIsCompleted(false);
+    setShowChatHistory(false); // Reset this state too
     setCurrentStepIndex(0);
     setCurrentInput('');
     setFeedbackHistory([]);
@@ -217,11 +219,11 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
             <AlertDescription className="text-lg font-medium">{error}</AlertDescription>
           </Alert>
           <div className="mt-6 flex justify-center gap-4">
-            <Button onClick={initializeSession} size="lg" className="bg-cyan-600 hover:bg-cyan-700 transition-colors">
+            <Button onClick={initializeSession} size="lg" variant="default" className="">
               <Zap className="mr-2 h-4 w-4" />
               Tentar Novamente
             </Button>
-            <Button onClick={onExit} variant="outline" size="lg" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
+            <Button onClick={onExit} variant="default" className="">
               Voltar
             </Button>
           </div>
@@ -254,28 +256,64 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
 
   if (isCompleted) {
     const finalFeedback = feedbackHistory.find(f => f.step === SNAPPSStep.SELECT)?.feedback;
-    // Ensure we have a valid feedback object with default values
     const safeFeedback = finalFeedback || {
       key_strengths: [],
       areas_for_development: [],
       metacognitive_insight: 'Nenhum feedback final disponível.',
       performance_metrics: []
     };
-    return (
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
-        <SimulationSummaryDashboard feedback={safeFeedback} />
-        <div className="mt-8 flex justify-center space-x-4">
-          <Button onClick={resetSimulation} variant="outline" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
-            <Brain className="mr-2 h-4 w-4" />
-            Reiniciar Simulação
-          </Button>
-          <Button onClick={onExit} className="bg-cyan-600 hover:bg-cyan-700 transition-colors shadow-lg">
-            <Target className="mr-2 h-4 w-4" />
-            Sair para Academia
-          </Button>
+
+    if (showChatHistory) {
+      return (
+        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+          <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">Revisão da Simulação</h2>
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <SimulationWorkspace
+              currentStep={{ id: 'REVIEW', title: 'Revisão Completa', description: 'Revise todas as suas interações na simulação.', completed: true }}
+              isLoading={false}
+              onInputChange={() => {}} // No input allowed in review mode
+              onSubmitStep={() => {}} // No submission in review mode
+              clinicalCase={selectedCase}
+              feedbackHistory={feedbackHistory}
+            />
+          </div>
+          <div className="mt-8 flex justify-center space-x-4">
+            <Button onClick={() => setShowChatHistory(false)} variant="default" className="">
+              <Activity className="mr-2 h-4 w-4" />
+              Ver Dashboard de Performance
+            </Button>
+            <Button onClick={resetSimulation} variant="default" className="">
+              <Brain className="mr-2 h-4 w-4" />
+              Reiniciar Simulação
+            </Button>
+            <Button onClick={onExit} variant="default" className="">
+              <Target className="mr-2 h-4 w-4" />
+              Sair para Academia
+            </Button>
+          </div>
         </div>
-      </div>
-    );
+      );
+    } else {
+      return (
+        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+          <SimulationSummaryDashboard feedback={safeFeedback} />
+          <div className="mt-8 flex justify-center space-x-4">
+            <Button onClick={() => setShowChatHistory(true)} variant="default" className="">
+              <Eye className="mr-2 h-4 w-4" />
+              Voltar para Histórico do Chat
+            </Button>
+            <Button onClick={resetSimulation} variant="default" className="">
+              <Brain className="mr-2 h-4 w-4" />
+              Reiniciar Simulação
+            </Button>
+            <Button onClick={onExit} variant="default" className="">
+              <Target className="mr-2 h-4 w-4" />
+              Sair para Academia
+            </Button>
+          </div>
+        </div>
+      );
+    }
   }
 
   const currentWorkflowStep = snappsWorkflowSteps[currentStepIndex];
@@ -325,10 +363,10 @@ export const SimulationContainer = ({ selectedCase, onExit }: SimulationContaine
                 feedbackHistory={feedbackHistory}
               />
               <div className="mt-6 flex justify-between items-center">
-                <Button onClick={handleBack} disabled={currentStepIndex === 0 || isLoading} variant="outline" className="border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors">
+                <Button onClick={handleBack} disabled={currentStepIndex === 0 || isLoading} variant="default" className="">
                   Anterior
                 </Button>
-                <Button onClick={handleSubmitStep} disabled={isLoading || !currentInput.trim()} className="bg-cyan-600 hover:bg-cyan-700 transition-colors shadow-lg">
+                <Button onClick={handleSubmitStep} disabled={isLoading || !currentInput.trim()} variant="default" className="">
                   {isLoading ? (
                     <div className="flex items-center">
                       <div className="relative mr-2">
