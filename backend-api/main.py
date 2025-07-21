@@ -40,14 +40,54 @@ app = FastAPI(
 
 # Configure CORS
 origins = settings.cors_origins.split(",") if settings.cors_origins else []
+# Ensure localhost:3000 is included for development
+if "http://localhost:3000" not in origins:
+    origins.append("http://localhost:3000")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Clean up origins (remove whitespace)
+origins = [origin.strip() for origin in origins if origin.strip()]
+logger.info(f"Configured CORS origins: {origins}")
+
+# Enhanced CORS middleware for development
+if settings.environment == "development":
+    logger.info("Running in development mode - using permissive CORS settings")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+
+# Add debug middleware to log CORS-related headers
+@app.middleware("http")
+async def log_cors_headers(request, call_next):
+    response = await call_next(request)
+    
+    # Log CORS headers for debugging
+    origin = request.headers.get("origin")
+    if origin:
+        logger.info(f"CORS request from origin: {origin}")
+        logger.info(f"Response CORS headers: {response.headers.get('Access-Control-Allow-Origin')}")
+    
+    # Ensure CORS headers are set for all responses
+    if origin and (settings.environment == "development" or origin in origins):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
+    
+    return response
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

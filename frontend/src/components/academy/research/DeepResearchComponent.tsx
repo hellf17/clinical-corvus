@@ -881,6 +881,7 @@ export default function DeepResearchComponent({
                       </div>
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
+
                       {/* Metanálises */}
                       {results.research_metrics?.meta_analysis_count !== undefined && results.research_metrics.meta_analysis_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -890,6 +891,7 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">Metanálises</div>
                         </div>
                       )}
+
                       {/* Diretrizes */}
                       {results.research_metrics?.guideline_count !== undefined && results.research_metrics.guideline_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -899,6 +901,7 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">Diretrizes</div>
                         </div>
                       )}
+
                       {/* RCTs */}
                       {results.research_metrics?.rct_count !== undefined && results.research_metrics.rct_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -908,6 +911,7 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">RCTs</div>
                         </div>
                       )}
+                      
                       {/* Fontes com Artigos */}
                       {results.research_metrics?.articles_by_source &&
                         Object.keys(results.research_metrics?.articles_by_source ?? {})
@@ -930,8 +934,6 @@ export default function DeepResearchComponent({
                     {/* Additional Metrics Grid */}
                     {results.research_metrics && (
                         (results.research_metrics.date_range_searched && results.research_metrics.date_range_searched.trim() !== '') ||
-                        (typeof results.research_metrics.unique_journals_found === 'number' && results.research_metrics.unique_journals_found > 0) ||
-                        (typeof results.research_metrics.high_impact_studies_count === 'number' && results.research_metrics.high_impact_studies_count > 0) ||
                         (typeof results.research_metrics.recent_studies_count === 'number' && results.research_metrics.recent_studies_count > 0)
                       ) && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
@@ -942,24 +944,6 @@ export default function DeepResearchComponent({
                             {results.research_metrics.date_range_searched}
                           </div>
                           <div className="text-sm text-blue-700 font-medium mt-1">Período Pesquisado</div>
-                        </div>
-                      )}
-                      {typeof results.research_metrics?.unique_journals_found === 'number' && results.research_metrics.unique_journals_found > 0 && (
-                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
-                          <div className="text-2xl font-bold text-blue-600 flex items-center justify-center">
-                            <BookOpen className="h-6 w-6 mr-2 text-blue-500" />
-                            {results.research_metrics.unique_journals_found}
-                          </div>
-                          <div className="text-sm text-blue-700 font-medium mt-1">Periódicos Únicos</div>
-                        </div>
-                      )}
-                      {typeof results.research_metrics?.high_impact_studies_count === 'number' && results.research_metrics.high_impact_studies_count > 0 && (
-                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
-                          <div className="text-2xl font-bold text-blue-600 flex items-center justify-center">
-                            <TrendingUp className="h-6 w-6 mr-2 text-blue-500" />
-                            {results.research_metrics.high_impact_studies_count}
-                          </div>
-                          <div className="text-sm text-blue-700 font-medium mt-1">Estudos de Alto Impacto</div>
                         </div>
                       )}
                       {typeof results.research_metrics?.recent_studies_count === 'number' && results.research_metrics.recent_studies_count > 0 && (

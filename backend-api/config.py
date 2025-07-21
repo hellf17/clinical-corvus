@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # CORS Origins (comma-separated string)
     cors_origins: str = Field("http://localhost:3000", env="CORS_ORIGINS")
 
+    # Environment
+    environment: str = Field("development", env="ENVIRONMENT")
+
     # MCP Server URL
     mcp_server_url: str = Field("http://mcp_server:8765", env="MCP_SERVER_URL")
     

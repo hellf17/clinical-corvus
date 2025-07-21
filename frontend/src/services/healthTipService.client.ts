@@ -7,54 +7,32 @@ import { HealthTip } from '@/types/healthTip'; // Import type from central locat
 /**
  * Fetches general health tips.
  * Calls backend GET /api/me/health-tips.
- * Accepts optional auth token, but the current endpoint might not require it.
+ * Uses Clerk session cookies for authentication.
  * Returns Promise<HealthTip[]> using the type from @/types/healthTip
  */
-export async function getHealthTips(token: string | null = null): Promise<HealthTip[]> {
+export async function getHealthTips(): Promise<HealthTip[]> {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  // Include Authorization header only if a token is provided
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-    console.log("Fetching health tips with auth token.");
-  } else {
-    console.log("Fetching health tips without auth token.");
-  }
 
-  // Endpoint might be /api/health-tips for general tips, 
-  // or /api/me/health-tips if it requires authentication for personalization
-  const endpoint = `${API_URL}/api/me/health-tips`; // Adjust endpoint if needed
-
-  console.log(`Fetching health tips from ${endpoint}...`);
+  const endpoint = `${API_URL}/api/me/health-tips`;
 
   try {
-    const response = await fetch(endpoint, { headers });
+    const response = await fetch(endpoint, {
+      headers,
+      credentials: 'include' // Include credentials for CORS - this sends Clerk session cookies
+    });
     
     if (!response.ok) {
-        let errorMsg = `API error fetching health tips: ${response.status} ${response.statusText}`;
-        try {
-            const errorBody = await response.json();
-            errorMsg += ` - ${JSON.stringify(errorBody.detail || errorBody)}`;
-        } catch (jsonError) {
-            errorMsg += ` - ${await response.text()}`;
-        }
-        console.error(errorMsg); // Log the detailed error
-        throw new Error(errorMsg);
+      console.error(`Health tips API error: ${response.status} ${response.statusText}`);
+      return [];
     }
     
-    // Expecting backend to return { tips: HealthTip[] }
-    // Type assertion might be needed if fetch returns raw data
-    const data = await response.json(); 
-    console.log(`Successfully fetched ${data?.tips?.length || 0} health tips.`);
-    // Ensure the returned data matches the imported HealthTip structure
-    return (data?.tips || []) as HealthTip[]; // Return the array of tips, assert type if needed
-
+    const data = await response.json();
+    return data || [];
+    
   } catch (error) {
-    console.error('Error in getHealthTips (client):', error);
-    // Avoid throwing generic error, let specific error propagate if needed
-    // or return empty array to prevent crashing UI
-    // throw new Error("Failed to fetch health tips.");
-    return []; // Return empty array on error to allow UI to render
+    console.error('Error fetching health tips:', error);
+    return [];
   }
-} 
+}

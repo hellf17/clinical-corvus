@@ -69,20 +69,31 @@ async def get_verified_clerk_session_data(
     except clerk_models.ClerkErrors as e:
         # Handle Clerk-specific errors (e.g., 400, 401, 404)
         # Log the error for debugging
-        print(f"Clerk API error during token verification: {e.status_code} - {e.body}")
-        # Depending on the error, you might want to map it to HTTPException
-        # For example, a 401 could be an invalid token.
-        if e.status_code == 401: # Unauthorized
+        error_status = getattr(e, 'status_code', 500)
+        error_body = getattr(e, 'body', str(e))
+        print(f"Clerk API error during token verification: {error_status} - {error_body}")
+        
+        # Map Clerk errors to appropriate HTTP status codes
+        if error_status == 401:  # Unauthorized
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        elif error_status == 400:  # Bad Request
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Bad request to Clerk API.",
+            )
+        elif error_status == 404:  # Not Found
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Resource not found in Clerk.",
+            )
         # For other Clerk errors, re-raise or handle as appropriate
-        # For now, treat other Clerk errors as server-side issues if not 401
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Clerk authentication error: {e.detail if hasattr(e, 'detail') else e.body}",
+            detail=f"Clerk authentication error: {error_body}",
         )
     except Exception as e:
         # Handle other unexpected errors
@@ -236,8 +247,9 @@ def sync_clerk_user(db: Session, clerk_session_data: dict) -> db_models.User:
 
     except clerk_models.ClerkErrors as e:
         db.rollback()
-        print(f"Clerk API error during user sync for {clerk_user_id}: {e.body}")
-        raise HTTPException(status_code=500, detail=f"Failed to sync Clerk user: {e.detail if hasattr(e, 'detail') else e.body}")
+        error_body = getattr(e, 'body', str(e))
+        print(f"Clerk API error during user sync for {clerk_user_id}: {error_body}")
+        raise HTTPException(status_code=500, detail=f"Failed to sync Clerk user: {error_body}")
     except Exception as e:
         db.rollback()
         print(f"Unexpected error during user sync for {clerk_user_id}: {e}")

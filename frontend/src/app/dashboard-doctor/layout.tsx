@@ -51,20 +51,3 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
     </AuthGuard>
   );
 }
-
-// TODO: Implement getUserRole(userId: string): Promise<'doctor' | 'patient' | null> in '@/lib/roles'
-// Example (needs actual implementation using your DB/Clerk metadata):
-/*
-import { clerkClient } from '@clerk/nextjs/server';
-
-export async function getUserRole(userId: string): Promise<'doctor' | 'patient' | null> {
-  try {
-    const user = await clerkClient.users.getUser(userId);
-    const role = user?.publicMetadata?.role as ('doctor' | 'patient');
-    return role || null;
-  } catch (error) {
-    console.error("Error fetching user role:", error);
-    return null;
-  }
-}
-*/ 

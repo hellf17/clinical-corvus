@@ -468,4 +468,4 @@ class HealthDiaryEntry(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
-    user = relationship("User", backref="health_diary_entries")
+    user = relationship("User", back_populates="health_diary_entries")

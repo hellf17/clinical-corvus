@@ -51,14 +51,19 @@ async def get_my_patient_profile(
 async def get_general_health_tips(
     limit: int = 10,
     db: Session = Depends(get_db),
-    # current_user: models.User = Depends(get_current_user_required) # Auth not strictly needed for general tips
+    current_user: models.User = Depends(get_current_user_required)
 ):
     """
-    Retrieves general health tips available to all users.
-    TODO: Add endpoint for personalized tips if needed.
+    Retrieves general health tips for authenticated users.
     """
-    tips = crud_health_tip.get_health_tips(db, limit=limit)
-    return tips
+    try:
+        tips = crud_health_tip.get_health_tips(db, limit=limit)
+        return tips
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching health tips: {str(e)}"
+        )
 
 @router.get("/diary", response_model=health_diary_schemas.PaginatedHealthDiaryResponse, summary="Get My Diary Entries (Paginated)")
 async def get_my_diary_entries(
