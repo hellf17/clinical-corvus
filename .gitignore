@@ -196,20 +196,23 @@ dist/
 # Other related files
 clinical-corvus.code-workspace
 *.png
-brand-guide-revised.md
+#brand-guide-revised.md
 
-# Example files
-exemplos/
+# Docs files
+docs/
 
 # # BAML
-#baml_client/
-#baml_src/
-#backend-api/baml_client/
+baml_client/
+baml_src/
+backend-api/baml_client/
 
 # # MCP Server
-#mcp_server/
+mcp_server/
 
 # # Backend
-# backend-api/services
-# backend-api/utils
-# backend-api/agents
+backend-api/services
+backend-api/utils
+backend-api/agents
+backend-api/clients
+backend-api/extractors
+backend-api/routers
