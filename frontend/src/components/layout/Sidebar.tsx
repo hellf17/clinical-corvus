@@ -16,6 +16,9 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuBadge,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
   SidebarHeader
 } from '@/components/ui/Sidebar';
 import {
@@ -40,6 +43,7 @@ type MenuItem = {
   disabled?: boolean;
   soon?: boolean;
   action?: 'login';
+  children?: MenuItem[];
 };
 
 // Logo component for sidebar
@@ -72,9 +76,16 @@ const AppSidebar = () => {
     { label: 'Login', icon: LogIn, action: 'login' },
   ];
 
-  // Itens para médicos e estudantes
+  // Itens para médicos estudantes
   const doctorItems: MenuItem[] = [
-    { label: 'Visão Geral', href: '/dashboard-doctor', icon: LayoutDashboard},
+    {
+      label: 'Dashboard geral',
+      href: '/dashboard-doctor',
+      icon: LayoutDashboard,
+      children: [
+        { label: 'Grupos', href: '/dashboard-doctor/groups', icon: Users },
+      ]
+    },
     { label: 'Análise Laboratorial', href: '/analysis', icon: Upload },
     { label: 'Academia Clínica', href: '/academy', icon: BrainCircuit },
     { label: 'Chat Dr. Corvus', href: '/chat', icon: MessageSquare, disabled: true, soon: true },
@@ -148,19 +159,42 @@ const AppSidebar = () => {
               </SidebarMenuButton>
             </SignInButton>
           ) : (
-            <SidebarMenuButton
-              asChild
-              disabled={item.disabled}
-              className={item.disabled ? 'cursor-not-allowed opacity-60' : ''}
-              aria-disabled={item.disabled}
-              onClick={(e) => item.disabled && e.preventDefault()}
-            >
-              <Link href={item.href || '#'}>
-                {item.icon && <item.icon className="h-4 w-4" />}
-                <span>{item.label}</span>
-                {item.soon && <SidebarMenuBadge>Breve</SidebarMenuBadge>}
-              </Link>
-            </SidebarMenuButton>
+            <>
+              <SidebarMenuButton
+                asChild
+                disabled={item.disabled}
+                className={item.disabled ? 'cursor-not-allowed opacity-60' : ''}
+                aria-disabled={item.disabled}
+                onClick={(e) => item.disabled && e.preventDefault()}
+              >
+                <Link href={item.href || '#'}>
+                  {item.icon && <item.icon className="h-4 w-4" />}
+                  <span>{item.label}</span>
+                  {item.soon && <SidebarMenuBadge>Breve</SidebarMenuBadge>}
+                </Link>
+              </SidebarMenuButton>
+              {item.children && item.children.length > 0 && (
+                <SidebarMenuSub>
+                  {item.children.map((child) => (
+                    <SidebarMenuSubItem key={child.label}>
+                      <SidebarMenuSubButton
+                        asChild
+                        disabled={child.disabled}
+                        className={child.disabled ? 'cursor-not-allowed opacity-60' : ''}
+                        aria-disabled={child.disabled}
+                        onClick={(e) => child.disabled && e.preventDefault()}
+                      >
+                        <Link href={child.href || '#'}>
+                          {child.icon && <child.icon className="h-4 w-4" />}
+                          <span>{child.label}</span>
+                          {child.soon && <SidebarMenuBadge>Breve</SidebarMenuBadge>}
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              )}
+            </>
           )}
         </SidebarMenuItem>
       ))}

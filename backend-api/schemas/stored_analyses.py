@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Union
 from datetime import datetime
 
@@ -20,13 +20,11 @@ class Analysis(AnalysisBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {
-        "from_attributes": True,
-        "populate_by_name": True,
-        "json_encoders": {
-            int: lambda v: str(v)
-        }
-    }
+    model_config = ConfigDict(
+        from_attributes=True,
+        populate_by_name=True,
+        json_encoders={int: lambda v: str(v)}
+    )
 
     def model_dump(self, **kwargs):
         data = super().model_dump(**kwargs)

@@ -34,34 +34,44 @@ def test_user_patient_relationship(sqlite_session):
     patient1 = models.Patient(
         user_id=user.user_id,
         name="Patient One",
-        idade=35,
-        sexo="F"
+        birthDate=datetime(1989, 1, 1),  # 35 years old
+        gender="F"
     )
     patient2 = models.Patient(
         user_id=user.user_id,
         name="Patient Two",
-        idade=42,
-        sexo="M"
+        birthDate=datetime(1982, 1, 1),  # 42 years old
+        gender="M"
     )
     
     # Add to session and commit
     sqlite_session.add_all([patient1, patient2])
+    sqlite_session.commit()
+
+    # Create doctor-patient associations
+    from database.models import doctor_patient_association
+    sqlite_session.execute(
+        doctor_patient_association.insert().values([
+            {'doctor_user_id': user.user_id, 'patient_patient_id': patient1.patient_id},
+            {'doctor_user_id': user.user_id, 'patient_patient_id': patient2.patient_id}
+        ])
+    )
     sqlite_session.commit()
     
     # Query user and check relationships
     db_user = sqlite_session.query(models.User).filter_by(email="relationship_test@example.com").first()
     
     # Verify one-to-many relationship
-    assert len(db_user.patients) == 2
-    
+    assert len(db_user.managed_patients) == 2
+
     # Check if patients are correctly associated
-    patient_names = [p.name for p in db_user.patients]
+    patient_names = [p.name for p in db_user.managed_patients]
     assert "Patient One" in patient_names
     assert "Patient Two" in patient_names
-    
+
     # Verify bidirectional relationship
-    for patient in db_user.patients:
-        assert patient.user.email == "relationship_test@example.com"
+    for patient in db_user.managed_patients:
+        assert patient.user_account.email == "relationship_test@example.com"
 
 def test_medication_relationships(sqlite_session):
     """Test relationships between Medication, Patient and User models."""
@@ -78,7 +88,7 @@ def test_medication_relationships(sqlite_session):
     patient = models.Patient(
         user_id=user.user_id,
         name="Med Patient",
-        idade=50
+        birthDate=datetime(1974, 1, 1)  # 50 years old
     )
     sqlite_session.add(patient)
     sqlite_session.commit()
@@ -153,7 +163,7 @@ def test_clinical_notes_relationships(sqlite_session):
     patient = models.Patient(
         user_id=user.user_id,
         name="Notes Patient",
-        idade=65
+        birthDate=datetime(1959, 1, 1)  # 65 years old
     )
     sqlite_session.add(patient)
     sqlite_session.commit()
@@ -208,7 +218,7 @@ def test_ai_chat_conversation_relationships(sqlite_session):
     patient = models.Patient(
         user_id=user.user_id,
         name="Chat Patient",
-        idade=40
+        birthDate=datetime(1984, 1, 1)  # 40 years old
     )
     sqlite_session.add(patient)
     sqlite_session.commit()
@@ -276,7 +286,7 @@ def test_alert_relationships(sqlite_session):
     patient = models.Patient(
         user_id=user.user_id,
         name="Alert Patient",
-        idade=55
+        birthDate=datetime(1969, 1, 1)  # 55 years old
     )
     sqlite_session.add(patient)
     sqlite_session.commit()
@@ -338,16 +348,26 @@ def test_multi_level_relationships(sqlite_session):
     patient1 = models.Patient(
         user_id=user.user_id,
         name="Complex Patient One",
-        idade=60,
-        sexo="M"
+        birthDate=datetime(1964, 1, 1),  # 60 years old
+        gender="M"
     )
     patient2 = models.Patient(
         user_id=user.user_id,
         name="Complex Patient Two",
-        idade=45,
-        sexo="F"
+        birthDate=datetime(1979, 1, 1),  # 45 years old
+        gender="F"
     )
     sqlite_session.add_all([patient1, patient2])
+    sqlite_session.commit()
+
+    # Create doctor-patient associations
+    from database.models import doctor_patient_association
+    sqlite_session.execute(
+        doctor_patient_association.insert().values([
+            {'doctor_user_id': user.user_id, 'patient_patient_id': patient1.patient_id},
+            {'doctor_user_id': user.user_id, 'patient_patient_id': patient2.patient_id}
+        ])
+    )
     sqlite_session.commit()
     
     # Create test category
@@ -424,7 +444,7 @@ def test_multi_level_relationships(sqlite_session):
     
     # 1. Get all lab results for a user through patients
     user_labs = []
-    for patient in user.patients:
+    for patient in user.managed_patients:
         user_labs.extend(patient.lab_results)
     
     assert len(user_labs) == 2

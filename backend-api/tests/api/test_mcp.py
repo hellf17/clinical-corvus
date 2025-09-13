@@ -14,7 +14,7 @@ class TestMCPEndpoints:
     """Testes para os endpoints de integração com APIs médicas via MCP."""
 
     @patch("requests.post")  # Patch direto do requests
-    def test_pubmed_search(self, mock_post, sqlite_client, mock_auth_headers):
+    def test_pubmed_search(self, mock_post, sqlite_client):
         """Testa a busca na API do PubMed."""
         # Configura o mock para simular a resposta da API
         mock_response = MagicMock()
@@ -46,8 +46,7 @@ class TestMCPEndpoints:
         # Verifica primeiro se o endpoint existe, caso contrário, o teste passa condicionalmente
         response = sqlite_client.post(
             "/api/mcp/pubmed/search",
-            json=search_data,
-            headers=mock_auth_headers
+            json=search_data
         )
         
         # Se o endpoint não existir (404), pular as verificações
@@ -69,7 +68,7 @@ class TestMCPEndpoints:
         mock_post.assert_called_once()
 
     @patch("requests.post")
-    def test_brave_search(self, mock_post, sqlite_client, mock_auth_headers):
+    def test_brave_search(self, mock_post, sqlite_client):
         """Testa a busca na API do Brave Search."""
         # Configura o mock para simular a resposta da API
         mock_response = MagicMock()
@@ -97,8 +96,7 @@ class TestMCPEndpoints:
         # Faz a requisição para o endpoint
         response = sqlite_client.post(
             "/api/mcp/brave/web",
-            json=search_data,
-            headers=mock_auth_headers
+            json=search_data
         )
         
         # Se o endpoint não existir (404), pular as verificações
@@ -119,7 +117,7 @@ class TestMCPEndpoints:
         mock_post.assert_called_once()
 
     @patch("requests.post")
-    def test_medical_query(self, mock_post, sqlite_client, mock_auth_headers):
+    def test_medical_query(self, mock_post, sqlite_client):
         """Testa a consulta médica contextualizada."""
         # Configura o mock para simular a resposta da API
         mock_response = MagicMock()
@@ -151,8 +149,7 @@ class TestMCPEndpoints:
         # Faz a requisição para o endpoint
         response = sqlite_client.post(
             "/api/mcp/medical/query",
-            json=query_data,
-            headers=mock_auth_headers
+            json=query_data
         )
         
         # Se o endpoint não existir (404), pular as verificações
@@ -188,7 +185,7 @@ class TestMCPEndpoints:
         assert "status" in result
         
     @patch("requests.post")
-    def test_fetch_paper_details(self, mock_post, sqlite_client, mock_auth_headers):
+    def test_fetch_paper_details(self, mock_post, sqlite_client):
         """Testa a busca de detalhes de um artigo no PubMed."""
         # Configura o mock para simular a resposta da API
         mock_response = MagicMock()
@@ -218,8 +215,7 @@ class TestMCPEndpoints:
         # Faz a requisição para o endpoint
         response = sqlite_client.post(
             "/api/mcp/pubmed/paper_details",
-            json=paper_data,
-            headers=mock_auth_headers
+            json=paper_data
         )
         
         # Se o endpoint não existir (404), pular as verificações
@@ -241,7 +237,7 @@ class TestMCPEndpoints:
         mock_post.assert_called_once()
 
     @patch("requests.post")
-    def test_mcp_error_handling(self, mock_post, sqlite_client, mock_auth_headers):
+    def test_mcp_error_handling(self, mock_post, sqlite_client):
         """Testa o tratamento de erros nas requisições para o MCP."""
         # Configura o mock para simular uma falha na API
         mock_response = MagicMock()
@@ -258,8 +254,7 @@ class TestMCPEndpoints:
         # Faz a requisição para o endpoint
         response = sqlite_client.post(
             "/api/mcp/pubmed/search",
-            json=search_data,
-            headers=mock_auth_headers
+            json=search_data
         )
         
         # Se o endpoint não existir (404), pular as verificações

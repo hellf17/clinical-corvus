@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
+from schemas.group_invitation import GroupInvitationListResponse
 
 from database import get_db, models
 from security import get_current_user_required
@@ -13,6 +14,7 @@ from crud import patients as crud_patients
 from crud import crud_health_tip
 from crud import crud_health_diary
 from crud import crud_lab_result
+import services.group_invitations as group_invitations_service
 
 router = APIRouter(
     tags=["Me - Current User Data"],
@@ -51,18 +53,25 @@ async def get_my_patient_profile(
 async def get_general_health_tips(
     limit: int = 10,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user_required)
+    # current_user: models.User = Depends(get_current_user_required) # Auth not strictly needed for general tips
 ):
     """
-    Retrieves general health tips for authenticated users.
+    Retrieves general health tips available to all users.
+    TODO: Add endpoint for personalized tips if needed.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"🏥 Fetching health tips with limit: {limit}")
         tips = crud_health_tip.get_health_tips(db, limit=limit)
+        logger.info(f"✅ Successfully fetched {len(tips)} health tips")
         return tips
     except Exception as e:
+        logger.error(f"❌ Error fetching health tips: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error fetching health tips: {str(e)}"
+            detail=f"Failed to fetch health tips: {str(e)}"
         )
 
 @router.get("/diary", response_model=health_diary_schemas.PaginatedHealthDiaryResponse, summary="Get My Diary Entries (Paginated)")
@@ -125,4 +134,31 @@ async def get_my_lab_summary(
         # days_limit is not implemented in current CRUD, add if needed
     )
     
-    return summary_data 
+    return summary_data
+
+@router.get("/invitations", response_model=GroupInvitationListResponse, summary="Get My Group Invitations")
+async def get_my_invitations(
+    skip: int = Query(0, ge=0, description="Number of invitations to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of invitations per page"),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user_required)
+):
+    """
+    Retrieves group invitations for the logged-in user.
+    """
+    try:
+        # Get all pending invitations for the user's email
+        invitations = group_invitations_service.get_pending_invitations_for_email(
+            db, current_user.email
+        )
+        
+        # Apply pagination
+        total = len(invitations)
+        paginated_invitations = invitations[skip:skip + limit]
+        
+        return GroupInvitationListResponse(items=paginated_invitations, total=total)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch invitations: {str(e)}"
+        )

@@ -5,20 +5,22 @@ import { useRouter, usePathname } from 'next/navigation';
 // import { useAuthStore } from '@/store/authStore'; // Remove Zustand store
 import { useAuth, useUser } from '@clerk/nextjs'; // Import Clerk hooks
 import { Spinner } from '@/components/ui/Spinner'; // Assuming Spinner is used for loading
+import { useGroupContext } from '@/context/GroupContext'; // Import GroupContext
 
 interface AuthGuardProps {
   children: React.ReactNode;
   allowedRoles?: Array<'doctor' | 'guest'>; // Future patient support (commented out for now)
 }
 
-export default function AuthGuard({ 
-  children, 
+export default function AuthGuard({
+  children,
   allowedRoles = ['doctor'] // Default allowed roles (patient support commented out for now)
 }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { isLoaded, userId } = useAuth(); // Use Clerk's loading state and userId
   const { user } = useUser(); // Get user details, including metadata
+  const { currentGroup, userGroups, loading: groupLoading } = useGroupContext(); // Get group context
 
   // Determine user role from Clerk metadata
   // Assumes role is stored in publicMetadata: { role: 'doctor' }
@@ -26,16 +28,36 @@ export default function AuthGuard({
 
   useEffect(() => {
     // Wait until Clerk is loaded and user data is available
-    if (isLoaded) {
+    if (isLoaded && !groupLoading) {
       // Middleware handles redirecting unauthenticated users, so we only check roles here.
       // If user is loaded (implies authenticated via middleware) but no role is set...
       if (userId && !userRole) {
         // Allow access to role selection page
-        if (pathname !== '/choose-role') { 
+        if (pathname !== '/choose-role') {
           console.log('AuthGuard: Redirecting to /choose-role (no role found)');
           router.push('/choose-role');
         }
         return; // Stop further checks if redirecting to role selection
+      }
+
+      // Check group-based access for group routes
+      if (userId && pathname.startsWith('/dashboard-doctor/groups/')) {
+        // Extract group ID from the URL path
+        const groupPathRegex = /^\/dashboard-doctor\/groups\/(\d+)/;
+        const match = pathname.match(groupPathRegex);
+        
+        if (match) {
+          const groupId = parseInt(match[1], 10);
+          
+          // Check if user is a member of this group
+          const isGroupMember = userGroups.some(group => group.group_id === groupId);
+          
+          if (!isGroupMember) {
+            console.log(`AuthGuard: User ${userId} is not a member of group ${groupId}`);
+            router.push('/unauthorized');
+            return;
+          }
+        }
       }
 
       // If user is loaded and has a role, check if it's allowed for the current route
@@ -54,10 +76,10 @@ export default function AuthGuard({
       // Current logic: If 'guest' is not in allowedRoles, the previous check handles redirection.
       // If 'guest' IS in allowedRoles, they pass through.
     }
-  }, [isLoaded, userId, userRole, router, pathname, allowedRoles]);
+  }, [isLoaded, groupLoading, userId, userRole, userGroups, router, pathname, allowedRoles]);
 
-  // Show loading spinner while Clerk is initializing
-  if (!isLoaded) {
+  // Show loading spinner while Clerk is initializing or groups are loading
+  if (!isLoaded || groupLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Spinner size="lg" />

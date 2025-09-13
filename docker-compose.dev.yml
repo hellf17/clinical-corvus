@@ -1,36 +1,58 @@
 services:
+  # PostgreSQL Database
   postgres:
-    image: postgres:14
+    image: postgres:15-alpine
+    container_name: clinical-corvus-postgres-dev
     environment:
-      - POSTGRES_USER=${DB_USER:-clinical_corvus}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-clinical_corvus_pass}
-      - POSTGRES_DB=${DB_NAME:-clinical_corvus}
+      POSTGRES_USER: clinical_corvus
+      POSTGRES_PASSWORD: clinical_corvus_230511
+      POSTGRES_DB: clinical_corvus
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
-      - clinical-corvus-network
-    restart: always
+      - clinical-corvus-dev
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-clinical_corvus}"]
+      test: ["CMD-SHELL", "pg_isready -U clinical_corvus"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Neo4j Database
+  neo4j:
+    image: neo4j:5.15
+    container_name: clinical-corvus-neo4j-dev
+    environment:
+      NEO4J_AUTH: neo4j/clinicalcorvus123
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_security_procedures_allowlist: apoc.*
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data_dev:/data
+      - neo4j_logs_dev:/logs
+    networks:
+      - clinical-corvus-dev
+    healthcheck:
+      test: ["CMD", "neo4j", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Backend API (Development) - Optimized for fast builds
   backend-api:
     build:
       context: .
-      dockerfile: backend-api/Dockerfile.prod
-    image: clinical-corvus-backend-dev
-    restart: always
+      dockerfile: ./backend-api/Dockerfile.dev
+    image: clinical-corvus-backend-dev:latest
+    container_name: clinical-corvus-backend-dev
     env_file:
       - ./.env
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - SECRET_KEY=${SECRET_KEY}
@@ -38,71 +60,216 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
       - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
       - NCBI_API_KEY=${NCBI_API_KEY}
       - BRAVE_API_KEY=${BRAVE_API_KEY}
-      - POSTGRES_URL=postgresql://${DB_USER:-clinical_corvus}:${DB_PASSWORD:-clinical_corvus_pass}@postgres:5432/${DB_NAME:-clinical_corvus}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       - MCP_SERVER_URL=http://mcp_server:8765
+      - RAG_USE_QDRANT=true
+      - QDRANT_URL=http://qdrant:6333
+      - RAG_USE_WHOOSH=true
+      - RAG_WHOOSH_INDEX_DIR=/app/data/whoosh_index
+      - RAG_ENABLE_RERANKER=false
+      - DOCLING_ENABLE=true
+      - INGEST_URL_DIRECT=false
+      # Optimization environment variables
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PIP_NO_CACHE_DIR=1
+      - PIP_DISABLE_PIP_VERSION_CHECK=1
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+    volumes:
+      # Bind mounts for live code reloading (optimized order)
+      - ./backend-api:/app:delegated
+      - ./baml_client:/app/baml_client:delegated
+      - ./requirements-shared.txt:/app/requirements-shared.txt:ro
+      # Named volumes for caching (persistent across rebuilds)
+      - backend_deps:/opt/venv
+      - whoosh_index_dev:/app/data/whoosh_index
+      # pip cache volume for faster dependency installs
+      - pip_cache_backend:/root/.cache/pip
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
     networks:
-      - clinical-corvus-network
+      - clinical-corvus-dev
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        - POSTGRES_URL=postgresql://${DB_USER:-clinical_corvus}:${DB_PASSWORD:-clinical_corvus_pass}@postgres:5432/${DB_NAME:-clinical_corvus}
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env
-    environment:
-      - NEXT_PUBLIC_API_URL=${API_URL:-http://backend-api:8000/api}
-      - NODE_ENV=production
-      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DEEPL_API_KEY=${DEEPL_API_KEY}
-      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
-    networks:
-      - clinical-corvus-network
-    restart: always
-    depends_on:
-      - backend-api
-
+  # MCP Server (Development) - Optimized for fast builds
   mcp_server:
     build:
       context: .
-      dockerfile: mcp_server/Dockerfile.prod
-    ports:
-      - "8765:8765"
-    env_file:
-      - ./.env
+      dockerfile: mcp_server/Dockerfile.dev
+    image: clinical-corvus-mcp-dev:latest
+    container_name: clinical-corvus-mcp-dev
     environment:
-      - NCBI_API_KEY=${NCBI_API_KEY}
-      - BRAVE_API_KEY=${BRAVE_API_KEY}
-      - MCP_PORT=8765
-      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=clinicalcorvus123
+      - MCP_PORT=8001
+      - ENVIRONMENT=development
+      - DEBUG=true
+      # Optimization environment variables
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PIP_NO_CACHE_DIR=1
+      - PIP_DISABLE_PIP_VERSION_CHECK=1
+    ports:
+      - "8001:8001"
+      - "5679:5678"  # Debug port (mapped to avoid conflict)
+    volumes:
+      # Bind mounts for live code reloading (optimized order)
+      - ./mcp_server:/app:delegated
+      - ./baml_client:/app/baml_client:delegated
+      - ./requirements-shared.txt:/app/requirements-shared.txt:ro
+      # Named volumes for caching (persistent across rebuilds)
+      - mcp_deps:/opt/venv
+      # pip cache volume for faster dependency installs
+      - pip_cache_mcp:/root/.cache/pip
+    depends_on:
+      neo4j:
+        condition: service_healthy
     networks:
-      - clinical-corvus-network
-    restart: always
+      - clinical-corvus-dev
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8765/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 6
+      start_period: 60s
 
-networks:
-  clinical-corvus-network:
-    driver: bridge
+  # Frontend (Development) - Optimized for fast builds
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    image: clinical-corvus-frontend-dev:latest
+    container_name: clinical-corvus-frontend-dev
+    environment:
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      - NEXT_PUBLIC_BACKEND_URL=http://backend-api:8000
+      - NEXT_PUBLIC_MCP_URL=http://localhost:8001
+      - NODE_ENV=development
+      # Optimization environment variables
+      - NEXT_TELEMETRY_DISABLED=1
+      - npm_config_cache=/app/.npm-cache
+      - npm_config_prefer_offline=true
+      - npm_config_audit=false
+      - npm_config_fund=false
+    command: npm run dev
+    ports:
+      - "3000:3000"
+      - "9230:9229"  # Debug port (mapped to avoid conflict)
+    volumes:
+      # Bind mounts for live code reloading (optimized order)
+      - ./frontend:/app:delegated
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+      # Cache volumes for faster builds
+      - npm_cache_frontend:/app/.npm-cache
+    depends_on:
+      backend-api:
+        condition: service_healthy
+      mcp_server:
+        condition: service_healthy
+    networks:
+      - clinical-corvus-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health", "--max-time", "10"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+
+  # Redis (for caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: clinical-corvus-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    networks:
+      - clinical-corvus-dev
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MailHog (for email testing in development)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: clinical-corvus-mailhog-dev
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - clinical-corvus-dev
+
+  # Qdrant (Vector DB)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: clinical-corvus-qdrant-dev
+    ports:
+      - "6333:6333"  # HTTP
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_storage_dev:/qdrant/storage
+    networks:
+      - clinical-corvus-dev
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:6333/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # GROBID (Scholarly PDF parser)
+  grobid:
+    image: lfoppiano/grobid:0.8.0
+    container_name: clinical-corvus-grobid-dev
+    ports:
+      - "8070:8070"
+    environment:
+      - GROBID_MAX_CONNECTIONS=10
+      - GROBID_N_THREADS=4
+    networks:
+      - clinical-corvus-dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8070/api/isalive"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  postgres-data: 
+  postgres_data_dev:
+  neo4j_data_dev:
+  neo4j_logs_dev:
+  redis_data_dev:
+  backend_deps:
+  mcp_deps:
+  frontend_node_modules:
+  frontend_next:
+  qdrant_storage_dev:
+  whoosh_index_dev:
+  # Caching volumes for faster builds
+  pip_cache_backend:
+  pip_cache_mcp:
+  npm_cache_frontend:
+
+networks:
+  clinical-corvus-dev:
+    driver: bridge

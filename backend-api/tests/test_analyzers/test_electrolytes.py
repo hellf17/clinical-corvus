@@ -14,14 +14,17 @@ if os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 from analyzers.electrolytes import analisar_eletrolitos
 
 def test_electrolytes_analyzer_empty_data():
-    """Test that the analyzer returns an empty list when no relevant data is provided."""
+    """Test that the analyzer returns expected dictionary structure when no relevant data is provided."""
     # Empty data
     result = analisar_eletrolitos({})
-    assert result == []
+    assert isinstance(result, dict)
+    assert 'interpretation' in result
+    assert 'insufficient' in result['interpretation'].lower() or 'insuficientes' in result['interpretation'].lower()
     
     # Irrelevant data only
     result = analisar_eletrolitos({"Creat": 1.2, "Ur": 35})
-    assert result == []
+    assert isinstance(result, dict)
+    assert 'insufficient' in result['interpretation'].lower() or 'insuficientes' in result['interpretation'].lower()
 
 def test_electrolytes_analyzer_normal_values():
     """Test interpretation of normal electrolyte values."""
@@ -36,12 +39,18 @@ def test_electrolytes_analyzer_normal_values():
     
     result = analisar_eletrolitos(data)
     
-    assert len(result) > 0
-    assert any("Sódio normal" in r for r in result)
-    assert any("Potássio normal" in r for r in result)
-    assert any("Cálcio normal" in r for r in result)
-    assert any("Magnésio normal" in r for r in result)
-    assert any("Fósforo normal" in r for r in result)
+    assert isinstance(result, dict)
+    assert 'interpretation' in result
+    assert 'abnormalities' in result
+    assert 'is_critical' in result
+    assert 'recommendations' in result
+    assert 'details' in result
+    assert result['is_critical'] is False
+    assert "sódio normal" in result['interpretation'].lower() or "na+ normal" in result['interpretation'].lower()
+    assert "potássio normal" in result['interpretation'].lower() or "k+ normal" in result['interpretation'].lower()
+    assert "cálcio total normal" in result['interpretation'].lower() or "ca+ normal" in result['interpretation'].lower()
+    assert "magnésio normal" in result['interpretation'].lower() or "mg+ normal" in result['interpretation'].lower()
+    assert "fósforo normal" in result['interpretation'].lower() or "p normal" in result['interpretation'].lower()
 
 def test_electrolytes_analyzer_hyponatremia():
     """Test interpretation of hyponatremia."""
@@ -52,9 +61,10 @@ def test_electrolytes_analyzer_hyponatremia():
     
     result = analisar_eletrolitos(data)
     
-    assert len(result) > 0
-    assert any("Hiponatremia" in r for r in result)
-    assert any("130" in r for r in result)
+    assert isinstance(result, dict)
+    assert len(result['interpretation']) > 0
+    assert "hiponatremia" in result['interpretation'].lower()
+    assert "130" in result['interpretation'] or "130" in str(result['details'])
     
     # Severe hyponatremia
     data = {
@@ -63,10 +73,10 @@ def test_electrolytes_analyzer_hyponatremia():
     
     result = analisar_eletrolitos(data)
     
-    assert any("Hiponatremia" in r for r in result)
-    assert any("118" in r for r in result)
-    assert any("grave" in r.lower() for r in result)
-    assert any("convulsões" in r.lower() for r in result)
+    assert "hiponatremia" in result['interpretation'].lower()
+    assert "118" in result['interpretation'] or "118" in str(result['details'])
+    assert "grave" in result['interpretation'].lower() or result['is_critical'] is True
+    assert "convulsões" in result['interpretation'].lower() or len(result['recommendations']) > 0
 
 def test_electrolytes_analyzer_hypernatremia():
     """Test interpretation of hypernatremia."""

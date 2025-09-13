@@ -7,7 +7,7 @@ import { Route } from '@playwright/test';
 
 // Flag to enable full page mocking for environments 
 // where the application server might not be available
-const USE_FULL_PAGE_MOCKING = true;
+const USE_FULL_PAGE_MOCKING = false;
 
 test.describe('Fluxo de Autenticação', () => {
   test.beforeEach(async ({ page }) => {

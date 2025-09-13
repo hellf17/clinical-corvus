@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, event, Engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 import tempfile
-from datetime import timedelta
+from datetime import timedelta, date # Added date import
 import jwt
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,10 +17,10 @@ from sqlalchemy.sql import text
 from sqlalchemy.exc import OperationalError
 import warnings
 
-# Add the root directory to the Python path
-parentdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if parentdir not in sys.path:
-    sys.path.insert(0, parentdir)
+# Add the backend-api directory to the Python path
+backend_api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if backend_api_dir not in sys.path:
+    sys.path.insert(0, backend_api_dir)
 
 # Import test settings and apply settings patch FIRST before any other imports
 from tests.test_settings import get_test_settings, patch_production_settings, AppTestSettings
@@ -34,36 +34,40 @@ test_settings = get_test_settings()
 # Try importing database.py directly first
 try:
     from database import Base, get_db, is_sqlite_dialect
-    from database.models import User, AIChatConversation, AIChatMessage  # Usando a estrutura unificada
+    import database.models as models # Import models module directly
 except ImportError:
+    # This block is for fallback if database.models cannot be imported directly.
+    # It attempts to create simplified mock classes for testing purposes.
+    # It's important that this fallback correctly mocks all necessary models.
     import sys
     from sqlalchemy.ext.declarative import declarative_base
     
-    # Create a real Base class for SQLAlchemy
     Base = declarative_base()
     
-    # Create a simplified database module for tests
     class DatabaseModule:
         Base = Base
-        
         def get_db():
-            raise NotImplementedError("This is a mock get_db function")
-    
+            raise NotImplementedError("Mock get_db function")
     sys.modules['database'] = DatabaseModule()
     
-    # Create a simplified dependencies module for tests
-    class DependenciesModule:
-        def get_db():
-            raise NotImplementedError("This is a mock get_db function")
-    
-    sys.modules['dependencies'] = DependenciesModule()
-    
-    # Create minimal model classes needed for tests
+    # Define mock classes
     class User:
         user_id = None
+        clerk_user_id = None
         email = None
         name = None
         role = None
+    
+    class Patient:
+        patient_id = None
+        name = None
+        birthDate = None
+        gender = None
+        weight = None
+        height = None
+        ethnicity = None
+        primary_diagnosis = None
+        user_id = None
     
     class AIChatConversation:
         id = None
@@ -79,27 +83,23 @@ except ImportError:
         content = None
         message_metadata = None
     
-    sys.modules['db_models'] = type('db_models', (), {'User': User})
+    # Create a mock models module and add it to sys.modules
+    # This ensures that `models.User`, `models.Patient`, etc. can be accessed.
+    class MockModels:
+        User = User
+        Patient = Patient
+        AIChatConversation = AIChatConversation
+        AIChatMessage = AIChatMessage
     
-    # Create a models.ai_chat module
-    ai_chat_module = type('ai_chat', (), {
-        'AIChatConversation': AIChatConversation,
-        'AIChatMessage': AIChatMessage
-    })
+    sys.modules['database.models'] = MockModels()
+    # Also ensure 'models' is directly available if some code expects it that way
+    sys.modules['models'] = MockModels()
     
-    # Ensure models package exists
-    if 'models' not in sys.modules:
-        sys.modules['models'] = type('models', (), {})
-    
-    # Add ai_chat to models
-    sys.modules['models.ai_chat'] = ai_chat_module
+# Import models after the try-except block to ensure it's always available
+import database.models as models
 
-# Create a test FastAPI app instead of importing main.py
-app = FastAPI(
-    title="Clinical Helper API Test",
-    version="0.1.0",
-    description="Testing API for Clinical Helper"
-)
+# Import the actual FastAPI app from main.py
+from main import app
 
 # Configure CORS
 app.add_middleware(
@@ -110,19 +110,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Import routers after app creation
-from routers import auth, patients, lab_analysis, medications, clinical_notes, alerts, files, stored_analyses
-from routers.files import upload_pdf_guest
+# Mock Clerk client before importing routers that use it
+from unittest.mock import MagicMock, patch
+import os
 
-# Register the routers
-app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(patients.router, prefix="/api/patients", tags=["Patients"])
-app.include_router(lab_analysis.router, prefix="/api/analyze", tags=["Analysis"])
-app.include_router(medications.router, prefix="/api", tags=["Medications"])
-app.include_router(clinical_notes.router, prefix="/api/clinical-notes", tags=["Clinical Notes"])
-app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
-app.include_router(files.router, prefix="/api/files", tags=["Files"])
-app.include_router(stored_analyses.router, prefix="/api", tags=["Analyses"])
+# Set test environment to disable real API calls
+os.environ['CLERK_SECRET_KEY'] = 'test_key_for_testing'
+
+# Create a mock Clerk client
+mock_clerk_client = MagicMock()
+mock_client_response = MagicMock()
+mock_client_response.client = MagicMock()
+mock_client_response.client.session_ids = ["test_session_123"]
+mock_clerk_client.clients.verify.return_value = mock_client_response
+
+mock_session_response = MagicMock()
+mock_session_response.session = MagicMock()
+mock_session_response.session.user_id = "test_clerk_user_123"
+mock_clerk_client.sessions.get_session.return_value = mock_session_response
+
+mock_user_response = MagicMock()
+mock_user_response.email_addresses = [MagicMock()]
+mock_user_response.email_addresses[0].email_address = "test@example.com"
+mock_user_response.email_addresses[0].id = "primary_email_123"
+mock_user_response.primary_email_address_id = "primary_email_123"
+mock_user_response.first_name = "Test"
+mock_user_response.last_name = "User"
+mock_user_response.public_metadata = {"role": "doctor"}
+mock_clerk_client.users.get.return_value = mock_user_response
+
+# Patch the Clerk client before importing modules that use it
+with patch('clerk_backend_api.Clerk', return_value=mock_clerk_client):
+    # Import routers after app creation
+    from routers import auth, patients, lab_analysis, medications, clinical_notes, alerts, files, stored_analyses, groups
+    from routers.files import upload_pdf_guest
+
+    # Routers are now included directly from main.app, no need to include them here
 
 # Adicionar o endpoint de guest-upload diretamente à aplicação de teste
 @app.post("/api/guest-upload", tags=["Guest Access"])
@@ -196,11 +219,27 @@ def sqlite_client(db_session):
     # Adiciona um usuário de teste ao banco de dados
     test_user = User(
         user_id=1,
+        clerk_user_id="test_clerk_user_123",  # Same as mocked Clerk user
         email="test@example.com",
         name="Test User",
         role="doctor"
     )
     db_session.add(test_user)
+    db_session.commit()
+
+    # Create a test patient for tests that require one (e.g., test_upload_and_analyze_with_patient)
+    test_patient = models.Patient(
+        patient_id=1,
+        name="Test Patient",
+        birthDate=date(2000, 1, 1), # Converted to date object
+        gender="M",
+        weight=70.0,
+        height=170.0,
+        ethnicity="Caucasian",
+        primary_diagnosis="Test Diagnosis",
+        user_id=test_user.user_id # Associate with the test user
+    )
+    db_session.add(test_patient)
     db_session.commit()
     
     # Adiciona uma função para configurar o usuário autenticado para fins de teste
@@ -240,23 +279,26 @@ def sqlite_client(db_session):
     # Adiciona a função ao cliente
     client.set_auth_user = set_auth_user
     
-    yield client
+    yield client, test_user # Yield both client and test_user
     
     # Limpa a substituição de dependência
     app.dependency_overrides.clear()
 
-@pytest.fixture
-def mock_auth_headers():
-    """
-    Cria os cabeçalhos de autenticação simulados para os testes.
-    """
-    # Cria um token de acesso para o usuário de teste (id=1)
-    access_token = jwt.encode(
-        {"sub": "1", "exp": 1745184261},  # Token válido por um longo tempo
-        "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7",  # Secret key
-        algorithm="HS256"
-    )
-    return {"Authorization": f"Bearer {access_token}"}
+# This fixture is part of the legacy authentication system and is no longer needed.
+# The `sqlite_client` and `pg_client` fixtures now handle authentication by mocking the Clerk client,
+# which is the correct approach for the current test setup.
+# @pytest.fixture
+# def mock_auth_headers():
+#     """
+#     Cria os cabeçalhos de autenticação simulados para os testes.
+#     """
+#     # Cria um token de acesso para o usuário de teste (id=1)
+#     access_token = jwt.encode(
+#         {"sub": "1", "exp": 1745184261},  # Token válido por um longo tempo
+#         "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7",  # Secret key
+#         algorithm="HS256"
+#     )
+#     return {"Authorization": f"Bearer {access_token}"}
 
 # Adicionado para inicializar as tabelas do chat AI
 @pytest.fixture

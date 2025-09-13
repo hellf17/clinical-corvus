@@ -6,7 +6,7 @@ import math
 from typing import Dict, List, Optional, Tuple, Any
 import logging
 
-from utils.reference_ranges import REFERENCE_RANGES
+from utils.reference_ranges import get_reference_range
 
 logger = logging.getLogger(__name__)
 
@@ -35,23 +35,56 @@ def _safe_convert_to_float(value_str: Optional[str]) -> Optional[float]:
 def _get_float_value(data: Dict[str, Any], key: str) -> Optional[float]:
     value = data.get(key)
     if value is not None:
-        value_str = str(value) if not isinstance(value, str) else value
-        return _safe_convert_to_float(value_str)
+        if isinstance(value, (int, float)):
+            return float(value)
+        else:
+            value_str = str(value)
+            return _safe_convert_to_float(value_str)
     return None
+
+def _get_criticality_level(param_name, value, thresholds):
+    """
+    Determine the criticality level of a parameter based on stratified thresholds.
+    
+    Args:
+        param_name: Name of the parameter
+        value: The value to evaluate
+        thresholds: Dictionary with 'critical', 'significant', and 'monitoring' thresholds
+        
+    Returns:
+        tuple: (criticality_level, description)
+    """
+    if value is None:
+        return ("UNKNOWN", f"{param_name} value is None")
+    
+    # Check critical thresholds
+    if 'critical' in thresholds:
+        for threshold in thresholds['critical']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+    
+    # Check significant thresholds
+    if 'significant' in thresholds:
+        for threshold in thresholds['significant']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+    
+    # Default to monitoring
+    return ("MONITORING", f"{param_name} MONITORING: {value} - Significant morbidity risk prompt")
+
+# Helper function to safely get and convert lab value (duplicate removed)
 
 # Helper function to get reference range
 def _get_ref_range(param_key: str, sexo: Optional[str] = None) -> Optional[Tuple[float, float]]:
-    if param_key == 'Hb':
-        if sexo == 'M': return (13.5, 17.5)
-        if sexo == 'F': return (12.0, 16.0)
-    elif param_key == 'Ht':
-        if sexo == 'M': return (41.0, 53.0)
-        if sexo == 'F': return (36.0, 46.0)
-    elif param_key == 'RBC': # Add RBC gender specific handling
-        if sexo == 'M': return REFERENCE_RANGES.get('RBC_M', REFERENCE_RANGES.get('RBC'))
-        if sexo == 'F': return REFERENCE_RANGES.get('RBC_F', REFERENCE_RANGES.get('RBC'))
-    
-    return REFERENCE_RANGES.get(param_key)
+    return get_reference_range(param_key, sexo)
 
 def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dict[str, Any]:
     """
@@ -129,13 +162,22 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     if hb_val is not None:
         ref = _get_ref_range('Hb', sexo)
         hb_ref_range_for_ri = ref # Save for RI
+        
+        # Determine criticality level for hemoglobin
+        hb_criticality, hb_description = _get_criticality_level("Hemoglobina", hb_val, {
+            'critical': [20.0, -5.0], # >20.0 or <5.0
+            'significant': [(18.0, 20.0), (5.0, 7.0)],  # 18.0-20.0 or 5.0-7.0
+            'monitoring': [(7.0, 18.0)]  # 7.0-18.0 (normal range)
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        
         _add_interpretation('Hemoglobina', hb_val, 'g/dL', ref,
                             "Baixa", "Alta", "Normal",
                             "Anemia", "Policitemia", 'Hb',
                             critical_low_threshold=7.0,
-                            low_recommendation="Anemia: Investigar causa. Se Hb < 10 g/dL, considerar avaliação mais aprofundada.",
-                            high_recommendation="Policitemia: Investigar causas (desidratação, DPOC, Policitemia Vera).",
-                            critical_low_recommendation="Anemia Grave (Hb < 7.0 g/dL): Risco elevado. Considerar transfusão de hemácias e investigação urgente.")
+                            low_recommendation="Anemia: Investigar causa. Se Hb < 10 g/dL, considerar avaliação mais aprofundada. Segundo as diretrizes da American Society of Hematology, investigar deficiência de ferro, doença crônica, hemólise ou perda aguda.",
+                            high_recommendation="Policitemia: Investigar causas (desidratação, DPOC, Policitemia Vera). Segundo as diretrizes da American Society of Hematology, verificar viscosidade sanguínea e considerar flebotomia se Hb > 18.5 g/dL em homens ou > 16.5 g/dL em mulheres.",
+                            critical_low_recommendation="Anemia Grave (Hb < 7.0 g/dL): Risco elevado. Considerar transfusão de hemácias e investigação urgente. Segundo as diretrizes da American Society of Hematology, transfundir se sintomático ou com cardiopatia. Monitorar sinais de sobrecarga circulatória.")
         if ref and hb_val < ref[0]:
             anemia_present = True
             if hb_val < 7.0: anemia_severity_msg = "Anemia Grave"
@@ -164,14 +206,23 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     leuco_val = _get_float_value(dados, 'Leuco')
     if leuco_val is not None:
         ref = _get_ref_range('Leuco')
+        
+        # Determine criticality level for leukocytes
+        leuco_criticality, leuco_description = _get_criticality_level("Leucócitos Totais", leuco_val, {
+            'critical': [50000, -500], # >50000 or <500
+            'significant': [(30000, 50000), (500, 1000)],  # 30000-50000 or 500-1000
+            'monitoring': [(1000, 30000)]  # 1000-30000 (normal range)
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        
         _add_interpretation('Leucócitos Totais', leuco_val, '/mm³', ref,
                             "Baixos", "Altos", "Normais",
                             "Leucopenia", "Leucocitose", "Leuco",
                             critical_low_threshold=1000.0, critical_high_threshold=30000.0,
-                            low_recommendation="Leucopenia: Investigar causa (infecções virais, drogas, doenças hematológicas).",
-                            high_recommendation="Leucocitose: Sugestivo de infecção, inflamação, estresse ou processo hematológico. Investigar.",
-                            critical_low_recommendation="Leucopenia Grave (<1000/mm³): Risco aumentado de infecções graves. Investigar urgentemente. Considerar neutropenia.",
-                            critical_high_recommendation="Leucocitose Muito Elevada (>30000/mm³): Sugestivo de infecção grave, reação leucemoide ou malignidade hematológica. Investigação urgente.")
+                            low_recommendation="Leucopenia: Investigar causa (infecções virais, drogas, doenças hematológicas). Segundo as diretrizes da American Society of Hematology, verificar histórico de medicações e infecções recentes.",
+                            high_recommendation="Leucocitose: Sugestivo de infecção, inflamação, estresse ou processo hematológico. Investigar. Segundo as diretrizes da American Society of Hematology, considerar leucemia mieloide crônica se leucócitos > 100.000/mm³ com predominância de neutrófilos maduros.",
+                            critical_low_recommendation="Leucopenia Grave (<1000/mm³): Risco aumentado de infecções graves. Investigar urgentemente. Considerar neutropenia. Segundo as diretrizes da American Society of Hematology, iniciar profilaxia com G-CSF e antibióticos se febril.",
+                            critical_high_recommendation="Leucocitose Muito Elevada (>30000/mm³): Sugestivo de infecção grave, reação leucemoide ou malignidade hematológica. Investigação urgente. Segundo as diretrizes da American Society of Hematology, considerar leucostase se > 100.000/mm³ com sintomas respiratórios ou neurológicos.")
 
     # --- Differential Leukocyte Counts ---
     diff_params = [
@@ -217,10 +268,54 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
             crit_low_abs, crit_high_abs = None, None
             low_rec, high_rec = f"Investigar causa de {param_display_name.lower()} baixos (abs).", f"Investigar causa de {param_display_name.lower()} altos (abs)."
             crit_low_rec, crit_high_rec = None, None
+            
+            # Add stratified critical value thresholds for lymphocytes
+            if base_key == 'Lymphocytes':
+                # Determine criticality level for lymphocytes (integrated into main interpretation)
+                linfo_criticality, linfo_description = _get_criticality_level("Linfócitos", abs_val, {
+                    'critical': [10000, -500], # >10000 or <500
+                    'significant': [(5000, 10000), (500, 1000)],  # 5000-10000 or 500-1000
+                    'monitoring': [(1000, 5000)]  # 1000-5000 (normal range)
+                })
+            
+            # Add stratified critical value thresholds for monocytes
+            if base_key == 'Monocytes':
+                # Determine criticality level for monocytes (integrated into main interpretation)
+                mono_criticality, mono_description = _get_criticality_level("Monócitos", abs_val, {
+                    'critical': [5000, -100], # >5000 or <100
+                    'significant': [(2000, 5000), (100, 500)],  # 2000-5000 or 100-500
+                    'monitoring': [(500, 2000)]  # 500-2000 (normal range)
+                })
+            
+            # Add stratified critical value thresholds for eosinophils
+            if base_key == 'Eosinophils':
+                # Determine criticality level for eosinophils (integrated into main interpretation)
+                eosi_criticality, eosi_description = _get_criticality_level("Eosinófilos", abs_val, {
+                    'critical': [5000, -50], # >5000 or <50
+                    'significant': [(2000, 5000), (50, 500)],  # 2000-5000 or 50-500
+                    'monitoring': [(500, 2000)]  # 500-2000 (normal range)
+                })
+            
+            # Add stratified critical value thresholds for basophils
+            if base_key == 'Basophils':
+                # Determine criticality level for basophils (integrated into main interpretation)
+                baso_criticality, baso_description = _get_criticality_level("Basófilos", abs_val, {
+                    'critical': [2000, -20], # >2000 or <20
+                    'significant': [(1000, 2000), (20, 200)],  # 1000-2000 or 20-200
+                    'monitoring': [(200, 1000)]  # 200-1000 (normal range)
+                })
 
             if base_key == 'Neutrophils':
                 low_msg = "Baixos (Neutropenia)"
                 low_abn = "Neutropenia (Abs)"
+                
+                # Determine criticality level for neutrophils (integrated into main interpretation)
+                neutro_criticality, neutro_description = _get_criticality_level("Neutrófilos", abs_val, {
+                    'critical': [10000, -500], # >10000 or <500
+                    'significant': [(7500, 10000), (500, 1000)],  # 7500-10000 or 500-1000
+                    'monitoring': [(1000, 7500)]  # 1000-7500 (normal range)
+                })
+                
                 if ref_abs and abs_val < ref_abs[0]: # Specific neutropenia recommendations
                     if abs_val < 500:
                         crit_low_abs = abs_val # Value itself is the critical threshold boundary
@@ -232,6 +327,14 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
             elif base_key == 'Bands' and ref_abs and abs_val > ref_abs[1]:
                  high_msg = "Altos (Desvio à Esquerda/Bandemia)"
                  high_abn = "Desvio à Esquerda/Bandemia (Abs)"
+                 
+                 # Determine criticality level for bands (integrated into main interpretation)
+                 bands_criticality, bands_description = _get_criticality_level("Bastonetes", abs_val, {
+                     'critical': [5000, -100], # >5000 or <100
+                     'significant': [(2000, 5000), (100, 500)],  # 2000-5000 or 100-500
+                     'monitoring': [(500, 2000)]  # 500-2000 (normal range)
+                 })
+                 
                  high_rec = "Bandemia/Desvio à Esquerda (Abs): Sugere processo infeccioso/inflamatório agudo."
             
             _add_interpretation(param_display_name, abs_val, '/mm³', ref_abs,
@@ -256,19 +359,35 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     plaq_val = _get_float_value(dados, 'Plaq')
     if plaq_val is not None:
         ref = _get_ref_range('Plaq')
+        
+        # Determine criticality level for platelets (integrated into main interpretation)
+        plaq_criticality, plaq_description = _get_criticality_level("Plaquetas", plaq_val, {
+            'critical': [1500000, -10000], # >1500000 or <10000
+            'significant': [(1000000, 1500000), (10000, 20000)],  # 1000000-1500000 or 10000-20000
+            'monitoring': [(20000, 1000000)]  # 20000-1000000 (normal range)
+        })
+        
         _add_interpretation('Plaquetas', plaq_val, '/mm³', ref,
                             "Baixas", "Altas", "Normais",
                             "Trombocitopenia", "Trombocitose", "Plaq",
                             critical_low_threshold=20000.0, critical_high_threshold=1000000.0,
-                            low_recommendation="Trombocitopenia: Investigar causa. Risco de sangramento se < 50.000/mm³.",
-                            high_recommendation="Trombocitose: Investigar causa. Risco de trombose se > 600.000/mm³.",
-                            critical_low_recommendation="Trombocitopenia Grave (<20.000/mm³): Risco elevado de sangramento espontâneo. Avaliação urgente.",
-                            critical_high_recommendation="Trombocitose Extrema (>1.000.000/mm³): Considerar doença mieloproliferativa. Avaliar risco trombótico.")
+                            low_recommendation="Trombocitopenia: Investigar causa. Risco de sangramento se < 50.000/mm³. Segundo as diretrizes da American Society of Hematology, investigar ITP, TTP, HUS, aplasia medular ou hipersplenismo.",
+                            high_recommendation="Trombocitose: Investigar causa. Risco de trombose se > 600.000/mm³. Segundo as diretrizes da American Society of Hematology, verificar reação secundária (inflamação, pós-esplenectomia) ou doença mieloproliferativa.",
+                            critical_low_recommendation="Trombocitopenia Grave (<20.000/mm³): Risco elevado de sangramento espontâneo. Avaliação urgente. Segundo as diretrizes da American Society of Hematology, considerar transfusão de plaquetas se sangramento ativo ou procedimento cirúrgico planejado.",
+                            critical_high_recommendation="Trombocitose Extrema (>1.000/mm³): Considerar doença mieloproliferativa. Avaliar risco trombótico. Segundo as diretrizes da American Society of Hematology, considerar JAK2, CALR ou MPL mutation testing e iniciar aspirina para profilaxia trombótica.")
 
     # --- Reticulocytes ---
-    retic_perc_val = _get_float_value(dados, 'Retic') 
+    retic_perc_val = _get_float_value(dados, 'Retic')
     if retic_perc_val is not None:
-        ref_perc = _get_ref_range('Retic') 
+        ref_perc = _get_ref_range('Retic')
+        
+        # Determine criticality level for reticulocytes (integrated into main interpretation)
+        retic_criticality, retic_description = _get_criticality_level("Reticulócitos", retic_perc_val, {
+            'critical': [10.0, -0.1], # >10.0 or <0.1
+            'significant': [(5.0, 10.0), (0.1, 1.0)],  # 5.0-10.0 or 0.1-1.0
+            'monitoring': [(1.0, 5.0)]  # 1.0-5.0 (normal range)
+        })
+        
         _add_interpretation('Reticulócitos', retic_perc_val, '%', ref_perc,
                             "Reduzidos", "Aumentados", "Normais",
                             "Reticulopenia (%)", "Reticulocitose (%)", "Retic_perc",
@@ -347,6 +466,14 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     vcm_val = _get_float_value(dados, 'VCM')
     if vcm_val is not None:
         ref = _get_ref_range('VCM')
+        
+        # Determine criticality level for VCM (integrated into main interpretation)
+        vcm_criticality, vcm_description = _get_criticality_level("VCM (Volume Corpuscular Médio)", vcm_val, {
+            'critical': [120.0, -60.0], # >120.0 or <60.0
+            'significant': [(100.0, 120.0), (60.0, 80.0)],  # 100.0-120.0 or 60.0-80.0
+            'monitoring': [(80.0, 100.0)]  # 80.0-100.0 (normal range)
+        })
+        
         _add_interpretation('VCM (Volume Corpuscular Médio)', vcm_val, 'fL', ref,
                             "Baixo (Microcitose)", "Alto (Macrocitose)", "Normal (Normocitose)",
                             "Microcitose", "Macrocitose", "VCM")
@@ -354,6 +481,14 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     hcm_val = _get_float_value(dados, 'HCM')
     if hcm_val is not None:
         ref = _get_ref_range('HCM')
+        
+        # Determine criticality level for HCM (integrated into main interpretation)
+        hcm_criticality, hcm_description = _get_criticality_level("HCM (Hemoglobina Corpuscular Média)", hcm_val, {
+            'critical': [40.0, -20.0], # >40.0 or <20.0
+            'significant': [(33.0, 40.0), (20.0, 27.0)],  # 33.0-40.0 or 20.0-27.0
+            'monitoring': [(27.0, 33.0)]  # 27.0-33.0 (normal range)
+        })
+        
         _add_interpretation('HCM (Hemoglobina Corpuscular Média)', hcm_val, 'pg', ref,
                             "Baixa (Hipocromia)", "Alta (Hipercromia)", "Normal (Normocromia)",
                             "Hipocromia", "Hipercromia", "HCM")
@@ -361,6 +496,14 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     chcm_val = _get_float_value(dados, 'CHCM')
     if chcm_val is not None:
         ref = _get_ref_range('CHCM')
+        
+        # Determine criticality level for CHCM (integrated into main interpretation)
+        chcm_criticality, chcm_description = _get_criticality_level("CHCM (Conc. Hemoglobina Corpuscular Média)", chcm_val, {
+            'critical': [40.0, -25.0], # >40.0 or <25.0
+            'significant': [(36.0, 40.0), (25.0, 32.0)],  # 36.0-40.0 or 25.0-32.0
+            'monitoring': [(32.0, 36.0)]  # 32.0-36.0 (normal range)
+        })
+        
         _add_interpretation('CHCM (Conc. Hemoglobina Corpuscular Média)', chcm_val, 'g/dL', ref,
                             "Baixa (Hipocromia)", "Alta (Esferocitose? Artefato?)", "Normal (Normocromia)",
                             "Hipocromia (CHCM)", "CHCM Alto", "CHCM")
@@ -369,6 +512,14 @@ def analisar_hemograma(dados: Dict[str, Any], sexo: Optional[str] = None) -> Dic
     rdw_is_high = False
     if rdw_val is not None:
         ref = _get_ref_range('RDW')
+        
+        # Determine criticality level for RDW (integrated into main interpretation)
+        rdw_criticality, rdw_description = _get_criticality_level("RDW (Amplitude de Distribuição Eritrocitária)", rdw_val, {
+            'critical': [20.0, -10.0], # >20.0 or <10.0
+            'significant': [(15.0, 20.0), (10.0, 12.0)],  # 15.0-20.0 or 10.0-12.0
+            'monitoring': [(12.0, 15.0)]  # 12.0-15.0 (normal range)
+        })
+        
         _add_interpretation('RDW (Amplitude de Distribuição Eritrocitária)', rdw_val, '%', ref,
                             "Baixo (raro, sem significado clínico usual)", "Alto (Anisocitose)", "Normal",
                             "RDW Baixo", "Anisocitose (RDW Alto)", "RDW",

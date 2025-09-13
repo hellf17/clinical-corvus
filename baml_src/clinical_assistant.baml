@@ -21,100 +21,63 @@ class LabAnalysisInput {
 }
 
 class LabInsightsOutput {
-  // Campos para Pacientes
-  patient_friendly_summary string? @description("A summary for the patient in simple terms.")
-  potential_health_implications_patient string[]? @description("Potential health implications for the patient.")
-  lifestyle_tips_patient string[]? @description("Lifestyle tips a patient could discuss with their doctor.")
-  important_results_to_discuss_with_doctor string[]? @description("Highlights of results that warrant discussion with a doctor.")
-
-  // Campos para Profissionais (RESUMOS/DESTAQUES do CoT)
-  professional_detailed_reasoning_cot string? @description("The complete DETAILED REASONING PROCESS (CHAIN-OF-THOUGHT) from Dr. Corvus, explaining how the insights were derived. Filled only for the DOCTOR_STUDENT user_role.")
-  key_abnormalities_professional string[]? @description("Summary of the main abnormalities identified in the CoT.")
-  key_normal_results_with_context string[]? @description("Summary of the main relevant normal results identified in the CoT.")
-  potential_patterns_and_correlations string[]? @description("Summary of the main patterns and correlations identified in the CoT.")
-  differential_considerations_professional string[]? @description("Summary of the main differential diagnostic considerations from the CoT.")
-  suggested_next_steps_professional string[]? @description("Summary of the main suggested next steps and investigations from the CoT.")
+  // The complete clinical reasoning process with enhanced formatting and section highlighting
+  professional_detailed_reasoning_cot string @description("The complete 6-step clinical reasoning process with clear markdown formatting and section dividers.")
+  // Objective clinical summary with key actionable information
+  clinical_summary string @description("Concise, objective summary of critical findings, top differential diagnoses, and immediate next steps for clinical decision-making.")
+  // Critical results requiring immediate discussion
+  important_results_to_discuss_with_doctor string[] @description("Key findings that warrant immediate medical attention.")
 }
 
 // --- LLM Function Definition for Lab Insights ---
 function GenerateDrCorvusInsights(input: LabAnalysisInput) -> LabInsightsOutput {
-  client DrCorvusLLM
+  client HighPriorityClient
   prompt #"""
-    // Persona and High-Level Instructions
-    {% if input.user_role == "DOCTOR_STUDENT" %}
-    // PROFESSIONAL MODE
     {{ GetProfessionalIntroduction() }}
     {{ GetProfessionalGuidanceCommunicationRules() }}
 
-    // "No Guessing" Policy and Incomplete Data Handling
-    If the provided data is insufficient for meaningful analysis of a particular aspect (e.g., lack of reference values for a test, very vague or absent history), explicitly mention this limitation in your DETAILED REASONING PROCESS and suggest the need for data completion. If you don't have sufficient information to comment on a specific point with confidence, it's preferable to declare that the information is not available or that analysis is not possible with the provided data, rather than speculating.
-
-    // DETAILED INSTRUCTIONS FOR PROFESSIONAL MODE:
-    Your task is twofold:
-    FIRST, you MUST articulate your "DETAILED REASONING PROCESS" as free text, following the 6 steps below, using markdown bold (**) for each step's title. This process is crucial for transparency and demonstrating your reasoning.
+    If the provided data is insufficient for meaningful analysis, explicitly mention this limitation and suggest the need for data completion.
 
     {% if input.specific_user_query != null and input.specific_user_query != "" %}
-    IMPORTANT: You have a specific user question to answer: "{{ input.specific_user_query }}"
-    Ensure your reasoning addresses this question explicitly where relevant within these 6 steps, integrating the response organically into the analytical process.
-    {% endif %}
-
-    **DETAILED REASONING PROCESS (Follow these 6 steps):**
-    **1. Main Abnormal Findings Identified:** List laboratory findings that are outside reference values, qualifying their magnitude/severity (e.g., "Slightly elevated", "Significantly low", "Critical level") and the exact value with unit and reference.
-    **2. Relevance of Normal Findings in Context:** Identify any results WITHIN the reference range that are particularly relevant or reassuring in the context of abnormal findings or `input.patient_context` (if provided), **or that help exclude significant alternative diagnoses (pertinent negatives)**. Briefly explain why they are relevant (e.g., "Normal thyroid function (TSH, T4L) helps decrease the probability of thyroidal cause for tachycardia", "Normal C-reactive protein helps decrease the probability of acute severe bacterial infection as the primary cause").
-    **3. Observed Clinical Patterns and Correlations:** Describe patterns formed by the set of abnormal and relevant normal findings (e.g., "Pattern of microcytic hypochromic anemia with low ferritin suggests iron deficiency", "Transaminase elevation with normal GGT and alkaline phosphatase points to hepatocellular rather than cholestatic injury"). **Actively seek pathophysiological inter-relationships between different abnormal findings** and connect findings with each other and with `input.patient_context`.
-    **4. Considered Pathophysiological Implications:** Based on patterns, briefly discuss pathophysiological mechanisms or organ systems primarily involved. **Explore how different identified abnormalities might be pathophysiologically interconnected** (E.g., "Findings suggest a primary disorder in medullary erythropoiesis or chronic blood loss", "Lipid profile indicates elevated cardiovascular risk due to atherogenic dyslipidemia", "The respiratory acidosis may be contributing to the observed electrolyte disturbances").
-    **5. Prioritized Differential Diagnostic Hypotheses:** Formulate a list of differential diagnostic considerations. If possible, hierarchize them based on inferred probability from findings and `input.patient_context`. Briefly justify each main hypothesis and qualify the probability (high, moderate, low) (E.g., "1. Iron deficiency anemia (high probability, given hematimetric indices and ferritin). 2. Occult gastrointestinal bleeding (to investigate, given the anemia). 3. Thalassemia minor (less likely without Hb electrophoresis, but consider if family history)").
-    **6. Rationale for Suggested Next Steps:** For each suggested investigation or referral, explain the clinical rationale and indicate the degree of urgency (E.g., "Request ferritin and transferrin saturation: to confirm suspected iron deficiency. Upper GI Endoscopy: to investigate possible upper GI bleeding as cause of anemia, if iron deficiency is confirmed - moderate urgency").
-
-    SECOND, AFTER detailing the REASONING PROCESS above, you MUST generate a JSON object that strictly corresponds to the `LabInsightsOutput` schema.
-
-    CRITICAL JSON REQUIREMENTS:
-    - The `professional_detailed_reasoning_cot` field MUST contain EXACTLY the "DETAILED REASONING PROCESS" you elaborated in the 6 steps above.
-    - All other professional fields should be CONCISE SUMMARIES extracted from your detailed reasoning.
-
-    MANDATORY JSON STRUCTURE FOR PROFESSIONAL MODE:
-    {
-      "patient_friendly_summary": null,
-      "potential_health_implications_patient": null,
-      "lifestyle_tips_patient": null,
-      "questions_to_ask_doctor_patient": null,
-      "important_results_to_discuss_with_doctor": [array of critical findings],
-      "professional_detailed_reasoning_cot": "EXACTLY the detailed reasoning process you wrote above",
-      "key_abnormalities_professional": [array of key abnormalities],
-      "key_normal_results_with_context": [array of relevant normal findings],
-      "potential_patterns_and_correlations": [array of patterns],
-      "differential_considerations_professional": [array of differential diagnoses],
-      "suggested_next_steps_professional": [array of next steps],
-    }
-
-    {% else %}
-    // PATIENT MODE
-    {{ GetPatientIntroduction() }}
-    {{ GetPatientGuidanceKeyPoints() }}
-    {{ GetPatientGuidanceReminders() }}
-
-    // "No Guessing" Policy and Incomplete Data Handling
-    If the provided data is insufficient for meaningful analysis of a particular aspect (e.g., lack of reference values for a test), mention this limitation in an understandable and gentle way to the patient, always reinforcing the importance of talking with their doctor to get all the details. If you don't have sufficient information to comment on a specific point with confidence, it's preferable to declare that the information is not available or that analysis is not possible with the provided data, always reinforcing the importance of talking with their doctor.
-
-    // INTERNAL CoT FOR PATIENTS (to guide your JSON generation):
-    // Before generating the JSON, think internally:
-    // 1. Main findings in simple terms: How to translate abnormal results into completely lay language, clear and without causing unnecessary alarm? Focus on what the test measures in general terms.
-    // 2. General implications: What might these findings suggest in terms of general health areas or body functioning that deserve attention? (Avoid specific disease names if possible, unless it's a very direct result like "High glucose may be related to diabetes").
-    // 3. Lifestyle tips: Tips should be GENERIC, safe, and connected to findings when appropriate (e.g., if cholesterol is high, "Talk to your doctor about how a fiber-rich diet low in saturated fats may help maintain healthy cholesterol."). Always reinforce that the patient should DISCUSS these tips with their doctor BEFORE implementing them. Don't prescribe diets or exercises.
-    // 4. Questions for the doctor: Questions should be direct, actionable and help the patient get clarity from their doctor about THEIR specific results and next steps.
-
-    // Patient Context and Specific Question
-    {% if input.specific_user_query != null and input.specific_user_query != "" %}
-    USER'S SPECIFIC QUESTION: "{{ input.specific_user_query }}"
-    Make sure to address this question appropriately in your responses.
+    SPECIFIC QUESTION: "{{ input.specific_user_query }}" - Address this throughout your analysis.
     {% endif %}
 
     {% if input.patient_context != null and input.patient_context != "" %}
-    PATIENT CONTEXTUAL DATA / GENERAL NOTES (Consider this in your reasoning and summary):
-    {{ input.patient_context }}
+    PATIENT CONTEXT: {{ input.patient_context }}
     {% endif %}
 
-    {% endif %}
+    **DETAILED CLINICAL REASONING:**
+    Format your reasoning with clear markdown sections using horizontal dividers (---) between steps for enhanced readability:
+
+    **## 1. ABNORMAL FINDINGS IDENTIFIED**
+    List values outside reference ranges with exact values, units, references, and severity assessment (mild/moderate/severe/critical).
+    
+    ---
+    **## 2. RELEVANT NORMAL VALUES**
+    Note normal results that help exclude differentials or provide important clinical context (pertinent negatives).
+    
+    ---
+    **## 3. CLINICAL PATTERNS & CORRELATIONS**
+    Describe pathophysiological relationships and patterns connecting the abnormal findings.
+    
+    ---
+    **## 4. PATHOPHYSIOLOGICAL MECHANISMS**
+    Explain underlying mechanisms and organ system involvement based on the observed patterns.
+    
+    ---
+    **## 5. DIFFERENTIAL DIAGNOSES**
+    List probable diagnoses hierarchically (High/Moderate/Low probability) with clinical justification.
+    
+    ---
+    **## 6. RECOMMENDED NEXT STEPS**
+    Suggest investigations and interventions with clinical rationale and urgency level.
+
+    **CLINICAL SUMMARY:**
+    After the detailed reasoning, provide a concise objective summary (2-3 paragraphs max) covering:
+    - Most critical abnormal findings requiring immediate attention
+    - Top 2-3 differential diagnoses with likelihood
+    - Immediate next steps with urgency level
+    - Any red flags or time-sensitive issues
 
     // Final instruction for output format
     {{ ctx.output_format }}
@@ -130,84 +93,85 @@ function GenerateDrCorvusInsights(input: LabAnalysisInput) -> LabInsightsOutput 
 }
 
 // -------- Function: ExpandDifferentialDiagnosis (DifferentialDiagnosis_Builder_UsingMnemonicsOrAnatomy) --------
-// Input for ExpandDifferentialDiagnosis
+// --- Refined Classes ---
+
 class ExpandDifferentialDiagnosisInput {
-  presenting_complaint string @description("Sintomas relatados pelo paciente (subjetivos)")
-  location_if_pain string? @description("Sinais clínicos objetivos observados no exame físico")
-  student_initial_ddx_list string[]
+  presenting_complaint string @description("Main complaint and the patient’s subjective symptoms.")
+  clinical_signs string? @description("Objective clinical signs and physical exam findings.")
+  patient_demographics string? @description("Relevant context: age, sex, comorbidities, risk factors.")
+  user_initial_ddx_list string[] @description("The user's initial list of differential diagnoses.")
 }
 
-// Output for ExpandDifferentialDiagnosis
-class ExpandedDdxOutput {
-  applied_approach_description string @description("Description of the approach used, e.g., anatomical or mnemonic.")
-  suggested_additional_diagnoses_with_rationale string[] @description("List of suggested additional diagnoses, each with a rationale. Format: 'Diagnosis: [Name], Rationale: [Rationale], Category: [Category]'")
+enum SuspicionLevel {
+  HIGH @description("High clinical suspicion, requires immediate action.")
+  MODERATE @description("Moderate suspicion, requires prioritized investigation.")
+  LOW @description("Low suspicion, but should be monitored or actively ruled out.")
 }
+
+enum DiagnosisCategory {
+  RED_FLAG @description("Critical condition that must not be missed.")
+  MOST_LIKELY @description("Common and highly probable diagnosis.")
+  SYSTEMATIC_EXPANSION @description("Diagnosis considered through a systematic framework to ensure breadth.")
+}
+
+class ExpandedDiagnosis {
+  diagnosis_name string
+  rationale string @description("Concise rationale connecting the patient's data to this hypothesis.")
+  suspicion_level SuspicionLevel
+  category DiagnosisCategory
+}
+
+class ExpandedDdxOutput {
+  applied_approach_description string @description("Description of the hierarchical reasoning process used.")
+  suggested_diagnoses ExpandedDiagnosis[]
+}
+
+
+// --- Restructured BAML Function ---
 
 function ExpandDifferentialDiagnosis(input: ExpandDifferentialDiagnosisInput) -> ExpandedDdxOutput {
   client DrCorvusLLM
   prompt #"""
-    // --- BAML Prompt for Advanced Differential Diagnosis Expansion ---
+    You are Dr. Corvus, a senior physician and expert in clinical reasoning. Your task is to intelligently expand a differential diagnosis (Ddx) list in a hierarchical and clinically safe manner.
 
-    {{ GetProfessionalIntroduction() }}
-    You are Dr. Corvus, a senior expert in clinical reasoning. Your task is to expand a differential diagnosis list in an intelligent, hierarchical, and contextually-appropriate manner.
+    **GUIDING PHILOSOPHY:** An expert's Ddx is a tool for action. It prioritizes danger and probability. The goal is not to list everything but to create a mental map for investigation.
 
-    **GUIDING PHILOSOPHY: Balance safety (never miss 'Red Flags') with clinical probability (do not suggest catastrophic scenarios for common symptoms without clear evidence).**
+    **PROVIDED CLINICAL DATA:**
+    - Main Complaint and Symptoms: {{ input.presenting_complaint }}
+    - Objective Clinical Signs: {{ input.clinical_signs if input.clinical_signs else "No objective signs provided." }}
+    - Demographics and Context: {{ input.patient_demographics if input.patient_demographics else "No context provided." }}
+    - User's Initial Ddx: {{ input.user_initial_ddx_list | join(", ") }}
 
-    **CLINICAL DATA PROVIDED:**
-    - Symptoms (Subjective): {{ input.presenting_complaint }}
-    - Clinical Signs (Objective): {{ input.clinical_signs if input.clinical_signs else "No objective signs provided." }}
-    - Patient Demographics/Context: {{ input.patient_demographics if input.patient_demographics else "No context provided."}}
-    - User's Initial DDx: {{ input.user_initial_ddx_list | join(", ") }}
+    **STRUCTURED REASONING PROCESS (3 LAYERS):**
 
-    **STRUCTURED ANALYSIS PROCESS (4 STEPS):**
+    **LAYER 1: CRITICAL CONDITIONS (RED FLAGS)**
+    First, always consider life- or integrity-threatening conditions, even if less likely.
+    - Based on the main complaint (e.g., "chest pain", "sudden headache"), list 2–3 diagnoses that “must not be missed.”
+    - For each, assign a **Suspicion Level** (High, Moderate, Low) based on the patient data.
+    *Calibration Example:* For "headache", Subarachnoid Hemorrhage is a Red Flag. If the patient describes it as "the worst headache of their life", suspicion is HIGH. If the headache is chronic and without warning signs, suspicion is LOW, but the condition is still listed as a Red Flag to be ruled out.
 
-    // --- STEP 0: INPUT VALIDATION & TRIAGE (CRITICAL FOR HANDLING EDGE CASES) ---
-    **STEP 0: Input Quality Assessment**
-    First, critically evaluate the user's input.
-    - **Is the input sufficient?** If the 'presenting_complaint' is too vague (e.g., 'headache', 'feeling unwell') AND there are no objective signs or demographics, your primary response should be a request for more specific information.
-    - **Are there multiple unrelated complaints?** (e.g., 'knee pain and cough'). If so, acknowledge this and suggest addressing one primary complaint at a time.
-    - **Is the input non-clinical?** If the input is nonsensical or clearly not a medical complaint, state that you cannot process the request.
-    
-    // If input is insufficient or invalid, STOP HERE and explain what is needed. If the input is valid, PROCEED to Step 1.
+    **LAYER 2: MOST LIKELY DIAGNOSES (THE “WORKHORSES”)**
+    Based on epidemiology and the full set of patient data, list 3–4 of the most common causes.
+    - Use the **Anatomical Approach** for localized complaints (e.g., abdominal pain -> which organs are in the lower right quadrant?).
+    - Use the **Pathophysiological Approach** for systemic complaints (e.g., dyspnea -> cardiac, pulmonary, or hematologic cause?).
+    - The rationale here should be about probability. E.g., “For a young patient with these symptoms, this is the most common cause.”
 
-    **STEP 1: Alert Level Assessment (Risk Calibration)**
-    Assess the severity implied by the input data.
-    - **Are Red Flags present?** Check for objective signs or symptoms suggesting high urgency (e.g., high fever, hemodynamic instability, altered mental status, neurological deficits).
-    - **Is it a High-Risk Demographic?** Does the context (e.g., immunocompromised, frail elderly) increase the baseline risk?
-    - **Conclusion for this Step:** Determine an "Alert Level" (Low, Moderate, High). This will modulate the prominence and suspicion level of Red Flags in your output.
+    **LAYER 3: SYSTEMATIC EXPANSION (THE COGNITIVE SAFETY NET)**
+    To avoid premature closure, apply a systematic framework to uncover less obvious diagnoses. Choose and justify the most appropriate framework.
+    - For general complaints, **VINDICATE** (Vascular, Inflammatory, Neoplastic, Degenerative/Drugs, Idiopathic, Congenital, Autoimmune, Traumatic, Endocrine) is a good option.
+    - For specific neurological complaints, other approaches may be more appropriate.
+    - **Instruction:** Select 1–2 categories from the framework that are most relevant to the case and suggest 1 diagnosis for each. Do not blindly apply the entire mnemonic.
+    *Example:* For chronic joint pain in a young patient, “Have you considered Autoimmune causes (A from VINDICATE), such as Lupus, or Inflammatory causes (I), such as reactive arthritis?”
 
-    **STEP 2: Hypothesis Generation - Hierarchical & Contextual Approach**
+    **OUTPUT FORMATTING:**
 
-    **A. CRITICAL CONDITIONS (RED FLAGS) - *ALWAYS CONSIDER, BUT WITH CALIBRATED SUSPICION***
-    List 2-4 "don't-miss" diagnoses relevant to the chief complaint. For each, assign a **Suspicion Level** based on your Step 1 assessment:
-      - `HIGH Suspicion`: Use ONLY if there are clear alarm signs or a very high-risk context.
-      - `MODERATE Suspicion`: Use if there are some suggestive but non-definitive findings.
-      - `LOW Suspicion (Vigilance Needed)`: Use for vague symptoms without alarm signs. The rationale is "unlikely given current data, but too important to ignore."
-    *Calibration Example:* For "diarrhea and low-grade fever", list Sepsis as `LOW Suspicion (Vigilance Needed)`, explaining that there are no signs of systemic instability.
-
-    **B. MOST LIKELY DIAGNOSES ('Bread and Butter' Cases)**
-    List 3-5 of the most common and probable diagnoses for the combination of symptoms, signs, and demographics.
-    - Use the **Anatomical Approach** as the first choice for localized complaints (e.g., chest pain, abdominal pain).
-    - Use the **Pathophysiological/Systemic Approach** for general complaints (e.g., fatigue, dyspnea).
-
-    **C. SYSTEMATIC EXPANSION (The Cognitive Safety Net)**
-    Choose and apply **ONE** systematic framework that is **MOST APPROPRIATE** for the chief complaint to ensure breadth.
-    - For **Altered Mental Status**: Use **TIPS-AEIOU** (Trauma, Infection, Psychiatric, Seizure - Alcohol, Electrolytes, Insulin, Opiates, Uremia).
-    - For **Chest Pain**: Use the framework of the **6 Deadly Causes** (MI, PE, Tamponade, Pneumothorax, Aortic Dissection, Esophageal Rupture).
-    - For more **general or musculoskeletal complaints**: Use **VINDICATE** in a targeted manner.
-    - **Justify your framework choice:** "To ensure no categories were missed for [chief complaint], the [Framework Name] framework is most appropriate because..."
-    - List 1-2 relevant diagnoses derived from this approach.
-
-    **STEP 3: Formulate the Final Output**
-
-    1.  **`applied_approach_description`**: Briefly describe your multi-step approach. E.g., "The analysis began by assessing for red flags, followed by identifying the most common causes based on an anatomical approach. The TIPS-AEIOU framework was then used as a safety net to ensure comprehensive coverage."
-    2.  **`suggested_additional_diagnoses_with_rationale`**: Build the final list by combining the results from Step 2. For each item, use the strict format:
-        `"Diagnosis: [Name], Rationale: [Direct link to provided findings and why it's relevant], Suspicion Level: [High/Moderate/Low], Category: [Red Flag / Common Cause / Systematic Framework (e.g., TIPS-AEIOU)]"`
+    1.  **`applied_approach_description`**: Describe your 3-layered approach. E.g., “The analysis was structured in a risk-based hierarchy: first, critical conditions (Red Flags) were considered; then, the most probable causes for the patient’s profile; and finally, a systematic expansion using the VINDICATE framework to ensure a broad Ddx.”
+    2.  **`suggested_diagnoses`**: Build the final list combining the results of all three layers. Use the structure of the `ExpandedDiagnosis` class for each item.
 
     **FINAL INSTRUCTIONS:**
-    - The quality of your reasoning and hierarchy is more important than the quantity of diagnoses.
-    - Be didactic in your `applied_approach_description`.
-    - **Always respond in ENGLISH.**
+    - The quality of your hierarchical reasoning is more important than the quantity of diagnoses.
+    - Ignore the user’s initial Ddx if it’s of low quality, but try to incorporate it into your structure if relevant.
+    - Be didactic in your description of the approach.
 
     {{ ctx.output_format }}
   """#
@@ -305,7 +269,6 @@ function TeachQuestionPrioritization(input: DdxQuestioningInput) -> DdxQuestioni
 }
 
 // --- Classes and Function for the CLINICAL WORKFLOW Module (Differential Diagnosis Builder) ---
-
 class QuestionCategory {
   category_name string
   questions string[]
@@ -331,11 +294,13 @@ function GenerateClinicalWorkflowQuestions(input: DdxQuestioningInput) -> Clinic
     1.  **Characterization of the Chief Complaint:** Questions to detail the primary symptom (e.g., using OPQRST - Onset, Palliation/Provocation, Quality, Radiation, Severity, Timing).
     2.  **Focused System Review:** Questions about other systems that are commonly associated with the chief complaint.
     3.  **Risk Factors:** Questions about other systems that are commonly associated with the chief complaint.
-    5.  **Red Flags:** Questions to actively search for signs/symptoms indicating a serious condition and requiring immediate escalation.
+    4.  **Red Flags:** Questions to actively search for signs/symptoms indicating a serious condition and requiring immediate escalation.
 
     **INSTRUCTIONS:**
     - Be comprehensive, but clinically relevant. Avoid generic questions that do not apply to the context.
     - The goal is to be a safety and efficiency checklist for the doctor, not an exercise in prioritization.
+    - You MUST provide an "overall_rationale" field that explains your questioning strategy for this specific case.
+    - All fields in the ClinicalWorkflowQuestionsOutput class are required.
 
     **DATA PROVIDED:**
     Chief Complaint: {{ input.chief_complaint }}
@@ -347,6 +312,12 @@ function GenerateClinicalWorkflowQuestions(input: DdxQuestioningInput) -> Clinic
 
     **OUTPUT FORMAT (JSON):**
     Provide the output in the format of the 'ClinicalWorkflowQuestionsOutput' class.
+    
+    Your response must include ALL of the following fields:
+    - question_categories: Array of QuestionCategory objects with category_name, questions (array of strings), and category_rationale
+    - red_flag_questions: Array of strings with critical questions to investigate serious conditions
+    - overall_rationale: A brief explanation of your questioning strategy for this case
+    
     {{ ctx.output_format }}
   """#
 }
@@ -899,45 +870,45 @@ function ProvideMatrixFeedback(input: CompareContrastMatrixInput) -> MatrixFeedb
   client DrCorvusLLM
   prompt #"""
     {{ GetProfessionalIntroduction() }}
-    Você é Dr. Corvus, um preceptor de raciocínio clínico experiente. O estudante completou um exercício de matriz "Evidências vs. Hipóteses" onde cada achado clínico foi classificado como "Suporta", "Neutro" ou "Refuta" para cada hipótese diagnóstica.
+    You are Dr. Corvus, an experienced clinical reasoning preceptor. The student has completed a "Findings vs. Hypotheses" matrix exercise where each clinical finding was classified as "Supports", "Neutral", or "Refutes" for each diagnostic hypothesis.
 
-    **CENÁRIO CLÍNICO:**
-    Vinheta: {{ input.scenario.case_vignette }}
+    **CLINICAL SCENARIO:**
+    Vignette: {{ input.scenario.case_vignette }}
     
-    Achados Principais:
+    Key Findings:
     {% for finding in input.scenario.initial_findings %}
     - {{ finding.finding_name }}{% if finding.details %}: {{ finding.details }}{% endif %}{% if finding.onset_duration_pattern %} ({{ finding.onset_duration_pattern }}){% endif %}{% if finding.severity_level %}, {{ finding.severity_level }}{% endif %}
     {% endfor %}
     
-    Hipóteses a Analisar: {{ input.scenario.plausible_hypotheses | join(", ") }}
+    Hypotheses to Analyze: {{ input.scenario.plausible_hypotheses | join(", ") }}
 
-    **ANÁLISE MATRICIAL DO ESTUDANTE:**
+    **STUDENT'S MATRIX ANALYSIS:**
     {% for analysis in input.student_matrix_analysis %}
-    - Achado "{{ analysis.finding_name }}" foi classificado como "{{ analysis.student_evaluation }}" para a hipótese "{{ analysis.hypothesis_name }}"{% if analysis.student_rationale %} (Justificativa: {{ analysis.student_rationale }}){% endif %}
+    - Finding "{{ analysis.finding_name }}" was classified as "{{ analysis.student_evaluation }}" for hypothesis "{{ analysis.hypothesis_name }}"{% if analysis.student_rationale %} (Rationale: {{ analysis.student_rationale }}){% endif %}
     {% endfor %}
 
-    **DISCRIMINADOR CHAVE ESCOLHIDO PELO ESTUDANTE:** "{{ input.student_chosen_discriminator }}"
+    **STUDENT'S CHOSEN KEY DISCRIMINATOR:** "{{ input.student_chosen_discriminator }}"
 
-    **SUA TAREFA COMO PRECEPTOR:**
+    **YOUR TASK AS PRECEPTOR:**
 
-    1. **Avalie a Matriz Geral (overall_matrix_feedback):** Forneça um comentário sobre a precisão geral das classificações do estudante. Destaque acertos importantes e identifique erros significativos. Seja específico sobre quais relações foram bem identificadas e quais foram mal avaliadas.
+    1. **Evaluate Overall Matrix (overall_matrix_feedback):** Provide feedback on the overall accuracy of the student's classifications. Highlight significant correct classifications and identify significant errors. Be specific about which relationships were well-identified and which were poorly evaluated.
 
-    2. **Avalie a Escolha do Discriminador (discriminator_feedback):** A escolha do estudante foi ideal? Existe um discriminador mais forte? Explique por que a escolha foi boa ou como poderia ser melhorada.
+    2. **Evaluate Discriminator Choice (discriminator_feedback):** Was the student's choice ideal? Is there a stronger discriminator? Explain why the choice was good or how it could be improved.
 
-    3. **Gere uma Matriz Expert (expert_matrix_analysis):** Forneça sua própria classificação para cada célula da matriz, incluindo uma justificativa clara para cada avaliação. Foque nas relações mais importantes para o diagnóstico diferencial.
+    3. **Generate Expert Matrix (expert_matrix_analysis):** Provide your own classification for each cell of the matrix, including a clear rationale for each evaluation. Focus on the most important relationships for differential diagnosis.
 
-    4. **Recomende um Discriminador Expert (expert_recommended_discriminator e expert_discriminator_rationale):** Qual achado você consideraria o discriminador mais poderoso? Explique por que este achado é superior para diferenciar entre as hipóteses.
+    4. **Recommend Expert Discriminator (expert_recommended_discriminator and expert_discriminator_rationale):** Which finding would you consider the most powerful discriminator? Explain why this finding is superior for differentiating between the hypotheses.
 
-    5. **Sugira Foco de Aprendizado (learning_focus_suggestions):** Com base nos padrões de erros e acertos, sugira 2-3 tópicos específicos para estudo (ex: "Revisar os sintomas urinários da cistite", "Estudar a fisiopatologia da dor referida").
+    5. **Suggest Learning Focus (learning_focus_suggestions):** Based on patterns of errors and successes, suggest 2-3 specific topics for study (e.g., "Review urinary symptoms of cystitis", "Study the pathophysiology of referred pain").
 
-    6. **Calcule Pontuação de Precisão (matrix_accuracy_score):** Atribua uma pontuação de 0.0 a 1.0 baseada na precisão geral da matriz do estudante.
+    6. **Calculate Accuracy Score (matrix_accuracy_score):** Assign an accuracy score from 0.0 to 1.0 based on the overall accuracy of the student's matrix.
 
-    **DIRETRIZES PEDAGÓGICAS:**
-    - Mantenha um tom construtivo e encorajador
-    - Seja específico em seus exemplos
-    - Foque no PROCESSO de pensamento, não apenas no resultado
-    - Explique o raciocínio por trás das classificações corretas
-    - Use linguagem didática apropriada para estudantes
+    **PEDAGOGICAL GUIDELINES:**
+    - Maintain a constructive and encouraging tone.
+    - Be specific in your examples.
+    - Focus on the thought PROCESS, not just the outcome.
+    - Explain the reasoning behind correct classifications.
+    - Use didactic language appropriate for students.
 
     {{ ctx.output_format }}
   """#

@@ -1,73 +1,84 @@
-import { NextResponse } from 'next/server';
-import { currentUser } from '@clerk/nextjs/server';
-import pool from '@/lib/db'; // Import the pool
+import { auth } from '@clerk/nextjs/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-// GET /api/conversations - List conversations for the current user
-export async function GET(req: Request) {
-  let client;
+export async function GET(request: NextRequest) {
   try {
-    const user = await currentUser();
-    if (!user || !user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { getToken } = await auth();
+    const token = await getToken();
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/conversations`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Failed to fetch conversations' },
+        { status: response.status }
+      );
     }
 
-    // Check if the pool is defined before trying to connect
-    if (!pool) {
-      console.error('Database pool is not initialized. POSTGRES_URL might be missing or invalid.');
-      return NextResponse.json({ error: 'Internal Server Error: Database connection failed' }, { status: 500 });
-    }
+    const data = await response.json();
+    
+    // Transform response to match RecentConversationsCard component format
+    const transformedData = {
+      conversations: data.conversations?.map((conv: any) => ({
+        conversation_id: conv.id || conv.conversation_id,
+        patient_name: conv.patient_name || conv.title || 'Conversa sem título',
+        last_message_content: conv.last_message || conv.content || conv.title || 'Sem mensagens',
+        unread_count: conv.unread_count || 0,
+      })) || []
+    };
 
-    client = await pool.connect();
-    const result = await client.query(
-      'SELECT id, title, "updatedAt", "patientId" FROM "Conversation" WHERE "userId" = $1 ORDER BY "updatedAt" DESC',
-      [user.id]
+    return NextResponse.json(transformedData);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
     );
-    const conversations = result.rows;
-    return NextResponse.json(conversations);
-
-  } catch (error: any) {
-    console.error('Error fetching conversations:', error);
-    return NextResponse.json({ error: 'Failed to fetch conversations', details: error.message }, { status: 500 });
-  } finally {
-    if (client) {
-        client.release(); // Ensure client is released
-    }
   }
 }
 
-// POST /api/conversations - Create a new conversation
-export async function POST(req: Request) {
-  let client;
+export async function POST(request: NextRequest) {
   try {
-    const user = await currentUser();
-    if (!user || !user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const body = await request.json();
+    const { getToken } = await auth();
+    const token = await getToken();
+    
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { error: 'Failed to create conversation' },
+        { status: response.status }
+      );
     }
 
-    const body = await req.json().catch(() => ({})); // Handle cases with no body
-    const { title = 'Nova Conversa', patientId = null } = body;
+    const data = await response.json();
+    
+    // Transform response to match RecentConversationsCard component format
+    const transformedData = {
+      id: data.id,
+      patientName: data.patient_name || data.title,
+      content: data.last_message || data.title,
+      createdAt: data.created_at,
+      lastMessageAt: data.updated_at,
+    };
 
-    // Check if the pool is defined before trying to connect
-    if (!pool) {
-      console.error('Database pool is not initialized. POSTGRES_URL might be missing or invalid.');
-      return NextResponse.json({ error: 'Internal Server Error: Database connection failed' }, { status: 500 });
-    }
-
-    client = await pool.connect();
-    const result = await client.query(
-      'INSERT INTO "Conversation" ("userId", title, "patientId", "createdAt", "updatedAt") VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, title, "updatedAt", "patientId"',
-      [user.id, title, patientId]
+    return NextResponse.json(transformedData);
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
     );
-    const newConversation = result.rows[0];
-    return NextResponse.json(newConversation, { status: 201 });
-
-  } catch (error: any) {
-    console.error('Error creating conversation:', error);
-    // Consider more specific error checking (e.g., duplicate key)
-    return NextResponse.json({ error: 'Failed to create conversation', details: error.message }, { status: 500 });
-  } finally {
-      if (client) {
-          client.release();
-      }
   }
-} 
+}

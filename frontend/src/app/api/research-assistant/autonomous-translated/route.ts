@@ -7,7 +7,8 @@ const BACKEND_API_URL = 'http://backend-api:8000';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const targetUrl = `${BACKEND_API_URL}/api/research/autonomous-translated`;
+    // Use agent-orchestrated translated endpoint for deeper analysis
+    const targetUrl = `${BACKEND_API_URL}/api/research/agent-research/autonomous-translated`;
 
     console.log(`Forwarding POST request from /api/research/autonomous-translated to ${targetUrl}`);
     console.log(`Request body:`, JSON.stringify(body, null, 2));

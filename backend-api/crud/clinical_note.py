@@ -6,24 +6,24 @@ from uuid import UUID # Ensure UUID is imported if used by other functions
 
 # Corrected import
 from database.models import ClinicalNote
+from utils.sanitization import sanitize_html, sanitize_text
 # Corrected import for schemas
 import schemas.clinical_note as clinical_note_schemas
 
 
 def get_notes(
-    db: Session, 
-    patient_id: int, 
+    db: Session,
+    patient_id: int,
     skip: int = 0,
     limit: int = 100
-) -> List[ClinicalNote]:
+) -> (List[ClinicalNote], int):
     """
-    Get all clinical notes for a patient.
+    Get paginated clinical notes for a patient and the total count.
     """
-    return db.query(ClinicalNote).filter(
-        ClinicalNote.patient_id == patient_id
-    ).order_by(
-        ClinicalNote.created_at.desc()
-    ).offset(skip).limit(limit).all()
+    query = db.query(ClinicalNote).filter(ClinicalNote.patient_id == patient_id)
+    total = query.count()
+    notes = query.order_by(ClinicalNote.created_at.desc()).offset(skip).limit(limit).all()
+    return notes, total
 
 
 def get_note(db: Session, note_id: int) -> Optional[ClinicalNote]:
@@ -59,6 +59,12 @@ def create_note(
         # Fall back to Pydantic v1 approach
         note_data = note.dict()
     
+    # Sanitize fields
+    if 'title' in note_data:
+        note_data['title'] = sanitize_text(note_data.get('title'))
+    if 'content' in note_data:
+        note_data['content'] = sanitize_html(note_data.get('content'))
+
     # Add the user ID
     note_data["user_id"] = user_id
     
@@ -106,9 +112,14 @@ def update_note(
             # Fall back to v1 without exclude_unset if not supported
             update_data = note_update.dict()
     
-    # Update the fields
+    # Sanitize and update the fields
     for key, value in update_data.items():
-        setattr(db_note, key, value)
+        if key == 'title':
+            setattr(db_note, key, sanitize_text(value))
+        elif key == 'content':
+            setattr(db_note, key, sanitize_html(value))
+        else:
+            setattr(db_note, key, value)
     
     # Update the updated_at timestamp
     db_note.updated_at = datetime.utcnow()
@@ -136,4 +147,37 @@ def delete_note(db: Session, note_id: int) -> bool:
 
 
 # Alias for compatibility with existing tests
-create_clinical_note = create_note 
+create_clinical_note = create_note
+
+
+class ClinicalNoteCRUD:
+    """CRUD operations for ClinicalNote model."""
+
+    def get_by_patient_id(self, db: Session, patient_id: int, limit: int = 5) -> List[ClinicalNote]:
+        """Get clinical notes for a specific patient."""
+        notes, _ = get_notes(db, patient_id, limit=limit)
+        return notes
+
+    def get(self, db: Session, note_id: int) -> Optional[ClinicalNote]:
+        """Get a clinical note by ID."""
+        return get_note(db, note_id)
+
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[ClinicalNote]:
+        """Get multiple clinical notes."""
+        return db.query(ClinicalNote).offset(skip).limit(limit).all()
+
+    def create(self, db: Session, *, obj_in, user_id: int, patient_id: int) -> ClinicalNote:
+        """Create a new clinical note."""
+        return create_note(db, obj_in, user_id, patient_id)
+
+    def update(self, db: Session, *, db_obj: ClinicalNote, obj_in) -> ClinicalNote:
+        """Update a clinical note."""
+        return update_note(db, db_obj.id, obj_in)
+
+    def remove(self, db: Session, *, note_id: int) -> bool:
+        """Remove a clinical note."""
+        return delete_note(db, note_id)
+
+
+# Create instance for easy import
+clinical_note = ClinicalNoteCRUD()

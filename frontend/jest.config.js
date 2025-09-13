@@ -8,14 +8,16 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
-    '^@/components/(.*)$': '<rootDir>/src/components/$1',
-    '^@/store/(.*)$': '<rootDir>/src/store/$1',
-    '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
-    '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
-    '^@/services/(.*)$': '<rootDir>/src/services/$1',
-    '^@/types/(.*)$': '<rootDir>/src/types/$1',
-    '^@/hooks/(.*)$': '<rootDir>/src/hooks/$1',
-    '^@/app/(.*)$': '<rootDir>/src/app/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    // Add mocks for Clerk modules that cause issues
+    '^@clerk/backend$': '<rootDir>/src/__tests__/mocks/clerk-backend.js',
+    '^@clerk/nextjs$': '<rootDir>/src/__tests__/mocks/clerk-nextjs.js',
+    // Map msw/node to msw for JSDOM environment
+    '^msw/node$': 'msw',
+  },
+  // ADDED: transform entry for .mjs files
+  transform: {
+    '^.+\.(js|jsx|ts|tsx|mjs)$': ['babel-jest', { presets: ['next/babel'] }],
   },
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
@@ -26,22 +28,21 @@ const customJestConfig = {
     '<rootDir>/node_modules/',
     '<rootDir>/.next/',
     '<rootDir>/src/__tests__/mocks/',
-    '<rootDir>/e2e/', 
-    '<rootDir>/src/__tests__/e2e/', 
-    '**/*.spec.ts', 
-    '**/*.spec.tsx' 
+    '<rootDir>/e2e/',
+    '<rootDir>/src/__tests__/e2e/'
   ],
+  // MODIFIED: transformIgnorePatterns with the new regex and correct syntax
   transformIgnorePatterns: [
-    '/node_modules/',
-    '^.+\\.module\\.(css|sass|scss)$'
+    '/node_modules/(?!.*(esm|es6)/)', // This is a common pattern to include esm modules
+    '^.+\.module\.(css|sass|scss)$'
   ],
   moduleDirectories: ['node_modules', '<rootDir>'],
   modulePathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/.next/',
-    '<rootDir>/e2e/', 
-    '<rootDir>/src/__tests__/e2e/' 
+    '<rootDir>/e2e/',
+    '<rootDir>/src/__tests__/e2e/'
   ],
 };
 
-module.exports = createJestConfig(customJestConfig); 
+module.exports = createJestConfig(customJestConfig);

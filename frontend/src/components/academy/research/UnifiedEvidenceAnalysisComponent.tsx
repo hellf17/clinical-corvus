@@ -306,102 +306,146 @@ export default function UnifiedEvidenceAnalysisComponent({
 
   const renderUnifiedResults = () => unifiedResults && (
     <div className="space-y-8 animate-fade-in">
-      {/* Dashboard de Confiança - Cabeçalho */}
-      <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300 border-t-4 border-t-green-600">
-        <div className="absolute inset-0 bg-gradient-to-r from-green-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      {/* Dashboard de Confiança - Reorganizado */}
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         <CardHeader className="relative z-10">
-          <CardTitle className="flex items-center text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+          <CardTitle className="flex items-center text-xl font-semibold text-green-800">
             <Award className="mr-3 h-6 w-6 text-green-600" />
             Dashboard de Confiança da Evidência
           </CardTitle>
           <CardDescription className="text-gray-600">
             Avaliação estruturada baseada no framework GRADE
           </CardDescription>
-          <div className="flex items-center justify-center space-x-2 mt-4">
-            <Zap className="h-5 w-5 text-yellow-500" />
-            <span className="text-sm text-gray-500">Análise completa de qualidade metodológica</span>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span className="text-sm font-medium text-green-700">
+              Síntese metodológica completa
+            </span>
+            <Zap className="h-4 w-4 text-green-700" />
           </div>
         </CardHeader>
         <CardContent className="relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Resumo Principal em destaque */}
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <h3 className="font-semibold text-green-800 mb-2 flex items-center">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              Resumo dos Achados
+            </h3>
+            <p className="text-green-700 text-sm leading-relaxed">
+              {unifiedResults?.grade_summary?.summary_of_findings}
+            </p>
+          </div>
+
+          {/* Grade Summary em grid compacto */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {/* Qualidade da Evidência */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-lg">Qualidade da Evidência</h3>
-                <div className={`px-6 py-3 rounded-lg font-bold text-lg border-2 shadow-lg ${
-                  unifiedResults?.grade_summary?.overall_quality === 'ALTA' ? 'bg-green-100 text-green-900 border-green-300' : 
-                  unifiedResults?.grade_summary?.overall_quality === 'MODERADA' ? 'bg-amber-100 text-amber-900 border-amber-300' : 
-                  unifiedResults?.grade_summary?.overall_quality === 'BAIXA' ? 'bg-orange-100 text-orange-900 border-orange-300' : 
-                  'bg-red-100 text-red-900 border-red-300'
+            <div className="p-4 bg-white border border-green-100 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-green-800">Qualidade da Evidência</h4>
+                <Badge className={`font-bold ${
+                  unifiedResults?.grade_summary?.overall_quality === 'ALTA' ? 'bg-green-600 hover:bg-green-700 text-white' :
+                  unifiedResults?.grade_summary?.overall_quality === 'MODERADA' ? 'bg-amber-500 hover:bg-amber-600 text-white' :
+                  unifiedResults?.grade_summary?.overall_quality === 'BAIXA' ? 'bg-orange-500 hover:bg-orange-600 text-white' :
+                  'bg-red-500 hover:bg-red-600 text-white'
                 }`}>
-                  <div className="flex items-center space-x-2">
-                    <Award className="h-5 w-5" />
-                    <span>{unifiedResults?.grade_summary?.overall_quality}</span>
-                  </div>
-                </div>
+                  <Award className="h-4 w-4 mr-1" />
+                  {unifiedResults?.grade_summary?.overall_quality}
+                </Badge>
               </div>
-              <p className="text-muted-foreground text-sm">{unifiedResults?.grade_summary?.summary_of_findings}</p>
-              
-              {/* Legenda de cores para Qualidade */}
-              <div className="flex flex-wrap gap-2 mt-2">
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-green-100 border border-green-800 mr-1"></div>
-                  <span>Alta</span>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-green-600 mr-1"></div>
+                  <span className="text-green-700">Alta</span>
                 </div>
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-amber-100 border border-amber-800 mr-1"></div>
-                  <span>Moderada</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 mr-1"></div>
+                  <span className="text-amber-700">Moderada</span>
                 </div>
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-orange-100 border border-orange-800 mr-1"></div>
-                  <span>Baixa</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-orange-500 mr-1"></div>
+                  <span className="text-orange-700">Baixa</span>
                 </div>
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-red-100 border border-red-800 mr-1"></div>
-                  <span>Muito Baixa</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-red-500 mr-1"></div>
+                  <span className="text-red-700">Muito Baixa</span>
                 </div>
               </div>
             </div>
 
             {/* Força da Recomendação */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-lg">Força da Recomendação</h3>
-                <div className={`px-6 py-3 rounded-lg font-bold text-lg border-2 shadow-lg ${
-                  unifiedResults?.grade_summary?.recommendation_strength === 'FORTE' ? 
-                  'bg-blue-100 text-blue-900 border-blue-300' : 'bg-amber-100 text-amber-900 border-amber-300'
+            <div className="p-4 bg-white border border-green-100 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-green-800">Força da Recomendação</h4>
+                <Badge className={`font-bold ${
+                  unifiedResults?.grade_summary?.recommendation_strength === 'FORTE' ?
+                  'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'
                 }`}>
-                  <div className="flex items-center space-x-2">
-                    <Target className="h-5 w-5" />
-                    <span>{unifiedResults?.grade_summary?.recommendation_strength}</span>
-                  </div>
-                </div>
+                  <Target className="h-4 w-4 mr-1" />
+                  {unifiedResults?.grade_summary?.recommendation_strength}
+                </Badge>
               </div>
-              <p className="text-muted-foreground text-sm">{unifiedResults?.grade_summary?.summary_of_findings}</p>
-              
-              {/* Legenda de cores para Força da Recomendação */}
-              <div className="flex flex-wrap gap-2 mt-2">
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-blue-100 border border-blue-800 mr-1"></div>
-                  <span>Forte</span>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-blue-600 mr-1"></div>
+                  <span className="text-blue-700">Forte</span>
                 </div>
-                <div className="flex items-center text-xs">
-                  <div className="w-3 h-3 rounded-full bg-amber-100 border border-amber-800 mr-1"></div>
-                  <span>Fraca</span>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 mr-1"></div>
+                  <span className="text-amber-700">Fraca</span>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Balance de Recomendações se disponível */}
+          {unifiedResults?.grade_summary?.recommendation_balance && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {unifiedResults.grade_summary.recommendation_balance.positive_factors?.length > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <h5 className="font-medium text-green-800 mb-2 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    Fatores Positivos
+                  </h5>
+                  <ul className="space-y-1">
+                    {unifiedResults.grade_summary.recommendation_balance.positive_factors.map((factor, index) => (
+                      <li key={index} className="text-xs text-green-700 flex items-start">
+                        <span className="text-green-500 mr-1">•</span>
+                        {factor}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {unifiedResults.grade_summary.recommendation_balance.negative_factors?.length > 0 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <h5 className="font-medium text-green-800 mb-2 flex items-center">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Limitações
+                  </h5>
+                  <ul className="space-y-1">
+                    {unifiedResults.grade_summary.recommendation_balance.negative_factors.map((factor, index) => (
+                      <li key={index} className="text-xs text-green-700 flex items-start">
+                        <span className="text-green-500 mr-1">•</span>
+                        {factor}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Fatores de Qualidade */}
-      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500">
         <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         <CardHeader className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
+              <CardTitle className="flex items-center text-xl font-semibold text-green-800">
                 <BarChart3 className="mr-3 h-6 w-6 text-green-600" />
                 Fatores que Influenciam a Qualidade
               </CardTitle>
@@ -447,7 +491,7 @@ export default function UnifiedEvidenceAnalysisComponent({
                 const localizedTitle = factorTitleMap[factor.factor_name] || factor.factor_name;
                 
                 return (
-                  <Card key={index} className="bg-white border-l-4 border-l-blue-600">
+                  <Card key={index} className="bg-white border-l-4 border-l-green-500">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-md flex items-center">
                         {getAssessmentIcon(factor.assessment)}
@@ -472,28 +516,28 @@ export default function UnifiedEvidenceAnalysisComponent({
       </Card>
 
       {/* Análise de Viés */}
-      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-500/3 to-red-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500">
+        <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         <CardHeader className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
-                <Scale className="mr-3 h-6 w-6 text-orange-600" />
+              <CardTitle className="flex items-center text-xl font-semibold text-green-800">
+                <Scale className="mr-3 h-6 w-6 text-green-600" />
                 Análise de Viés
               </CardTitle>
               <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-orange-500" />
-                <span className="text-sm font-medium text-orange-700">
+                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <span className="text-sm font-medium text-green-700">
                   {unifiedResults?.bias_analysis?.length || 0} análise(s) de viés
                 </span>
-                <Shield className="h-4 w-4 text-orange-700" />
+                <Shield className="h-4 w-4 text-green-700" />
               </div>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => toggleSectionExpansion('bias_analysis')}
-              className="hover:bg-orange-50 transition-colors"
+              className="hover:bg-green-50 transition-colors"
             >
               <span className="text-sm mr-2">
                 {expandedSections['bias_analysis'] ? 'Ocultar detalhes' : 'Ver detalhes'}
@@ -510,28 +554,28 @@ export default function UnifiedEvidenceAnalysisComponent({
               {unifiedResults.bias_analysis && unifiedResults.bias_analysis.length > 0 ? (
                 <div className="space-y-6">
                   {unifiedResults.bias_analysis.map((item: BiasAnalysisItem) => (
-                    <Card key={item.id} className="p-4 border border-orange-200 bg-gradient-to-r from-orange-50 to-red-50">
+                    <Card key={item.id} className="p-4 border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
                       <div className="space-y-3">
                         <div className="flex items-center space-x-2">
-                          <Shield className="h-5 w-5 text-orange-600" />
-                          <h4 className="font-semibold text-lg text-orange-800">{item.bias_type}</h4>
+                          <Shield className="h-5 w-5 text-green-600" />
+                          <h4 className="font-semibold text-lg text-green-800">{item.bias_type}</h4>
                         </div>
                         
                         <div className="space-y-3">
-                          <div className="p-3 bg-orange-100 rounded-lg border-l-4 border-orange-400">
-                            <h5 className="font-medium text-orange-800 mb-1 flex items-center">
+                          <div className="p-3 bg-green-100 rounded-lg border-l-4 border-green-400">
+                            <h5 className="font-medium text-green-800 mb-1 flex items-center">
                               <AlertTriangle className="h-4 w-4 mr-2" />
                               Impacto Potencial
                             </h5>
-                            <p className="text-sm text-orange-700">{item.potential_impact}</p>
+                            <p className="text-sm text-green-700">{item.potential_impact}</p>
                           </div>
                           
-                          <div className="p-3 bg-blue-100 rounded-lg border-l-4 border-blue-400">
-                            <h5 className="font-medium text-blue-800 mb-1 flex items-center">
+                          <div className="p-3 bg-green-100 rounded-lg border-l-4 border-green-400">
+                            <h5 className="font-medium text-green-800 mb-1 flex items-center">
                               <Shield className="h-4 w-4 mr-2" />
                               Estratégias de Mitigação
                             </h5>
-                            <p className="text-sm text-blue-700">{item.mitigation_strategies}</p>
+                            <p className="text-sm text-green-700">{item.mitigation_strategies}</p>
                           </div>
                           
                           <div className="p-3 bg-green-100 rounded-lg border-l-4 border-green-400">
@@ -547,10 +591,10 @@ export default function UnifiedEvidenceAnalysisComponent({
                   ))}
                 </div>
               ) : (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Análise de Viés Não Disponível</AlertTitle>
-                  <AlertDescription>
+                <Alert className="bg-green-50 border-green-200">
+                  <AlertCircle className="h-4 w-4 text-green-600" />
+                  <AlertTitle className="text-green-800">Análise de Viés Não Disponível</AlertTitle>
+                  <AlertDescription className="text-green-700">
                     Não foi possível realizar uma análise detalhada dos viéses neste estudo com base nas informações disponíveis.
                   </AlertDescription>
                 </Alert>
@@ -561,28 +605,35 @@ export default function UnifiedEvidenceAnalysisComponent({
       </Card>
 
       {/* Recomendações para Prática */}
-      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-400">
+      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 border-l-4 border-green-500">
         <div className="absolute inset-0 bg-gradient-to-r from-green-500/3 to-emerald-500/3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
         <CardHeader className="relative z-10">
-          <CardTitle className="flex items-center text-xl font-semibold text-gray-800">
+          <CardTitle className="flex items-center text-xl font-semibold text-green-800">
             <CheckSquare className="mr-3 h-6 w-6 text-green-600" />
             Recomendações para Prática Clínica
           </CardTitle>
+          <div className="flex items-center space-x-2 mt-2">
+            <div className="w-3 h-3 rounded-full bg-green-500" />
+            <span className="text-sm font-medium text-green-700">
+              Aplicação prática das evidências
+            </span>
+            <Target className="h-4 w-4 text-green-700" />
+          </div>
         </CardHeader>
         <CardContent className="relative z-10">
           <Alert className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-800">Aplicação Clínica</AlertTitle>
             <AlertDescription>
-              <p className="text-gray-700">{unifiedResults?.practice_recommendations?.clinical_application}</p>
-              <p className="text-gray-700 mt-2"><strong>Pontos de Monitoramento:</strong></p>
+              <p className="text-green-700">{unifiedResults?.practice_recommendations?.clinical_application}</p>
+              <p className="text-green-700 mt-2"><strong>Pontos de Monitoramento:</strong></p>
               <ul className="list-disc list-outside pl-5 space-y-1 mt-1">
                 {unifiedResults?.practice_recommendations?.monitoring_points?.map((point, index) => (
-                  <li key={index} className="text-gray-700">{point}</li>
+                  <li key={index} className="text-green-700">{point}</li>
                 ))}
               </ul>
-              <p className="text-gray-700 mt-2"><strong>Caveats da Evidência:</strong></p>
-              <p className="text-gray-700">{unifiedResults?.practice_recommendations?.evidence_caveats}</p>
+              <p className="text-green-700 mt-2"><strong>Caveats da Evidência:</strong></p>
+              <p className="text-green-700">{unifiedResults?.practice_recommendations?.evidence_caveats}</p>
             </AlertDescription>
           </Alert>
         </CardContent>

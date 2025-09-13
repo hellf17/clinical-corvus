@@ -14,7 +14,7 @@ function calculateAge(birthDate?: string) {
 }
 
 export default function PatientHeader({ patient }: { patient: Patient }) {
-  const age = calculateAge(patient.birthDate || patient.dateOfBirth);
+  const age = calculateAge(patient.birthDate);
   return (
     <header className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border-b bg-muted/30 rounded-t-lg">
       <div>
@@ -24,8 +24,8 @@ export default function PatientHeader({ patient }: { patient: Patient }) {
           {patient.gender && <span> &middot; {patient.gender === 'male' ? 'Masculino' : patient.gender === 'female' ? 'Feminino' : 'Outro'}</span>}
           {patient.primary_diagnosis && <span> &middot; {patient.primary_diagnosis}</span>}
         </div>
-        {patient.admissionDate && (
-          <div className="text-xs text-muted-foreground mt-1">Admitido em: {new Date(patient.admissionDate).toLocaleDateString()}</div>
+        {patient.admission_date && (
+          <div className="text-xs text-muted-foreground mt-1">Admitido em: {new Date(patient.admission_date).toLocaleDateString()}</div>
         )}
       </div>
       {patient.patient_id && (

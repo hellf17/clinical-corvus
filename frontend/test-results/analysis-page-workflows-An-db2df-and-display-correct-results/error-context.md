@@ -1,0 +1,53 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e5]:
+      - link "Clinical Corvus logo Clinical Corvus" [ref=e7] [cursor=pointer]:
+        - /url: /
+        - img "Clinical Corvus logo" [ref=e8] [cursor=pointer]
+        - generic [ref=e9] [cursor=pointer]: Clinical Corvus
+      - generic [ref=e11]:
+        - button "Menu Principal" [ref=e12]
+        - generic [ref=e14]:
+          - link "Análise Rápida" [ref=e16] [cursor=pointer]:
+            - /url: /analysis
+            - img [ref=e17] [cursor=pointer]
+            - generic [ref=e22] [cursor=pointer]: Análise Rápida
+          - link "Academia Clínica" [ref=e24] [cursor=pointer]:
+            - /url: /academy
+            - img [ref=e25] [cursor=pointer]
+            - generic [ref=e37] [cursor=pointer]: Academia Clínica
+          - link "Documentação" [ref=e39] [cursor=pointer]:
+            - /url: /docs
+            - img [ref=e40] [cursor=pointer]
+            - generic [ref=e42] [cursor=pointer]: Documentação
+          - button "Login" [ref=e44] [cursor=pointer]:
+            - img [ref=e45] [cursor=pointer]
+            - generic [ref=e48] [cursor=pointer]: Login
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - heading "Central de Análise Dr. Corvus" [level=1] [ref=e55]:
+          - img [ref=e56]
+          - text: Central de Análise Dr. Corvus
+        - paragraph [ref=e58]: Faça upload de um PDF de exame ou insira os dados manualmente para análise inteligente.
+        - generic [ref=e59]:
+          - generic [ref=e60]: Sistema Ativo
+          - generic [ref=e62]:
+            - img [ref=e63]
+            - text: Análise Avançada com Insights
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - switch "Upload de Arquivo Ativo" [ref=e76] [cursor=pointer]
+          - generic [ref=e77] [cursor=pointer]: Upload de Arquivo Ativo
+        - paragraph [ref=e78]: Faça upload de um arquivo PDF contendo os resultados dos exames para análise automática.
+        - generic [ref=e82]:
+          - generic [ref=e83]: Upload de Exame (PDF, máx 10MB)
+          - generic [ref=e84]:
+            - button "Upload de Exame (PDF, máx 10MB)" [ref=e85]
+            - button "Enviar Análise Rápida" [ref=e86] [cursor=pointer]:
+              - img [ref=e87] [cursor=pointer]
+              - text: Enviar Análise Rápida
+  - alert [ref=e90]
+```

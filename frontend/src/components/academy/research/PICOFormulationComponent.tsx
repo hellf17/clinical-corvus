@@ -9,12 +9,12 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
-import { 
-  FileQuestion, 
-  RefreshCw, 
-  ChevronDown, 
-  ChevronUp, 
-  Info, 
+import {
+  FileQuestion,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Info,
   Search,
   AlertTriangle,
   CheckCircle,
@@ -30,10 +30,12 @@ import {
   MessageSquare,
   Database,
   Filter,
-  Globe
+  Globe,
+  Brain
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/Tooltip';
 import ReactMarkdown from "react-markdown";
+import DOMPurify from 'isomorphic-dompurify';
 
 // Interfaces para tipos de dados
 // MIGRATION NOTE: Backend now returns 'structured_pico_question' (not 'pico_components')
@@ -535,7 +537,7 @@ export default function PICOFormulationComponent({
                   <h4 className="font-semibold text-green-800">Raciocínio Detalhado (Chain-of-Thought)</h4>
                 </div>
                 <div className="text-sm text-green-700 leading-relaxed">
-                  <ReactMarkdown>{results.pico_derivation_reasoning}</ReactMarkdown>
+                  <ReactMarkdown>{DOMPurify.sanitize(results.pico_derivation_reasoning || '')}</ReactMarkdown>
                 </div>
               </div>
 
@@ -546,7 +548,7 @@ export default function PICOFormulationComponent({
                   <h4 className="font-semibold text-green-800">Explicação da Formulação</h4>
                 </div>
                 <div className="text-sm text-green-700 leading-relaxed">
-                  <ReactMarkdown>{results.explanation}</ReactMarkdown>
+                  <ReactMarkdown>{DOMPurify.sanitize(results.explanation || '')}</ReactMarkdown>
                 </div>
               </div>
 
@@ -647,6 +649,24 @@ export default function PICOFormulationComponent({
                     Buscar Evidências
                   </Button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {isLoading && !results && (
+            <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-green-200 rounded-full animate-spin">
+                  <div className="absolute top-0 left-0 w-16 h-16 border-4 border-green-600 rounded-full animate-pulse border-t-transparent"></div>
+                </div>
+                <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-green-600 animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está formulando a pergunta PICO...</p>
+                <p className="text-sm text-gray-500">Aguarde enquanto analisamos seu cenário clínico e estruturamos a pergunta.</p>
+              </div>
+              <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
               </div>
             </div>
           )}

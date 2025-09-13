@@ -132,16 +132,176 @@ class AlertSystem:
             "details": None # Can add extra details if needed
          }
 
-    def _severity_to_number(self, severity: str) -> int:
+    @staticmethod
+    def _severity_to_number(severity: str) -> int:
         """Converts severity string to a number for sorting."""
         mapping = {
-            CRITICAL: 4,
-            HIGH: 3,
-            WARNING: 2, # Or medium
-            INFO: 1, # Or low
-            "normal": 0
+            CRITICAL: 5,
+            "severe": 4,
+            HIGH: 4,
+            WARNING: 2,
+            "moderate": 3,
+            INFO: 1,
+            "normal": 0,
+            "": 0
         }
         return mapping.get(severity.lower(), 0)
+
+    @staticmethod
+    def _organize_exams_by_type(exams):
+        """Organize exams by their medical category."""
+        if not exams:
+            return {}
+
+        organized = {
+            "hepatic": [],
+            "renal": [],
+            "hematology": [],
+            "blood_gases": [],
+            "electrolytes": [],
+            "cardiac": [],
+            "metabolic": [],
+            "microbiology": []
+        }
+
+        # Keywords for categorization
+        categories = {
+            "hepatic": ["tgo", "tgp", "alt", "bilirrubina", "fosfatase", "albumina"],
+            "renal": ["creatinina", "ureia", "clearance"],
+            "hematology": ["hemoglobina", "plaquetas", "leucócitos", "hemograma"],
+            "blood_gases": ["ph", "po2", "pco2", "hco3", "be", "blood gas"],
+            "electrolytes": ["sódio", "potássio", "cálcio", "magnésio"],
+            "cardiac": ["troponina", "ck-mb", "nt-probnp"],
+            "metabolic": ["glicose", "insulina", "hba1c"],
+            "microbiology": ["cultura", "antibiograma", "pcr"]
+        }
+
+        for exam in exams:
+            test_name = exam.get("test", "").lower()
+            exam_type = exam.get("type", "")
+
+            # Check explicit type first
+            if exam_type:
+                # Handle special cases for type mapping
+                if exam_type == "blood gas":
+                    organized["blood_gases"].append(exam)
+                elif exam_type == "metabolism":
+                    organized["metabolic"].append(exam)
+                elif exam_type in organized:
+                    organized[exam_type].append(exam)
+                else:
+                    # Put unknown types in "other"
+                    if "other" not in organized:
+                        organized["other"] = []
+                    organized["other"].append(exam)
+                continue
+
+            # Check by keywords
+            categorized = False
+            for category, keywords in categories.items():
+                if any(keyword in test_name for keyword in keywords):
+                    organized[category].append(exam)
+                    categorized = True
+                    break
+
+            # If not categorized, put in "other"
+            if not categorized:
+                if "other" not in organized:
+                    organized["other"] = []
+                organized["other"].append(exam)
+
+        return organized
+
+    @staticmethod
+    def _convert_analysis_to_alerts(analysis_results, category):
+        """Convert analysis results to alert format."""
+        alerts = []
+
+        # Handle abnormalities
+        for abnormality in analysis_results.get('abnormalities', []):
+            alert = {
+                'alert_type': 'lab_abnormality',
+                'message': abnormality.get('message', ''),
+                'severity': abnormality.get('severity', 'info'),
+                'parameter': abnormality.get('parameter', 'Não especificado'),
+                'value': abnormality.get('value', ''),
+                'reference': abnormality.get('reference', ''),
+                'category': category,
+                'status': 'active',
+                'interpretation': abnormality.get('interpretation', ''),
+                'recommendation': abnormality.get('recommendation', ''),
+                'details': None
+            }
+            alerts.append(alert)
+
+        # Handle general interpretation
+        if 'interpretation' in analysis_results:
+            alert = {
+                'alert_type': 'lab_interpretation',
+                'message': analysis_results['interpretation'],
+                'severity': analysis_results.get('severity', 'info'),
+                'parameter': 'Geral',
+                'value': '',
+                'reference': '',
+                'category': category,
+                'status': 'active',
+                'interpretation': analysis_results['interpretation'],
+                'recommendation': analysis_results.get('recommendation', ''),
+                'details': None
+            }
+            alerts.append(alert)
+
+        # Handle critical conditions
+        for condition in analysis_results.get('critical_conditions', []):
+            alert = {
+                'alert_type': 'critical_condition',
+                'message': condition.get('description', ''),
+                'severity': 'critical',
+                'parameter': condition.get('parameter', 'Condição Crítica'),
+                'value': '',
+                'reference': '',
+                'category': category,
+                'status': 'active',
+                'interpretation': condition.get('description', ''),
+                'recommendation': condition.get('action', ''),
+                'details': None
+            }
+            alerts.append(alert)
+
+        return alerts
+
+    @staticmethod
+    def generate_alerts(exams):
+        """Generate alerts from exam data."""
+        if not exams:
+            return []
+
+        # Organize exams by type
+        organized = AlertSystem._organize_exams_by_type(exams)
+
+        alerts = []
+
+        # Process each category
+        for category, category_exams in organized.items():
+            if not category_exams:
+                continue
+
+            # Call appropriate analyzer based on category
+            analysis_result = None
+            if category == "hepatic":
+                analysis_result = analisar_funcao_hepatica(category_exams)
+            elif category == "renal":
+                analysis_result = analisar_funcao_renal(category_exams)
+            # Add other analyzers as needed
+
+            if analysis_result:
+                category_alerts = AlertSystem._convert_analysis_to_alerts(analysis_result, category.title())
+                alerts.extend(category_alerts)
+
+        # Sort by severity
+        alerts.sort(key=lambda x: AlertSystem._severity_to_number(x['severity']), reverse=True)
+
+        return alerts
 
 # Auxiliary analyzer functions used by AlertSystem
 def analisar_funcao_hepatica(exams):

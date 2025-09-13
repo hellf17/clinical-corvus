@@ -7,6 +7,16 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from .regex_patterns import CAMPOS_DESEJADOS
 
+# Import fuzzy matching and normalization modules
+try:
+    from .fuzzy_matching import fuzzy_match_test_name, normalize_number, normalize_unit
+    from .lab_test_synonyms import LAB_TEST_SYNONYMS, SYNONYM_TO_STANDARD
+    from rapidfuzz import fuzz, process
+    FUZZY_MATCHING_AVAILABLE = True
+except ImportError:
+    FUZZY_MATCHING_AVAILABLE = False
+    print("Fuzzy matching modules not available. Install required dependencies for fuzzy matching functionality.")
+
 # Importar pdfplumber como alternativa para PDFs problemáticos
 try:
     import pdfplumber
@@ -15,8 +25,16 @@ except ImportError:
     PDFPLUMBER_AVAILABLE = False
     print("pdfplumber não está disponível. Instale com 'pip install pdfplumber' para melhor suporte a PDFs problemáticos.")
 
+# Importar OCR modules
+try:
+    from .ocr_extractor import ocr_image, ocr_pdf_images
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+    print("OCR modules not available. Install required dependencies for OCR functionality.")
+
 # Pré-compilar expressões regulares para melhor performance
-COMPILED_PATTERNS = {campo: re.compile(padrao, re.IGNORECASE) 
+COMPILED_PATTERNS = {campo: re.compile(padrao, re.IGNORECASE)
                     for campo, padrao in CAMPOS_DESEJADOS.items()}
 
 def extrair_texto_com_pdfplumber(pdf_path, pagina=0):
@@ -36,10 +54,26 @@ def extrair_texto_com_pdfplumber(pdf_path, pagina=0):
     try:
         with pdfplumber.open(pdf_path) as pdf:
             if pagina < len(pdf.pages):
-                return pdf.pages[pagina].extract_text() or ""
+                text = pdf.pages[pagina].extract_text() or ""
+                # If no text extracted, try OCR as fallback
+                if not text and OCR_AVAILABLE:
+                    print(f"No text extracted with pdfplumber, trying OCR fallback for page {pagina+1}")
+                    # For single page, we need to extract just that page's images
+                    ocr_text = ocr_pdf_images(pdf_path)
+                    if ocr_text:
+                        print(f"OCR successful for page {pagina+1}")
+                        return ocr_text
+                return text
             return ""
     except Exception as e:
         print(f"Erro ao extrair texto com pdfplumber: {e}")
+        # Try OCR as fallback
+        if OCR_AVAILABLE:
+            print("Trying OCR fallback after pdfplumber failure")
+            ocr_text = ocr_pdf_images(pdf_path)
+            if ocr_text:
+                print("OCR successful as fallback")
+                return ocr_text
         return ""
 
 def extrair_id(pdf_path):
@@ -72,7 +106,12 @@ def extrair_id(pdf_path):
                         print("Erro ao extrair texto da primeira página com PyPDF2. Tentando com pdfplumber...")
                         texto = extrair_texto_com_pdfplumber(pdf_path, 0)
                         if not texto:
-                            return "Paciente não identificado", "Data não encontrada", "Hora não encontrada"
+                            # Try OCR as last fallback
+                            if OCR_AVAILABLE:
+                                print("Trying OCR as last fallback...")
+                                texto = ocr_pdf_images(pdf_path)
+                            if not texto:
+                                return "Paciente não identificado", "Data não encontrada", "Hora não encontrada"
                 except Exception as e:
                     print(f"Erro ao acessar a primeira página: {e}. Tentando com pdfplumber...")
                     texto = extrair_texto_com_pdfplumber(pdf_path, 0)
@@ -170,13 +209,33 @@ def extrair_campos_pagina(pdf_path, numero_pagina=None):
                             print(f"Erro ao extrair texto da página {i+1} com PyPDF2. Tentando com pdfplumber...")
                             texto = extrair_texto_com_pdfplumber(pdf_path, i)
                             if not texto:
-                                return {}
-                        return extrair_campos_do_texto(texto)
+                                # Try OCR as last fallback
+                                if OCR_AVAILABLE:
+                                    print(f"Trying OCR as last fallback for page {i+1}...")
+                                    texto = ocr_pdf_images(pdf_path)
+                                if not texto:
+                                    return {}
+                        # Use fuzzy matching for OCR-extracted text to improve tolerance
+                        if OCR_AVAILABLE and FUZZY_MATCHING_AVAILABLE:
+                            return extrair_campos_do_texto_com_fuzzy(texto)
+                        else:
+                            return extrair_campos_do_texto(texto)
                     except Exception as e:
                         print(f"Erro ao processar página {i+1}: {e}. Tentando com pdfplumber...")
                         texto = extrair_texto_com_pdfplumber(pdf_path, i)
                         if texto:
                             return extrair_campos_do_texto(texto)
+                        else:
+                            # Try OCR as last fallback
+                            if OCR_AVAILABLE:
+                                print(f"Trying OCR as last fallback for page {i+1} after exception...")
+                                texto = ocr_pdf_images(pdf_path)
+                                if texto:
+                                    # Use fuzzy matching for OCR-extracted text to improve tolerance
+                                    if FUZZY_MATCHING_AVAILABLE:
+                                        return extrair_campos_do_texto_com_fuzzy(texto)
+                                    else:
+                                        return extrair_campos_do_texto(texto)
                         return {}
                 
                 # Use multithreading to process pages in parallel
@@ -200,15 +259,35 @@ def extrair_campos_pagina(pdf_path, numero_pagina=None):
                         print(f"Erro ao extrair texto da página {numero_pagina} com PyPDF2. Tentando com pdfplumber...")
                         texto = extrair_texto_com_pdfplumber(pdf_path, numero_pagina - 1)
                         if not texto:
-                            return {}
+                            # Try OCR as last fallback
+                            if OCR_AVAILABLE:
+                                print(f"Trying OCR as last fallback for page {numero_pagina}...")
+                                texto = ocr_pdf_images(pdf_path)
+                            if not texto:
+                                return {}
                     
                     # Extract fields from this page
-                    return extrair_campos_do_texto(texto)
+                    # Use fuzzy matching for OCR-extracted text to improve tolerance
+                    if OCR_AVAILABLE and FUZZY_MATCHING_AVAILABLE:
+                        return extrair_campos_do_texto_com_fuzzy(texto)
+                    else:
+                        return extrair_campos_do_texto(texto)
                 except Exception as e:
                     print(f"Erro ao processar página {numero_pagina}: {e}. Tentando com pdfplumber...")
                     texto = extrair_texto_com_pdfplumber(pdf_path, numero_pagina - 1)
                     if texto:
                         return extrair_campos_do_texto(texto)
+                    else:
+                        # Try OCR as last fallback
+                        if OCR_AVAILABLE:
+                            print(f"Trying OCR as last fallback for page {numero_pagina} after exception...")
+                            texto = ocr_pdf_images(pdf_path)
+                            if texto:
+                                # Use fuzzy matching for OCR-extracted text to improve tolerance
+                                if FUZZY_MATCHING_AVAILABLE:
+                                    return extrair_campos_do_texto_com_fuzzy(texto)
+                                else:
+                                    return extrair_campos_do_texto(texto)
                     return {}
     except Exception as e:
         print(f"Erro ao processar PDF {pdf_path}: {e}")
@@ -223,10 +302,11 @@ def extrair_campos_do_texto(texto):
     
     Args:
         texto: Text content to parse
-        
+         
     Returns:
         dict: Dictionary with extracted data
     """
+    print(f"PDF_Extractor: Extracting fields from text (standard regex):\n---\n{texto}\n---")
     dados_extraidos = {}
     
     # Use pre-compiled patterns for better performance
@@ -238,11 +318,108 @@ def extrair_campos_do_texto(texto):
                 grupos = correspondencia.groups()
                 valor = next((g for g in grupos if g is not None), None)
                 if valor:
-                    dados_extraidos[campo] = valor.strip()
+                    # Normalize the extracted value
+                    if FUZZY_MATCHING_AVAILABLE:
+                        normalized_value = normalize_number(valor.strip())
+                        dados_extraidos[campo] = normalized_value
+                    else:
+                        dados_extraidos[campo] = valor.strip()
         except (AttributeError, IndexError) as e:
             # Skip if there's an error with the pattern or group
             continue
 
     # Preservar os valores originais em formato string
     # Não converter para numérico para manter consistência com os testes
-    return dados_extraidos 
+    print(f"PDF_Extractor: Extracted data (standard regex): {dados_extraidos}")
+    return dados_extraidos
+
+def extrair_campos_do_texto_com_fuzzy(texto):
+    """
+    Extract fields from text using fuzzy matching for improved OCR tolerance.
+    
+    Args:
+        texto: Text content to parse
+         
+    Returns:
+        dict: Dictionary with extracted data using fuzzy matching
+    """
+    if not FUZZY_MATCHING_AVAILABLE:
+        print("Fuzzy matching functionality not available. Using standard extraction.")
+        return extrair_campos_do_texto(texto)
+    
+    # First, try standard extraction
+    dados_extraidos = extrair_campos_do_texto(texto)
+    
+    # Then, try fuzzy matching on the text to catch OCR errors
+    print(f"PDF_Extractor: Extracting fields from text with fuzzy matching:\n---\n{texto}\n---")
+    try:
+        lines = texto.split('\n')
+        all_synonyms = []
+        for syn_list in LAB_TEST_SYNONYMS.values():
+            all_synonyms.extend(syn_list)
+
+        for line in lines:
+            if not line.strip():
+                continue
+            
+            # Extract potential test name and value from the line
+            match = re.match(r'(.+?):\s*([0-9,.]+)', line.strip())
+            if match:
+                test_name_candidate = match.group(1).strip()
+                value = match.group(2)
+
+                # Find the best fuzzy match for the test name candidate
+                best_match, score, _ = process.extractOne(test_name_candidate, all_synonyms, scorer=fuzz.token_sort_ratio)
+                print(f"Fuzzy match for '{test_name_candidate}': '{best_match}' with score {score}")
+                
+                if score >= 65: # Lowered threshold to catch "Sodo"
+                    standard_name = SYNONYM_TO_STANDARD.get(best_match.lower())
+                    if not standard_name:
+                        # if the best_match is not in the SYNONYM_TO_STANDARD dict, we need to find it
+                        for key, values in LAB_TEST_SYNONYMS.items():
+                            if best_match in values:
+                                standard_name = key
+                                break
+                    
+                    if standard_name:
+                        normalized_value = normalize_number(value)
+                        dados_extraidos[standard_name] = normalized_value
+                        print(f"  -> Found: {standard_name} = {normalized_value}")
+    except Exception as e:
+        print(f"Error in fuzzy matching extraction: {e}")
+    print(f"PDF_Extractor: Extracted data (fuzzy): {dados_extraidos}")
+    
+    return dados_extraidos
+
+def extrair_campos_de_imagem(image_path, use_fuzzy_matching=True, debug=False):
+    """
+    Extract fields from an image file using OCR.
+    
+    Args:
+        image_path: Path to the image file
+        use_fuzzy_matching: Whether to use fuzzy matching for improved OCR tolerance
+        debug: If True, save intermediate images for inspection
+         
+    Returns:
+        dict: Dictionary with extracted data
+    """
+    if not OCR_AVAILABLE:
+        print("OCR functionality not available.")
+        return {}
+    
+    try:
+        # Perform OCR on the image
+        texto = ocr_image(image_path, debug=debug)
+         
+        # Extract fields from the OCR text
+        if texto:
+            if use_fuzzy_matching and FUZZY_MATCHING_AVAILABLE:
+                return extrair_campos_do_texto_com_fuzzy(texto)
+            else:
+                return extrair_campos_do_texto(texto)
+        else:
+            print("No text extracted from image.")
+            return {}
+    except Exception as e:
+        print(f"Error extracting fields from image: {e}")
+        return {}

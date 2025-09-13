@@ -18,7 +18,7 @@ import { IntegratedWorkflowCard, WorkflowStep } from '@/components/academy/Integ
 interface ExpandDifferentialDiagnosisInput {
   presenting_complaint: string;
   location_if_pain?: string;
-  student_initial_ddx_list: string[];
+  user_initial_ddx_list: string[];
 }
 
 interface ExpandedDdxOutput {
@@ -416,7 +416,7 @@ export default function DifferentialDiagnosisPage() {
       const input: ExpandDifferentialDiagnosisInput = {
         presenting_complaint: symptoms.trim(),
         location_if_pain: clinicalSigns.trim() || undefined,
-        student_initial_ddx_list: ddxList,
+        user_initial_ddx_list: ddxList,
       };
 
       const response = await fetch('/api/clinical-assistant/expand-differential-diagnosis-translated', {
@@ -441,6 +441,7 @@ export default function DifferentialDiagnosisPage() {
       }
 
       const data: ExpandedDdxOutput = await response.json();
+      console.log('Received data from backend:', data);
       setExpandedDdx(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao processar sua solicitação.';
@@ -852,51 +853,151 @@ export default function DifferentialDiagnosisPage() {
                   </Alert>
                 )}
 
-                {isLoading && <ExpandedDdxSkeleton />}
+                {isLoading && !expandedDdx && (
+                    <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin">
+                                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-pulse border-t-transparent"></div>
+                            </div>
+                            <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-purple-600 animate-pulse" />
+                        </div>
+                        <div className="text-center space-y-2">
+                            <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está expandindo o diagnóstico...</p>
+                            <p className="text-sm text-gray-500">Aguarde enquanto analisamos e expandimos as hipóteses.</p>
+                        </div>
+                        <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+                        </div>
+                    </div>
+                )}
                 {expandedDdx && (
-                  <div className="mt-6 space-y-6">
-                    <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
-                      <div className="flex items-start">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                          <span className="text-blue-600 font-bold text-sm">🧠</span>
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-semibold mb-2 text-blue-800">Estratégia do Dr. Corvus</h3>
-                          <p className="text-sm text-blue-700 leading-relaxed">
-                            O raciocínio clínico eficaz combina múltiplas abordagens complementares: primeiro identifica e prioriza condições de maior gravidade que necessitam investigação urgente, depois aplica métodos sistemáticos (anatômicos, fisiopatológicos e epidemiológicos) para garantir amplitude diagnóstica sem perder o foco na relevância clínica específica do caso apresentado.
-                          </p>
-                        </div>
+                  <div className="mt-8 space-y-8">
+                    {/* Enhanced Header with Modern Design */}
+                    <div className="flex items-center space-x-4 mb-8">
+                      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h6a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600">
+                          Análise Expandida por Dr. Corvus
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Diagnósticos diferenciais expandidos com abordagem sistemática
+                        </p>
                       </div>
                     </div>
 
                     {expandedDdx.suggested_additional_diagnoses_with_rationale && expandedDdx.suggested_additional_diagnoses_with_rationale.length > 0 ? (
-                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center mb-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                            <ListChecks className="w-5 h-5 text-blue-600" />
-                          </div>
-                          <h4 className="font-semibold text-blue-800 text-lg">Sugestões de Diagnósticos Adicionais</h4>
-                        </div>
-                        <p className="text-sm text-blue-700 mb-4">
-                          Com base nos dados fornecidos, aqui estão alguns diagnósticos e racionais a serem considerados para ampliar sua perspectiva.
-                        </p>
-                        <div className="space-y-3">
-                          {expandedDdx.suggested_additional_diagnoses_with_rationale.map((item, index) => (
-                            <div key={`suggestion-${index}`} className="bg-white/70 p-3 rounded-md border border-blue-100">
-                              <div className="flex items-start">
-                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0 mt-0.5">
-                                  <span className="text-blue-700 font-semibold text-xs">{index + 1}</span>
-                                </div>
-                                <div className="flex-1">
-                                  <p className="text-sm text-blue-900 leading-relaxed">{item}</p>
-                                </div>
+                      <div className="space-y-8">
+                        {/* Strategy Section - Enhanced */}
+                        <div className="group relative overflow-hidden bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/50 dark:from-gray-800 dark:via-indigo-900/10 dark:to-purple-900/20 rounded-2xl p-8 border-2 border-indigo-200/50 dark:border-indigo-800/30 shadow-lg hover:shadow-2xl transition-all duration-500">
+                          {/* Background Pattern */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-indigo-50/40 to-purple-50/60 dark:from-gray-800/60 dark:via-indigo-900/20 dark:to-purple-900/30"></div>
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-200/20 to-purple-200/20 rounded-full -mr-16 -mt-16"></div>
+                          
+                          <div className="relative">
+                            {/* Header */}
+                            <div className="flex items-center space-x-4 mb-6">
+                              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-bold text-indigo-800 dark:text-indigo-300 leading-tight">
+                                  Estratégia do Dr. Corvus
+                                </h3>
+                                <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
+                                  Abordagem sistemática aplicada ao caso
+                                </p>
                               </div>
                             </div>
-                          ))}
+
+                            {/* Content */}
+                            <div className="p-6 bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 dark:from-indigo-900/30 dark:via-purple-900/30 dark:to-pink-900/30 rounded-xl border border-indigo-200/50 dark:border-indigo-800/50">
+                              <p className="text-indigo-800 dark:text-indigo-300 leading-relaxed font-medium">
+                                {expandedDdx.applied_approach_description}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Diagnoses Section - Enhanced */}
+                        <div className="group relative overflow-hidden bg-gradient-to-br from-white via-emerald-50/30 to-teal-50/50 dark:from-gray-800 dark:via-emerald-900/10 dark:to-teal-900/20 rounded-2xl p-8 border-2 border-emerald-200/50 dark:border-emerald-800/30 shadow-lg hover:shadow-2xl transition-all duration-500">
+                          {/* Background Pattern */}
+                          <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-emerald-50/40 to-teal-50/60 dark:from-gray-800/60 dark:via-emerald-900/20 dark:to-teal-900/30"></div>
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-emerald-200/20 to-teal-200/20 rounded-full -mr-16 -mt-16"></div>
+                          
+                          <div className="relative">
+                            {/* Header */}
+                            <div className="flex items-center space-x-4 mb-8">
+                              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                </svg>
+                              </div>
+                              <div>
+                                <h3 className="text-xl font-bold text-emerald-800 dark:text-emerald-300 leading-tight">
+                                  Diagnósticos Adicionais Sugeridos
+                                </h3>
+                                <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+                                  Hipóteses identificadas pela análise sistemática
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Diagnoses Grid */}
+                            <div className="space-y-6">
+                              {expandedDdx.suggested_additional_diagnoses_with_rationale.map((diagnosisString, index) => (
+                                <div
+                                  key={index}
+                                  className="group/item relative overflow-hidden p-6 bg-gradient-to-br from-white via-emerald-50/50 to-teal-50/50 dark:from-gray-700 dark:via-emerald-900/20 dark:to-teal-900/20 rounded-xl border-2 border-emerald-200/50 dark:border-emerald-800/50 shadow-md hover:shadow-xl transition-all duration-300 hover:scale-[1.02]"
+                                >
+                                  {/* Background Pattern */}
+                                  <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-emerald-50/50 to-teal-50/70 dark:from-gray-700/70 dark:via-emerald-900/30 dark:to-teal-900/50"></div>
+                                  <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-emerald-200/20 to-teal-200/20 rounded-full -mr-10 -mt-10"></div>
+                                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-200/0 via-emerald-200/30 to-emerald-200/0 translate-x-[-100%] group-hover/item:translate-x-[100%] transition-transform duration-700"></div>
+                                  
+                                  <div className="relative">
+                                    {/* Item Header */}
+                                    <div className="flex items-start space-x-4 mb-4">
+                                      <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-md group-hover/item:shadow-lg transition-all duration-300">
+                                        {index + 1}
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="w-16 h-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full mb-3"></div>
+                                      </div>
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="p-4 bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 dark:from-emerald-900/30 dark:via-teal-900/30 dark:to-cyan-900/30 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50">
+                                      <p className="text-emerald-800 dark:text-emerald-300 leading-relaxed font-medium">
+                                        {diagnosisString}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">Nenhum diagnóstico adicional foi sugerido com base nas informações fornecidas.</p>
+                      <div className="p-8 bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 dark:from-amber-900/20 dark:via-orange-900/20 dark:to-red-900/20 rounded-2xl border-2 border-amber-200/50 dark:border-amber-800/30 shadow-lg text-center">
+                        <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                          <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <p className="text-lg font-medium text-amber-800 dark:text-amber-300 mb-2">
+                          Análise Completa
+                        </p>
+                        <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed max-w-md mx-auto">
+                          Nenhum diagnóstico adicional foi sugerido com base nas informações fornecidas. Sua lista inicial parece abrangente para o caso apresentado.
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
@@ -981,7 +1082,23 @@ export default function DifferentialDiagnosisPage() {
                   ) : "Gerar Perguntas-Chave"}
                 </Button>
                 
-                {questionsLoading && <GeneratedQuestionsSkeleton />}
+                {questionsLoading && !generatedQuestions && (
+                    <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-purple-200 rounded-full animate-spin">
+                                <div className="absolute top-0 left-0 w-16 h-16 border-4 border-purple-600 rounded-full animate-pulse border-t-transparent"></div>
+                            </div>
+                            <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-purple-600 animate-pulse" />
+                        </div>
+                        <div className="text-center space-y-2">
+                            <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está gerando perguntas...</p>
+                            <p className="text-sm text-gray-500">Aguarde enquanto preparamos as questões para o diagnóstico.</p>
+                        </div>
+                        <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-purple-500 to-violet-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+                        </div>
+                    </div>
+                )}
                 {questionsError && (
                   <Alert variant="destructive" className="mt-4">
                     <Info className="h-4 w-4" />

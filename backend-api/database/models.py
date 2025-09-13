@@ -7,7 +7,7 @@ All models should be defined here to avoid duplication and conflicts.
 from datetime import datetime
 import enum
 import uuid
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, JSON, Enum as SQLAlchemyEnum, Table
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, JSON, Enum as SQLAlchemyEnum, Table, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.dialects.postgresql import UUID
@@ -18,11 +18,18 @@ from . import Base
 from .types import GUID
 
 # Add SQLite UUID handling for testing
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+def _add_sqlite_pragma_support():
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+# Only add SQLite pragma support if using SQLite
+from config import get_settings
+settings = get_settings()
+if 'sqlite' in settings.database_url:
+    _add_sqlite_pragma_support()
 
 # Check if using SQLite (for testing)
 def is_sqlite_dialect():
@@ -126,6 +133,11 @@ class User(Base):
     # clinical_notes = relationship("ClinicalNote", back_populates="user") # Example
     # analyses = relationship("Analysis", back_populates="user") # Example
     # ai_chat_conversations = relationship("AIChatConversation", back_populates="user") # Example
+    
+    # Group collaboration relationships
+    group_memberships = relationship("GroupMembership", back_populates="user", foreign_keys="GroupMembership.user_id")
+    group_invitations_sent = relationship("GroupInvitation", back_populates="invited_by", foreign_keys="GroupInvitation.invited_by_user_id")
+    patient_assignments = relationship("GroupPatient", back_populates="assigner", foreign_keys="GroupPatient.assigned_by")
 
 
 class Patient(Base):
@@ -134,20 +146,21 @@ class Patient(Base):
     
     patient_id = Column(Integer, primary_key=True, index=True)
     # This links the patient record to the user account representing the patient themselves
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False, unique=True) # Ensure one Patient record per User
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False) # Allow multiple patients per user
     name = Column(String(255))
-    idade = Column(Integer)
-    sexo = Column(String(1))
-    peso = Column(Float)
-    altura = Column(Float)
-    etnia = Column(String(50))
-    data_internacao = Column(DateTime)
-    diagnostico = Column(Text)
-    exames = Column(Text)  # Add field for lab tests/results as text
-    medicacoes = Column(Text)  # Add field for medications as text
-    exame_fisico = Column(Text)  # Add field for physical examination
-    historia_familiar = Column(Text)  # Add field for family history
-    historia_clinica = Column(Text)  # Add field for clinical history
+    birthDate = Column(DateTime)
+    gender = Column(String(10))
+    weight = Column(Float)
+    height = Column(Float)
+    ethnicity = Column(String(50))
+    admission_date = Column(DateTime)
+    primary_diagnosis = Column(Text)
+    secondary_diagnosis = Column(Text)  # Add field for secondary diagnosis
+    comorbidities = Column(Text)  # Add field for comorbidities as text
+    medications = Column(Text)  # Add field for medications as text
+    physical_exam = Column(Text)  # Add field for physical examination
+    family_history = Column(Text)  # Add field for family history
+    clinical_history = Column(Text)  # Add field for clinical history
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
@@ -174,6 +187,9 @@ class Patient(Base):
     # ai_chat_conversations = relationship("AIChatConversation", back_populates="patient") # Example
     vital_signs = relationship("VitalSign", back_populates="patient", cascade="all, delete-orphan")
     exams = relationship("Exam", back_populates="patient", cascade="all, delete-orphan")
+    
+    # Group collaboration relationships
+    group_assignments = relationship("GroupPatient", back_populates="patient", cascade="all, delete-orphan")
 
 # --- NEW VitalSign Model ---
 class VitalSign(Base):
@@ -362,6 +378,28 @@ class ClinicalNote(Base):
     patient = relationship("Patient", backref="clinical_notes")
     user = relationship("User", backref="clinical_notes")
 
+class UserPreferences(Base):
+    """User preferences including notifications, language, and timezone."""
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), unique=True, nullable=False)
+
+    # Notification preferences
+    email_clinical_alerts = Column(Boolean, default=True, nullable=False)
+    email_group_updates = Column(Boolean, default=True, nullable=False)
+    product_updates = Column(Boolean, default=False, nullable=False)
+
+    # Localization
+    language = Column(String(10), default="pt-BR", nullable=False)
+    timezone = Column(String(64), default="UTC", nullable=False)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationship
+    user = relationship("User", backref="preferences", uselist=False)
+
 class Analysis(Base):
     """Model for clinical analyses and assessments."""
     __tablename__ = "analyses"
@@ -469,3 +507,128 @@ class HealthDiaryEntry(Base):
 
     # Relationships
     user = relationship("User", back_populates="health_diary_entries")
+
+
+# ================ GROUP COLLABORATION MODELS ================
+
+class GroupInvitation(Base):
+    """Model for group invitations."""
+    __tablename__ = "group_invitations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    invited_by_user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)  # Email of the invited user
+    token = Column(String(255), unique=True, nullable=False, index=True)  # Unique token for the invitation
+    role = Column(String(50), default="member", nullable=False)  # Role to be assigned when accepted
+    expires_at = Column(DateTime, nullable=False)  # Expiration time for the invitation
+    accepted_at = Column(DateTime, nullable=True)  # When the invitation was accepted
+    declined_at = Column(DateTime, nullable=True)  # When the invitation was declined
+    revoked_at = Column(DateTime, nullable=True)  # When the invitation was revoked
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    
+    # Relationships
+    group = relationship("Group", foreign_keys=[group_id])
+    invited_by = relationship("User", foreign_keys=[invited_by_user_id])
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set default expiration to 7 days from now if not set
+        if not self.expires_at:
+            self.expires_at = datetime.utcnow() + timedelta(days=7)
+    
+    @property
+    def is_expired(self) -> bool:
+        """Check if the invitation has expired."""
+        return datetime.utcnow() > self.expires_at
+    
+    @property
+    def is_accepted(self) -> bool:
+        """Check if the invitation has been accepted."""
+        return self.accepted_at is not None
+    
+    @property
+    def is_declined(self) -> bool:
+        """Check if the invitation has been declined."""
+        return self.declined_at is not None
+    
+    @property
+    def is_revoked(self) -> bool:
+        """Check if the invitation has been revoked."""
+        return self.revoked_at is not None
+    
+    @property
+    def is_pending(self) -> bool:
+        """Check if the invitation is still pending."""
+        return not self.is_accepted and not self.is_declined and not self.is_revoked and not self.is_expired
+    
+    def accept(self) -> None:
+        """Accept the invitation."""
+        if self.is_pending:
+            self.accepted_at = datetime.utcnow()
+    
+    def decline(self) -> None:
+        """Decline the invitation."""
+        if self.is_pending:
+            self.declined_at = datetime.utcnow()
+    
+    def revoke(self) -> None:
+        """Revoke the invitation."""
+        if self.is_pending:
+            self.revoked_at = datetime.utcnow()
+
+class Group(Base):
+    """Group model for clinical collaboration between healthcare professionals."""
+    __tablename__ = "groups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, unique=True)
+    description = Column(Text)
+    max_patients = Column(Integer, default=100, nullable=False) # Default limit
+    max_members = Column(Integer, default=10, nullable=False)    # Default limit
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # Relationships
+    memberships = relationship("GroupMembership", back_populates="group", cascade="all, delete-orphan")
+    patients = relationship("GroupPatient", back_populates="group", cascade="all, delete-orphan")
+    invitations = relationship("GroupInvitation", back_populates="group", cascade="all, delete-orphan")
+
+
+class GroupMembership(Base):
+    """Association model for users belonging to groups with roles."""
+    __tablename__ = "group_memberships"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(50), default="member", nullable=False)  # "admin" or "member"
+    joined_at = Column(DateTime, default=func.now(), nullable=False)
+    invited_by = Column(Integer, ForeignKey("users.user_id"), index=True)  # User who invited this member
+    
+    # Relationships
+    group = relationship("Group", back_populates="memberships")
+    user = relationship("User", foreign_keys=[user_id])
+    inviter = relationship("User", foreign_keys=[invited_by])
+    
+    # Ensure a user can only be a member of a group once
+    __table_args__ = (UniqueConstraint('group_id', 'user_id', name='uq_group_user'),)
+
+
+class GroupPatient(Base):
+    """Association model for patients assigned to groups."""
+    __tablename__ = "group_patients"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.patient_id", ondelete="CASCADE"), nullable=False, index=True)
+    assigned_at = Column(DateTime, default=func.now(), nullable=False)
+    assigned_by = Column(Integer, ForeignKey("users.user_id"), index=True)  # User who assigned this patient
+    
+    # Relationships
+    group = relationship("Group", back_populates="patients")
+    patient = relationship("Patient")
+    assigner = relationship("User", foreign_keys=[assigned_by])
+    
+    # Ensure a patient can only be assigned to a group once
+    __table_args__ = (UniqueConstraint('group_id', 'patient_id', name='uq_group_patient'),)

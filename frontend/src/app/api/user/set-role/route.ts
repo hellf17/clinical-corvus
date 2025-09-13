@@ -66,9 +66,7 @@ export async function POST(req: NextRequest) { // Ensure req is NextRequest
       publicMetadata: updatedMetadata
     });
 
-    // Redirect to dashboard after successful role setting
-    const redirectUrl = new URL('/dashboard-doctor', req.url).toString();
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.json({ success: true, userId, role, profile });
 
   } catch (error: any) {
     console.error("Error in /api/user/set-role:", error);

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from sqlalchemy import or_, func
@@ -13,6 +13,7 @@ from crud import patients as crud_patients
 from crud import is_doctor_assigned_to_patient, assign_doctor_to_patient, remove_doctor_from_patient
 from crud import crud_lab_result
 from pydantic import BaseModel
+from utils.group_authorization import is_user_authorized_for_patient, get_patients_accessible_to_user, get_patient_count_accessible_to_user
 
 router = APIRouter()
 
@@ -20,6 +21,7 @@ router = APIRouter()
 
 @router.get("/", response_model=patient_schemas.PatientListResponse)
 async def read_patients_paginated(
+    request: Request,
     search: Optional[str] = Query(None, description="Search term for patient name (case-insensitive)"),
     skip: int = Query(0, ge=0, description="Number of records to skip for pagination"),
     limit: int = Query(100, ge=1, le=200, description="Maximum number of records to return"),
@@ -29,26 +31,23 @@ async def read_patients_paginated(
     """
     Retorna a lista paginada de pacientes.
     - Se admin: retorna todos os pacientes.
-    - Se médico: retorna apenas os pacientes a ele associados.
+    - Se médico: retorna os pacientes a ele associados diretamente ou através de grupos.
     - Se paciente: retorna apenas seus próprios dados (em formato de lista).
     """
     if current_user.role == 'admin':
         # Admin: Fetch all patients with pagination and search
         patients, total = crud_patients.get_patients(
-            db=db, 
-            search=search, 
-            skip=skip, 
+            db=db,
+            search=search,
+            skip=skip,
             limit=limit
         )
     elif current_user.role == 'doctor':
-        # Doctor: Fetch patients assigned to this doctor
-        patients, total = crud_patients.get_assigned_patients_for_doctor(
-            db=db, 
-            doctor_id=current_user.user_id, 
-            search=search, 
-            skip=skip, 
-            limit=limit
-        )
+        # Doctor: Fetch patients assigned to this doctor or through groups
+        patients = get_patients_accessible_to_user(db, current_user, search)
+        # For pagination, we need to manually slice the list
+        total = len(patients)
+        patients = patients[skip:skip+limit]
     elif current_user.role == 'patient':
         # Patient: Fetch their own patient record
         patient_record = db.query(PatientModel).filter(PatientModel.user_id == current_user.user_id).first()
@@ -74,43 +73,51 @@ async def read_patients_paginated(
 @router.post("/", response_model=patient_schemas.Patient, status_code=status.HTTP_201_CREATED)
 async def create_patient(
     patient: patient_schemas.PatientCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_required)
 ):
     """
-    Cria um novo registro de Paciente associado à conta do usuário LOGADO.
-    ATUALMENTE: Apenas usuários com role 'patient' podem usar este endpoint 
-                para criar seu próprio registro de paciente (geralmente na primeira vez).
-    FUTURO: Implementar endpoint separado para admins/médicos criarem pacientes,
-            lidando com a vinculação a contas de usuário existentes ou novas.
+    Cria um novo registro de Paciente associado ao médico autenticado.
+    Apenas usuários com role 'doctor' podem usar este endpoint.
+    O novo paciente é automaticamente associado ao médico (doctor_id) via JWT.
+    Se um group_id for fornecido, o paciente também será atribuído ao grupo.
     """
-    if current_user.role != 'patient':
+    if current_user.role != 'doctor':
          raise HTTPException(
-             status_code=status.HTTP_403_FORBIDDEN, 
-             detail="Apenas pacientes podem criar seu próprio registro via este endpoint. Use o endpoint dedicado para admin/médico."
+             status_code=status.HTTP_403_FORBIDDEN,
+             detail="Apenas médicos podem criar novos pacientes via este endpoint."
          )
 
-    # Prevent creating multiple patient records for the same user account
-    existing_patient = db.query(PatientModel).filter(PatientModel.user_id == current_user.user_id).first()
-    if existing_patient:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de paciente já existe para esta conta.")
-
-    db_patient = crud_patients.create_patient_record(db=db, patient_data=patient, user_id=current_user.user_id)
-    return db_patient
+    # The CRUD function now handles group assignment atomically.
+    try:
+        db_patient = crud_patients.create_patient_record(
+            db=db,
+            patient_data=patient,
+            user_id=current_user.user_id
+        )
+        return db_patient
+    except Exception as e:
+        # The CRUD function will re-raise exceptions on failure.
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create patient: {str(e)}"
+        )
 
 @router.get("/{patient_id}", response_model=patient_schemas.Patient)
 async def read_patient(
-    patient_id: int, 
+    patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_required)
 ):
     """
     Retorna um paciente específico pelo ID.
     - Se admin: acesso permitido.
-    - Se médico: requer que o médico esteja associado ao paciente.
+    - Se médico: requer que o médico esteja associado ao paciente diretamente ou através de grupos.
     - Se paciente: requer que o patient_id corresponda ao seu próprio registro.
     """
-    patient = crud_patients.get_patient(db, patient_id=patient_id)
+    patient = crud_patients.get_patient_basic(db, patient_id=patient_id)
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente não encontrado")
 
@@ -118,11 +125,11 @@ async def read_patient(
     if current_user.role == 'admin':
         pass # Admin can access any patient
     elif current_user.role == 'doctor':
-        # Doctor access: Check association
-        if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        # Doctor access: Check direct association or group membership
+        if not is_user_authorized_for_patient(db, current_user, patient_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado: Médico não associado a este paciente."
+                detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos."
             )
     elif current_user.role == 'patient':
         # Patient access: Check if it's their own record
@@ -141,6 +148,7 @@ async def read_patient(
 async def update_patient(
     patient_id: int,
     patient_update: patient_schemas.PatientUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     # Inject current_user instead of specific auth dependency
     current_user: UserModel = Depends(get_current_user_required)
@@ -148,7 +156,7 @@ async def update_patient(
     """
     Atualiza um paciente existente pelo ID.
     - Se admin: acesso permitido.
-    - Se médico: requer que o médico esteja associado ao paciente.
+    - Se médico: requer que o médico esteja associado ao paciente diretamente ou através de grupos.
     - Pacientes não podem usar este endpoint.
     """
     # Check if patient exists first (implicit in get_patient call below)
@@ -160,10 +168,10 @@ async def update_patient(
     if current_user.role == 'admin':
         pass # Admin can update any patient
     elif current_user.role == 'doctor':
-        if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        if not is_user_authorized_for_patient(db, current_user, patient_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado: Médico não associado a este paciente para atualização."
+                detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos para atualização."
             )
     else: # Includes patients and other roles
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão negada para atualizar este paciente.")
@@ -172,20 +180,21 @@ async def update_patient(
     db_patient = crud_patients.update_patient(db, patient_id=patient_id, patient_update=patient_update)
     # The previous check should prevent this, but double-check
     if db_patient is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente não encontrado durante a atualização.") 
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente não encontrado durante a atualização.")
     return db_patient
 
 @router.delete("/{patient_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_patient(
     patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     # Inject current_user instead of specific auth dependency
-    current_user: UserModel = Depends(get_current_user_required) 
+    current_user: UserModel = Depends(get_current_user_required)
 ):
     """
     Exclui um paciente pelo ID.
     - Se admin: acesso permitido.
-    - Se médico: requer que o médico esteja associado ao paciente.
+    - Se médico: requer que o médico esteja associado ao paciente diretamente ou através de grupos.
     - Pacientes não podem usar este endpoint.
     """
     # Check if patient exists first to provide 404 before 403
@@ -197,10 +206,10 @@ async def delete_patient(
     if current_user.role == 'admin':
         pass # Admin can delete any patient
     elif current_user.role == 'doctor':
-         if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+         if not is_user_authorized_for_patient(db, current_user, patient_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Acesso negado: Médico não associado a este paciente para exclusão."
+                detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos para exclusão."
             )
     else: # Includes patients and other roles
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão negada para excluir este paciente.")
@@ -222,6 +231,7 @@ class LabResultListResponse(BaseModel):
 @router.get("/{patient_id}/lab_results", response_model=LabResultListResponse)
 async def read_patient_lab_results(
     patient_id: int,
+    request: Request,
     skip: int = Query(0, ge=0, description="Number of results to skip"),
     limit: int = Query(1000, ge=1, description="Maximum number of results to return"), # High limit default
     db: Session = Depends(get_db),
@@ -229,7 +239,7 @@ async def read_patient_lab_results(
 ):
     """
     Retrieves paginated lab results for a specific patient.
-    Requires admin access, or doctor assigned to patient, or the patient themselves.
+    Requires admin access, or doctor assigned to patient directly or through groups, or the patient themselves.
     """
     # Authorization Check (similar to read_patient)
     patient = crud_patients.get_patient(db, patient_id=patient_id) # Check patient exists
@@ -239,8 +249,8 @@ async def read_patient_lab_results(
     if current_user.role == 'admin':
         pass # Admin can access labs for any patient
     elif current_user.role == 'doctor':
-        if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente.")
+        if not is_user_authorized_for_patient(db, current_user, patient_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos.")
     elif current_user.role == 'patient':
         if patient.user_id != current_user.user_id:
              raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Paciente só pode acessar seus próprios dados.")
@@ -260,12 +270,13 @@ async def read_patient_lab_results(
 async def create_manual_lab_result(
     patient_id: int,
     lab_result_data: lab_result_schemas.LabResultCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_required)
 ):
     """
     Creates a single lab result record manually for a specific patient.
-    Requires admin access, or doctor assigned to patient, or the patient themselves.
+    Requires admin access, or doctor assigned to patient directly or through groups, or the patient themselves.
     The user making the request is set as the creator (user_id) of the lab record.
     """
     # Authorization Check (same as reading lab results)
@@ -274,10 +285,10 @@ async def create_manual_lab_result(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente não encontrado")
 
     if current_user.role == 'admin':
-        pass 
+        pass
     elif current_user.role == 'doctor':
-        if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente.")
+        if not is_user_authorized_for_patient(db, current_user, patient_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos.")
     elif current_user.role == 'patient':
         if patient.user_id != current_user.user_id:
              raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Paciente só pode adicionar resultados para si mesmo.")
@@ -292,9 +303,9 @@ async def create_manual_lab_result(
              lab_result_data.timestamp = datetime.utcnow()
              
         db_lab_result = crud_lab_result.create_lab_result(
-            db=db, 
-            result_data=lab_result_data, 
-            patient_id=patient_id, 
+            db=db,
+            result_data=lab_result_data,
+            patient_id=patient_id,
             user_id=current_user.user_id # User creating the record
         )
         return db_lab_result
@@ -302,7 +313,7 @@ async def create_manual_lab_result(
         # Catch potential DB errors or validation errors during creation
         print(f"Error creating manual lab result: {e}")
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Erro ao salvar resultado: {e}"
         )
 
@@ -312,8 +323,9 @@ async def create_manual_lab_result(
 async def assign_doctor_endpoint(
     patient_id: int,
     doctor_id: int,
+    request: Request,
     db: Session = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user_required) 
+    current_user: UserModel = Depends(get_current_user_required)
 ):
     """Endpoint para associar um médico a um paciente (requer role 'admin')."""
     if current_user.role != 'admin':
@@ -328,6 +340,7 @@ async def assign_doctor_endpoint(
 async def remove_doctor_endpoint(
     patient_id: int,
     doctor_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_required)
 ):
@@ -342,4 +355,4 @@ async def remove_doctor_endpoint(
 
 # Endpoint de Análise de Convidado removido, pois a lógica de autenticação mudou.
 # @router.post("/analyze", response_model=Patient)
-# async def analyze_patient_guest(...): ... 
+# async def analyze_patient_guest(...): ...

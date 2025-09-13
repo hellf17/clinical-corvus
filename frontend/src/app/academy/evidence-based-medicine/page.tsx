@@ -185,8 +185,20 @@ export default function EvidenceBasedMedicinePage() {
           <Alert className="bg-green-50 border-green-200 rounded-lg mt-6">
             <CheckSquare className="h-5 w-5 text-green-700 mr-3 mt-0.5 flex-shrink-0" />
             <AlertDescription>
-              <p className="text-sm font-semibold text-green-700 mb-1">PICO Estruturada Ativa:</p>
-              <p className="text-sm text-green-700">{crossComponentState.picoQuestion}</p>
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm font-semibold text-green-700 mb-1">PICO Estruturada Ativa:</p>
+                  <p className="text-sm text-green-700">{crossComponentState.picoQuestion}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCrossComponentState({})}
+                  className="text-green-700 hover:text-green-800 hover:bg-green-100"
+                >
+                  Limpar
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
         ) : null;

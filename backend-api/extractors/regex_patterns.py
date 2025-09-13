@@ -8,7 +8,7 @@ CAMPOS_DESEJADOS = {
     'Hb': r'HEMOGLOBINA\.+:\s*([\d,.]+)|HEMOGLOBINA[\s\S]*?:\s*([\d,.]+)',
     'Ht': r'HEMAT[ÓO]CRITO\.+:\s*([\d,.]+)|HEMATOCRITO[\s\S]*?:\s*([\d,.]+)',
     'Leuco': r'LEUC[ÓO]CITOS\.+:\s*([\d,.]+)|LEUCOCITOS[\s\S]*?:\s*([\d,.]+)', # Total leukocytes
-    'Plaq': r'PLAQUETAS\.+:\s*([\d,.]+)',
+    'Plaq': r'PLAQUETAS[:.]+\s*([\d,.]+)',
     'Retic': r'CONTAGEM DE RETICULOCITOS[\s\S]*?Resultado[\s\S]*?:\s*([\d,.]+)',
     
     # Differential Leukocytes - New Patterns
@@ -37,8 +37,8 @@ CAMPOS_DESEJADOS = {
     'Metamielocitos_abs':  r'METAMIEL[OÓ]CITOS\.+(?:[^%\\n]*?%[^/\\n]*?)?([\d,.]+)\s*(?:/mm³|/µL|/\xb5L)?',
 
     # Electrolytes
-    'K+': r'POT[ÁA]SSIO\s*\n?Resultado\.+:\s*([\d,.]+)|POTÁSSIO[\s\S]*?:\s*([\d,.]+)',
-    'Na+': r'S[ÓO]DIO\s*\n?Resultado\.+:\s*([\d,.]+)|SÓDIO[\s\S]*?:\s*([\d,.]+)',
+    'K+': r'POT[ÁA]SSIO[\s\S]*?[:.]+\s*([\d,.]+)',
+    'Na+': r'S[ÓO]DIO[\s\S]*?[:.]+\s*([\d,.]+)',
     'Ca+': r'C[ÁA]LCIO\s*\n?Resultado\.+:\s*([\d,.]+)',
     'iCa': r'CALCIO IONICO[\s\S]*?:\s*([\d,.]+)',
     'Mg+': r'MAGN[ÉE]SIO\s*\n?Resultado\.+:\s*([\d,.]+)',

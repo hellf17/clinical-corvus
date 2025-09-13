@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
@@ -21,6 +21,7 @@ from security import get_current_user, get_current_user_required
 # Import the extractors from the original project
 from extractors.pdf_extractor import extrair_campos_pagina, extrair_id
 from extractors.regex_patterns import CAMPOS_DESEJADOS
+from utils.rate_limit import limiter
 
 router = APIRouter()
 
@@ -111,7 +112,9 @@ async def upload_pdf(
 # Endpoint de upload para convidados que não requer autenticação
 # Movido para um caminho raiz para garantir que não seja interceptado por middlewares de autenticação
 @router.post("/guest-upload", response_model=Dict[str, Any])
+@limiter.limit("5/minute")
 async def upload_pdf_guest(
+    request: Request,
     file: UploadFile = File(...),
 ):
     """
@@ -239,7 +242,9 @@ async def upload_pdf_guest(
 
 # Manter o endpoint antigo para compatibilidade, mas com redirecionamento
 @router.post("/upload/guest", response_model=Dict[str, Any])
+@limiter.limit("5/minute")
 async def upload_pdf_guest_legacy(
+    request: Request, # Add request as the first argument
     file: UploadFile = File(...),
 ):
     """
@@ -247,7 +252,7 @@ async def upload_pdf_guest_legacy(
     Redireciona para o novo endpoint /guest-upload.
     """
     # Simplesmente chama o novo endpoint
-    return await upload_pdf_guest(file)
+    return await upload_pdf_guest(request, file) # Pass request to the new endpoint
 
 @router.get("/status/{task_id}", response_model=Dict[str, Any])
 async def get_task_status(

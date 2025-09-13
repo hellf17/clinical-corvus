@@ -29,6 +29,7 @@ def create_test_user(sqlite_session):
     unique_id = str(uuid4())[:8]
     email = f"medication_test_{unique_id}@example.com"
     user = models.User(
+        clerk_user_id=f"test_clerk_user_{unique_id}",  # Use unique clerk_user_id
         email=email,
         name="Medication Test User",
         role="doctor"
@@ -53,10 +54,6 @@ def create_test_patient(sqlite_session, user_id):
     sqlite_session.commit()
     return patient
 
-def get_auth_headers(user_email):
-    """Get authorization headers with a valid token."""
-    access_token = create_access_token(data={"sub": user_email})
-    return {"Authorization": f"Bearer {access_token}"}
 
 def test_create_medication(sqlite_client, sqlite_session, monkeypatch):
     """Test creating a new medication."""
@@ -66,19 +63,29 @@ def test_create_medication(sqlite_client, sqlite_session, monkeypatch):
     mock_updated_at = datetime.now()
     
     def mock_create_medication(*args, **kwargs):
+        # Handle both parameter names: 'medication' and 'medication_data'
+        medication_obj = kwargs.get("medication") or kwargs.get("medication_data")
+        if medication_obj is None:
+            raise ValueError("No medication data provided")
+
+        # Extract patient_id and user_id
+        patient_id = medication_obj.patient_id if hasattr(medication_obj, 'patient_id') else medication_obj.get('patient_id')
+        user_id = medication_obj.user_id if hasattr(medication_obj, 'user_id') else medication_obj.get('user_id')
+
         return {
-            "medication_id": mock_uuid,
-            "patient_id": kwargs.get("medication").patient_id,
-            "name": kwargs.get("medication").name,
-            "dosage": kwargs.get("medication").dosage,
-            "route": kwargs.get("medication").route,
-            "frequency": kwargs.get("medication").frequency,
-            "raw_frequency": kwargs.get("medication").raw_frequency or "Daily",
-            "start_date": kwargs.get("medication").start_date,
-            "end_date": kwargs.get("medication").end_date,
-            "status": kwargs.get("medication").status,
-            "instructions": kwargs.get("medication").instructions or "Take as directed",
-            "notes": kwargs.get("medication").notes,
+            "medication_id": 123,  # Use integer ID as expected by schema
+            "patient_id": patient_id,
+            "user_id": user_id,    # Include required user_id field
+            "name": medication_obj.name if hasattr(medication_obj, 'name') else medication_obj.get('name'),
+            "dosage": medication_obj.dosage if hasattr(medication_obj, 'dosage') else medication_obj.get('dosage'),
+            "route": medication_obj.route if hasattr(medication_obj, 'route') else medication_obj.get('route'),
+            "frequency": medication_obj.frequency if hasattr(medication_obj, 'frequency') else medication_obj.get('frequency'),
+            "raw_frequency": getattr(medication_obj, 'raw_frequency', None) or medication_obj.get('raw_frequency') or "Daily",
+            "start_date": medication_obj.start_date if hasattr(medication_obj, 'start_date') else medication_obj.get('start_date'),
+            "end_date": medication_obj.end_date if hasattr(medication_obj, 'end_date') else medication_obj.get('end_date'),
+            "status": medication_obj.status if hasattr(medication_obj, 'status') else medication_obj.get('status'),
+            "instructions": getattr(medication_obj, 'instructions', None) or medication_obj.get('instructions') or "Take as directed",
+            "notes": medication_obj.notes if hasattr(medication_obj, 'notes') else medication_obj.get('notes'),
             "created_at": mock_created_at,
             "updated_at": mock_updated_at
         }
@@ -110,11 +117,11 @@ def test_create_medication(sqlite_client, sqlite_session, monkeypatch):
         "notes": "For fever and pain"
     }
     
-    response = sqlite_client.post("/api/medications/", json=medication_data)
+    response = sqlite_client.post(f"/api/patients/{patient.patient_id}/medications", json=medication_data)
     
     assert response.status_code == 201
-    assert "id" in response.json()
-    assert response.json()["medication_name"] == medication_data["name"]
+    assert "medication_id" in response.json()
+    assert response.json()["name"] == medication_data["name"]
     assert response.json()["dosage"] == medication_data["dosage"]
     assert response.json()["route"] == medication_data["route"]
     assert response.json()["status"] == medication_data["status"]

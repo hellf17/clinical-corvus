@@ -77,12 +77,26 @@ router = APIRouter(
 
 # --- Request/Response Models ---
 
+class SearchParameterOverride(BaseModel):
+    """User-supplied search step mirroring BAML SearchParameters in a safe subset."""
+    source: str
+    query_string: str
+    max_results: Optional[int] = None
+    study_type_filter: Optional[str] = None
+    date_range_years: Optional[int] = None
+    language_filter: Optional[str] = None
+    rationale: Optional[str] = None
+
 class DeepResearchRequest(BaseModel):
     user_original_query: str
     pico_question: Optional[Dict[str, Optional[str]]] = None
     research_focus: Optional[str] = None
     target_audience: Optional[str] = None
     research_mode: Optional[str] = 'quick'  # 'quick' ou 'expanded'
+    # Quick win: allow optional user-specified plan/strategy overrides
+    strategy_override: Optional[List[SearchParameterOverride]] = None
+    # Quick win: allow model preset to steer depth/cost knobs (service-tuned)
+    model_preset: Optional[str] = None  # e.g., 'fast' | 'balanced' | 'deep'
     
 class UnifiedEvidenceAnalysisRequest(BaseModel):
     paper_text: str
@@ -255,74 +269,6 @@ async def search_pubmed(query: str, max_results: int = 10, study_type_filter: Op
         logger.error(f"Error in unified search: {e}")
         return error
 
-@router.post("/autonomous", response_model=SynthesizedResearchOutput)
-async def perform_autonomous_deep_research(request: DeepResearchRequest):
-    """
-    Realiza pesquisa profunda AUTÔNOMA usando o serviço completo com Langroid
-    onde o Dr. Corvus decide quais ferramentas usar e adapta a estratégia baseada nos resultados.
-    
-    Suporta dois modos:
-    - research_mode == 'quick': Pesquisa otimizada (1-2 min)  
-    - research_mode == 'expanded': Análise mais profunda (3-5 min)
-    """
-    try:
-        # IMPORTANTE: Usar o serviço autônomo COMPLETO em vez do simplificado
-        from services.autonomous_research_service import conduct_autonomous_research
-        
-        # Converter PICO question se fornecida
-        pico_question = None
-        if request.pico_question:
-            pico_question = PICOQuestion(
-                patient_population=request.pico_question.get("population"),
-                intervention=request.pico_question.get("intervention"),
-                comparison=request.pico_question.get("comparison"),
-                outcome=request.pico_question.get("outcome"),
-                time_frame=request.pico_question.get("time_frame"),
-                study_type=request.pico_question.get("study_type")
-            )
-
-        # Preparar input para pesquisa autônoma COMPLETA
-        research_input = ResearchTaskInput(
-            user_original_query=request.user_original_query,
-            pico_question=pico_question,
-            research_focus=request.research_focus,
-            target_audience=request.target_audience
-        )
-        
-        # Detectar modo de pesquisa do request
-        research_mode = request.research_mode or 'quick'
-        logger.info(f"🤖 Iniciando pesquisa autônoma COMPLETA (modo: {research_mode}) para: {request.user_original_query}")
-        
-        # Ajustar parâmetros baseado no modo
-        max_turns = 20 if research_mode == 'expanded' else 15
-        
-        # Executar pesquisa autônoma COMPLETA com Langroid
-        result = await conduct_autonomous_research(research_input, max_turns=max_turns)
-        
-        # Adicionar informação sobre o modo usado
-        result.disclaimer += f" (Modo: {research_mode})"
-        
-        logger.info("✅ Pesquisa autônoma COMPLETA concluída")
-        return result
-        
-    except Exception as e:
-        logger.error(f"❌ Erro na pesquisa autônoma COMPLETA: {e}")
-        
-        # Fallback para o serviço simplificado se o completo falhar
-        try:
-            logger.info("🔄 Tentando fallback para serviço simplificado...")
-            from services.simple_autonomous_research import conduct_simple_autonomous_research
-            
-            result = await conduct_simple_autonomous_research(research_input)
-            result.disclaimer += f" NOTA: Usado serviço de fallback simplificado devido a erro no serviço completo. (Modo: {research_mode})"
-            
-            logger.info("✅ Pesquisa autônoma simplificada (fallback) concluída")
-            return result
-            
-        except Exception as fallback_error:
-            logger.error(f"❌ Erro também no fallback simplificado: {fallback_error}")
-            raise HTTPException(status_code=500, detail=f"Erro na pesquisa autônoma: {str(e)}")
-
 @router.post("/quick-search", response_model=SynthesizedResearchOutput)
 async def perform_quick_research(request: DeepResearchRequest):
     """
@@ -348,15 +294,210 @@ async def perform_quick_research(request: DeepResearchRequest):
     )
 
     try:
-        # Instantiate the service with the determined research_mode
-        research_service = SimpleAutonomousResearchService(research_mode=service_mode)
+        # Instantiate the service with the determined research_mode + model preset
+        research_service = SimpleAutonomousResearchService(
+            research_mode=service_mode,
+            model_preset=request.model_preset
+        )
+        # Convert optional user plan to internal strategy dicts
+        manual_strategies = []
+        if request.strategy_override:
+            allowed_sources = {
+                'pubmed': 'pubmed', 'europe_pmc': 'europe_pmc', 'brave': 'brave', 'guideline': 'guideline',
+                'google_scholar': 'google_scholar', 'cochrane': 'cochrane', 'ncbi_sources': 'ncbi_sources',
+                'elite_journals': 'elite_journals', 'comprehensive_academic': 'comprehensive_academic'
+            }
+            for step in request.strategy_override:
+                src = (step.source or '').strip().lower()
+                if src not in allowed_sources:
+                    logger.warning(f"Skipping strategy_override with unsupported source '{src}'")
+                    continue
+                # Clamp max_results into a safe range
+                mr = step.max_results if step.max_results is not None else None
+                if mr is not None:
+                    try:
+                        mr = max(5, min(int(mr), 50))
+                    except Exception:
+                        mr = None
+                manual_strategies.append({
+                    'source_service': allowed_sources[src],
+                    'query': step.query_string,
+                    'description': step.rationale or f"User strategy for {src}",
+                    'max_results': mr,
+                    'study_type_filter': step.study_type_filter,
+                    'date_range_years': step.date_range_years,
+                    'language_filter': step.language_filter,
+                })
+
         async with research_service as service:
-            result = await service.conduct_autonomous_research(research_input_baml)
+            result = await service.conduct_autonomous_research(
+                research_input_baml,
+                manual_strategies=manual_strategies if manual_strategies else None
+            )
         logger.info(f"✅ Research via /quick-search completed (mode: {service_mode}) for query: '{request.user_original_query}'")
-        return result
+        
+        # Translate the response
+        translated_result = await _translate_synthesized_output(result, target_lang="PT")
+        return translated_result
     except Exception as e:
         logger.error(f"❌ Error during research via /quick-search (mode: {service_mode}) for query '{request.user_original_query}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred during the research process: {str(e)}")
+
+from fastapi import Request
+from starlette.responses import StreamingResponse
+import asyncio
+import os
+import json
+from datetime import datetime
+
+@router.post("/quick-search-stream")
+async def perform_quick_research_stream(request: Request):
+    """
+    SSE endpoint: streams research progress events and the final result.
+    Accepts the same body as /quick-search, with optional strategy_override and model_preset.
+    """
+    try:
+        body = await request.json()
+        dr_req = DeepResearchRequest(**body)
+
+        # Resolve service mode as in perform_quick_research
+        if dr_req.research_mode == 'expanded' or dr_req.research_mode == 'comprehensive':
+            service_mode = 'comprehensive'
+        else:
+            service_mode = 'quick'
+
+        research_input_baml = ResearchTaskInput(
+            user_original_query=dr_req.user_original_query,
+            pico_question=PICOQuestion(**dr_req.pico_question) if dr_req.pico_question else None,
+            research_focus=dr_req.research_focus,
+            target_audience=dr_req.target_audience,
+            research_mode=service_mode
+        )
+
+        # Prepare manual strategies if provided
+        manual_strategies = []
+        if dr_req.strategy_override:
+            allowed_sources = {
+                'pubmed': 'pubmed', 'europe_pmc': 'europe_pmc', 'brave': 'brave', 'guideline': 'guideline',
+                'google_scholar': 'google_scholar', 'cochrane': 'cochrane', 'ncbi_sources': 'ncbi_sources',
+                'elite_journals': 'elite_journals', 'comprehensive_academic': 'comprehensive_academic'
+            }
+            for step in dr_req.strategy_override:
+                src = (step.source or '').strip().lower()
+                if src not in allowed_sources:
+                    continue
+                mr = step.max_results if step.max_results is not None else None
+                if mr is not None:
+                    try:
+                        mr = max(5, min(int(mr), 50))
+                    except Exception:
+                        mr = None
+                manual_strategies.append({
+                    'source_service': allowed_sources[src],
+                    'query': step.query_string,
+                    'description': step.rationale or f"User strategy for {src}",
+                    'max_results': mr,
+                    'study_type_filter': step.study_type_filter,
+                    'date_range_years': step.date_range_years,
+                    'language_filter': step.language_filter,
+                })
+
+        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+
+        async def progress_callback(event: Dict[str, Any]):
+            try:
+                await queue.put(event)
+            except Exception:
+                pass
+
+        async def run_and_signal():
+            service = SimpleAutonomousResearchService(
+                research_mode=service_mode,
+                model_preset=dr_req.model_preset,
+                progress_callback=progress_callback
+            )
+            async with service as s:
+                result = await s.conduct_autonomous_research(
+                    research_input_baml,
+                    manual_strategies=manual_strategies if manual_strategies else None
+                )
+            # Ship the final result as an SSE event
+            await queue.put({
+                'type': 'final_result',
+                'result': result.model_dump() if hasattr(result, 'model_dump') else result
+            })
+            await queue.put({'type': 'done'})
+
+        async def event_gen():
+            task = asyncio.create_task(run_and_signal())
+            try:
+                while True:
+                    event = await queue.get()
+                    import json
+                    yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                    if event.get('type') == 'done':
+                        break
+            finally:
+                task.cancel()
+
+        return StreamingResponse(event_gen(), media_type="text/event-stream")
+    except Exception as e:
+        logger.error(f"Error in /quick-search-stream: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/traces")
+async def list_research_traces(limit: int = 50):
+    """List recent research trace files if tracing is enabled."""
+    try:
+        if os.getenv('ENABLE_RESEARCH_TRACE', '').lower() not in ('1', 'true', 'yes'):
+            raise HTTPException(status_code=404, detail="Research tracing disabled")
+        base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'research_traces'))
+        base_dir = os.path.abspath(base_dir)
+        if not os.path.isdir(base_dir):
+            return []
+        items = []
+        for name in os.listdir(base_dir):
+            if not name.endswith('.json'):
+                continue
+            path = os.path.join(base_dir, name)
+            try:
+                st = os.stat(path)
+                items.append({
+                    'name': name,
+                    'modified': datetime.utcfromtimestamp(st.st_mtime).isoformat() + 'Z',
+                    'size': st.st_size,
+                })
+            except Exception:
+                continue
+        items.sort(key=lambda x: x['modified'], reverse=True)
+        return items[:limit]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing research traces: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list traces")
+
+@router.get("/traces/{name}")
+async def get_research_trace(name: str):
+    """Return a specific research trace file content if tracing is enabled."""
+    try:
+        if os.getenv('ENABLE_RESEARCH_TRACE', '').lower() not in ('1', 'true', 'yes'):
+            raise HTTPException(status_code=404, detail="Research tracing disabled")
+        if '/' in name or '\\' in name or not name.endswith('.json'):
+            raise HTTPException(status_code=400, detail="Invalid trace name")
+        base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'logs', 'research_traces'))
+        base_dir = os.path.abspath(base_dir)
+        path = os.path.join(base_dir, name)
+        if not os.path.isfile(path):
+            raise HTTPException(status_code=404, detail="Trace not found")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error reading research trace: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to read trace")
 
 @router.post("/formulate-pico", response_model=PICOFormulationOutput)
 async def formulate_pico_question(request: PICOFormulationRequest):
@@ -429,210 +570,24 @@ async def formulate_search_strategy(
 # === TRANSLATION HELPERS FOR RESEARCH OUTPUTS ===
 async def _translate_enhanced_appraisal_output(output: GradeEvidenceAppraisalOutput, target_lang="PT") -> GradeEvidenceAppraisalOutput:
     """
-    Translates the user-facing fields of an EvidenceAppraisalOutput object using batch translation.
-    This function manually deconstructs the object, translates text fields, and reconstructs it to avoid pydantic errors.
-    Handles both object and list forms of practice_recommendations.
+    Translates the user-facing fields of an EvidenceAppraisalOutput object using BAML as primary service, using full batching for all strings.
     """
     if not output:
         return output
-
-    # Mapeamento de termos fixos para tradução
-    fixed_term_translations = {
-        "HIGH": "ALTA",
-        "MODERATE": "MODERADA",
-        "LOW": "BAIXA",
-        "VERY_LOW": "MUITO BAIXA",
-        "STRONG": "FORTE",
-        "WEAK": "FRACA",
-        "Risk of Bias": "Risco de Viés",
-        "Inconsistency": "Inconsistência",
-        "Indirectness": "Indiretividade",
-        "Imprecision": "Imprecisão",
-        "Publication Bias": "Viés de Publicação",
-        "Selection Bias": "Viés de Seleção",
-        "Performance Bias": "Viés de Performance",
-        "Detection Bias": "Viés de Detecção",
-        "Attrition Bias": "Viés de Atrição",
-        "Reporting Bias": "Viés de Relato"
-    }
-    """
-    Translates the user-facing fields of an EvidenceAppraisalOutput object using batch translation.
-    This function manually deconstructs the object, translates text fields, and reconstructs it to avoid pydantic errors.
-    Handles both object and list forms of practice_recommendations.
-    """
-    if not output:
-        return output
-
+    logger.info(f"🌐 Starting batched translation of enhanced appraisal output to {target_lang}")
     try:
         from copy import deepcopy
-        logger.info(f"🌐 Translating enhanced appraisal output to {target_lang}")
-        
-        # Create a deep copy to avoid modifying the original object
-        translated_output = deepcopy(output)
-
-        # Apply fixed term translations first
-        # For enums, access the value directly
-        if translated_output.grade_summary.overall_quality.value in fixed_term_translations:
-            translated_output.grade_summary.overall_quality = fixed_term_translations[translated_output.grade_summary.overall_quality.value]
-        if translated_output.grade_summary.recommendation_strength.value in fixed_term_translations:
-            translated_output.grade_summary.recommendation_strength = fixed_term_translations[translated_output.grade_summary.recommendation_strength.value]
-
-        for factor in translated_output.quality_factors:
-            if factor.factor_name in fixed_term_translations:
-                factor.factor_name = fixed_term_translations[factor.factor_name]
-        
-        for bias in translated_output.bias_analysis:
-            if bias.bias_type in fixed_term_translations:
-                bias.bias_type = fixed_term_translations[bias.bias_type]
-
-        # 1. Deconstruct the output and gather all strings to be translated
-        texts_to_translate = []
-        # GradeSummary fields
-        texts_to_translate.append(translated_output.grade_summary.summary_of_findings)
-        texts_to_translate.extend(translated_output.grade_summary.recommendation_balance.positive_factors)
-        texts_to_translate.extend(translated_output.grade_summary.recommendation_balance.negative_factors)
-        texts_to_translate.append(translated_output.grade_summary.recommendation_balance.overall_balance)
-        # QualityFactors justifications
-        texts_to_translate.extend([factor.justification for factor in translated_output.quality_factors])
-        # BiasAnalysis fields
-        texts_to_translate.extend([bias.potential_impact for bias in translated_output.bias_analysis])
-        texts_to_translate.extend([bias.mitigation_strategies for bias in translated_output.bias_analysis])
-        texts_to_translate.extend([bias.actionable_suggestion for bias in translated_output.bias_analysis])
-        
-        # PracticeRecommendations fields - handle both object and list forms
-        practice_recs_texts = []
-        practice_recs_indices = {}
-        
-        # Check if practice_recommendations is a list or an object
-        if isinstance(translated_output.practice_recommendations, list):
-            logger.info("Practice recommendations is a list - processing each item")
-            for i, rec in enumerate(translated_output.practice_recommendations):
-                if isinstance(rec, str):
-                    # If it's a simple string recommendation
-                    practice_recs_texts.append(rec)
-                    practice_recs_indices[f"list_item_{i}"] = len(practice_recs_texts) - 1
-                else:
-                    # If it's an object with attributes
-                    try:
-                        if hasattr(rec, 'clinical_application') and rec.clinical_application:
-                            practice_recs_texts.append(rec.clinical_application)
-                            practice_recs_indices[f"clinical_application_{i}"] = len(practice_recs_texts) - 1
-                        
-                        if hasattr(rec, 'monitoring_points') and rec.monitoring_points:
-                            for j, point in enumerate(rec.monitoring_points):
-                                practice_recs_texts.append(point)
-                                practice_recs_indices[f"monitoring_point_{i}_{j}"] = len(practice_recs_texts) - 1
-                        
-                        if hasattr(rec, 'evidence_caveats') and rec.evidence_caveats:
-                            practice_recs_texts.append(rec.evidence_caveats)
-                            practice_recs_indices[f"evidence_caveats_{i}"] = len(practice_recs_texts) - 1
-                    except Exception as e:
-                        logger.warning(f"Error processing practice recommendation item {i}: {e}")
-        else:
-            # Original object form with attributes
-            logger.info("Practice recommendations is an object - processing attributes")
-            try:
-                if hasattr(translated_output.practice_recommendations, 'clinical_application'):
-                    practice_recs_texts.append(translated_output.practice_recommendations.clinical_application)
-                    practice_recs_indices["clinical_application"] = len(practice_recs_texts) - 1
-                
-                if hasattr(translated_output.practice_recommendations, 'monitoring_points'):
-                    for j, point in enumerate(translated_output.practice_recommendations.monitoring_points):
-                        practice_recs_texts.append(point)
-                        practice_recs_indices[f"monitoring_point_{j}"] = len(practice_recs_texts) - 1
-                
-                if hasattr(translated_output.practice_recommendations, 'evidence_caveats'):
-                    practice_recs_texts.append(translated_output.practice_recommendations.evidence_caveats)
-                    practice_recs_indices["evidence_caveats"] = len(practice_recs_texts) - 1
-            except Exception as e:
-                logger.warning(f"Error processing practice recommendations object: {e}")
-        
-        # Add practice recommendations texts to the main translation list
-        texts_to_translate.extend(practice_recs_texts)
-
-        # 2. Perform batch translation
-        translated_texts = await translate_with_fallback(texts_to_translate, target_lang, field_name="EvidenceAppraisal")
-
-        # 3. Reconstruct the object with translated text
-        i = 0
-        # GradeSummary
-        translated_output.grade_summary.summary_of_findings = translated_texts[i]; i += 1
-        len_pos = len(translated_output.grade_summary.recommendation_balance.positive_factors)
-        translated_output.grade_summary.recommendation_balance.positive_factors = translated_texts[i:i+len_pos]; i += len_pos
-        len_neg = len(translated_output.grade_summary.recommendation_balance.negative_factors)
-        translated_output.grade_summary.recommendation_balance.negative_factors = translated_texts[i:i+len_neg]; i += len_neg
-        translated_output.grade_summary.recommendation_balance.overall_balance = translated_texts[i]; i += 1
-        
-        # QualityFactors
-        for factor in translated_output.quality_factors:
-            factor.justification = translated_texts[i]; i += 1
-        
-        # BiasAnalysis
-        for bias in translated_output.bias_analysis:
-            bias.potential_impact = translated_texts[i]; i += 1
-            bias.mitigation_strategies = translated_texts[i]; i += 1
-            bias.actionable_suggestion = translated_texts[i]; i += 1
-        
-        # PracticeRecommendations - update with translated texts
-        practice_recs_base_index = i
-        
-        # Update practice recommendations with translated texts
-        if isinstance(translated_output.practice_recommendations, list):
-            for i, rec in enumerate(translated_output.practice_recommendations):
-                if isinstance(rec, str):
-                    # Update string recommendation
-                    idx = practice_recs_indices.get(f"list_item_{i}")
-                    if idx is not None:
-                        translated_output.practice_recommendations[i] = translated_texts[practice_recs_base_index + idx]
-                else:
-                    # Update object recommendation
-                    try:
-                        if hasattr(rec, 'clinical_application'):
-                            idx = practice_recs_indices.get(f"clinical_application_{i}")
-                            if idx is not None:
-                                rec.clinical_application = translated_texts[practice_recs_base_index + idx]
-                        
-                        if hasattr(rec, 'monitoring_points'):
-                            for j, _ in enumerate(rec.monitoring_points):
-                                idx = practice_recs_indices.get(f"monitoring_point_{i}_{j}")
-                                if idx is not None:
-                                    rec.monitoring_points[j] = translated_texts[practice_recs_base_index + idx]
-                        
-                        if hasattr(rec, 'evidence_caveats'):
-                            idx = practice_recs_indices.get(f"evidence_caveats_{i}")
-                            if idx is not None:
-                                rec.evidence_caveats = translated_texts[practice_recs_base_index + idx]
-                    except Exception as e:
-                        logger.warning(f"Error updating translated practice recommendation item {i}: {e}")
-        else:
-            # Update original object form
-            try:
-                if hasattr(translated_output.practice_recommendations, 'clinical_application'):
-                    idx = practice_recs_indices.get("clinical_application")
-                    if idx is not None:
-                        translated_output.practice_recommendations.clinical_application = translated_texts[practice_recs_base_index + idx]
-                
-                if hasattr(translated_output.practice_recommendations, 'monitoring_points'):
-                    for j, _ in enumerate(translated_output.practice_recommendations.monitoring_points):
-                        idx = practice_recs_indices.get(f"monitoring_point_{j}")
-                        if idx is not None:
-                            translated_output.practice_recommendations.monitoring_points[j] = translated_texts[practice_recs_base_index + idx]
-                
-                if hasattr(translated_output.practice_recommendations, 'evidence_caveats'):
-                    idx = practice_recs_indices.get("evidence_caveats")
-                    if idx is not None:
-                        translated_output.practice_recommendations.evidence_caveats = translated_texts[practice_recs_base_index + idx]
-            except Exception as e:
-                logger.warning(f"Error updating translated practice recommendations object: {e}")
-
-        logger.info(f"✅ Evidence appraisal translation completed successfully")
-        return translated_output
-
+        result = deepcopy(output)
+        translated_result = await _translate_field(
+            result,
+            target_lang=target_lang,
+            field_name="GradeEvidenceAppraisalOutput"
+        )
+        logger.info(f"✅ Enhanced appraisal translation completed successfully")
+        return translated_result
     except Exception as e:
-        logger.error(f"❌ Failed to translate evidence appraisal output: {e}", exc_info=True)
-        # Fallback to original output on any error
+        logger.error(f"❌ Failed to batch translate GradeEvidenceAppraisalOutput: {e}", exc_info=True)
         return output
-
 async def _translate_pico_formulation_output(output: PICOFormulationOutput, target_lang="PT") -> PICOFormulationOutput:
     """
     Translates the user-facing fields of a PICOFormulationOutput object, keeping search terms in English.
@@ -829,44 +784,23 @@ async def _translate_field(field, target_lang="PT", field_name=None):
 
 async def _translate_synthesized_output(output: SynthesizedResearchOutput, target_lang="PT") -> SynthesizedResearchOutput:
     """
-    Translates all user-facing fields of the SynthesizedResearchOutput in a single batch.
-    Uses BAML as primary translation service with DeepL fallback.
-    Handles nested objects, arrays, and maintains the original structure.
+    Translates the user-facing fields of a SynthesizedOutput object using BAML as primary service, using full batching for all strings.
     """
     if not output:
         return output
-
-    logger.info(f"🌐 Starting batch translation of research output to {target_lang}")
-    
+    logger.info(f"🌐 Starting batched translation of synthesized output to {target_lang}")
     try:
-        # Convert the output to a dictionary for batch processing
-        output_dict = output.model_dump() if hasattr(output, 'model_dump') else dict(output)
-        
-        # Use _translate_field to handle the entire structure with a single batch translation
-        translated_output = await _translate_field(output_dict, target_lang, "synthesized_research_output")
-        
-        # Verify translation success by checking a key field
-        if translated_output.get('executive_summary') == output_dict.get('executive_summary') and target_lang == "PT":
-            logger.warning("Research output translation may have failed - executive_summary unchanged")
-            # Try again with smaller batches if the full batch failed
-            try:
-                logger.info("Attempting translation with smaller batches")
-                # Translate executive_summary separately
-                if 'executive_summary' in output_dict and output_dict['executive_summary']:
-                    translated_summary = await translate_with_fallback(output_dict['executive_summary'], target_lang=target_lang)
-                    if translated_summary:
-                        translated_output['executive_summary'] = translated_summary
-            except Exception as retry_error:
-                logger.error(f"Retry translation also failed: {retry_error}")
-        
-        # Convert back to the original model type
-        if hasattr(output, 'model_validate'):
-            return type(output).model_validate(translated_output)
-        return type(output)(**translated_output)
-        
+        from copy import deepcopy
+        result = deepcopy(output)
+        translated_result = await _translate_field(
+            result,
+            target_lang=target_lang,
+            field_name="SynthesizedResearchOutput"
+        )
+        logger.info(f"✅ Synthesized research output translation completed successfully")
+        return translated_result
     except Exception as e:
-        logger.error(f"❌ Error during batch translation of research output: {str(e)}", exc_info=True)
-        # Return original output if translation fails
+        logger.error(f"❌ Failed to batch translate SynthesizedResearchOutput: {e}", exc_info=True)
         return output
 
 # === TRANSLATED ENDPOINTS ===
@@ -1654,26 +1588,6 @@ async def cite_source_quick_demo(
         logger.error(f"❌ Erro na demo CiteSource: {e}")
         raise HTTPException(status_code=500, detail=f"Erro na demo CiteSource: {str(e)}")
 
-async def _translate_synthesized_output(output: SynthesizedResearchOutput, target_lang="PT") -> SynthesizedResearchOutput:
-    """
-    Translates the user-facing fields of a SynthesizedOutput object using BAML as primary service, using full batching for all strings.
-    """
-    if not output:
-        return output
-    logger.info(f"🌐 Starting batched translation of synthesized output to {target_lang}")
-    try:
-        from copy import deepcopy
-        result = deepcopy(output)
-        translated_result = await _translate_field(
-            result,
-            target_lang=target_lang,
-            field_name="SynthesizedResearchOutput"
-        )
-        logger.info(f"✅ Synthesized research output translation completed successfully")
-        return translated_result
-    except Exception as e:
-        logger.error(f"❌ Failed to batch translate SynthesizedResearchOutput: {e}", exc_info=True)
-        return output
 
 @router.post("/unified-evidence-analysis-from-pdf-translated", response_model=GradeEvidenceAppraisalOutput)
 async def unified_evidence_analysis_from_pdf_translated(

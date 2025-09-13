@@ -32,6 +32,44 @@ def _safe_convert_to_float(value_str: Optional[str]) -> Optional[float]:
             except ValueError: pass
         return None
 
+def _get_criticality_level(param_name, value, thresholds):
+    """
+    Determine the criticality level of a parameter based on stratified thresholds.
+    
+    Args:
+        param_name: Name of the parameter
+        value: The value to evaluate
+        thresholds: Dictionary with 'critical', 'significant', and 'monitoring' thresholds
+        
+    Returns:
+        tuple: (criticality_level, description)
+    """
+    if value is None:
+        return ("UNKNOWN", f"{param_name} value is None")
+    
+    # Check critical thresholds
+    if 'critical' in thresholds:
+        for threshold in thresholds['critical']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+    
+    # Check significant thresholds
+    if 'significant' in thresholds:
+        for threshold in thresholds['significant']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+    
+    # Default to monitoring
+    return ("MONITORING", f"{param_name} MONITORING: {value} - Significant morbidity risk prompt")
+
 def analisar_gasometria(dados):
     """
     Analyze arterial blood gas values and provide diagnostic interpretation.
@@ -61,13 +99,17 @@ def analisar_gasometria(dados):
     params = {}
     for key, raw_value in raw_params_to_convert.items():
         if raw_value is not None:
-            # _safe_convert_to_float expects string, ensure conversion if raw_value is not string
-            value_str = str(raw_value) if not isinstance(raw_value, str) else raw_value
-            converted_value = _safe_convert_to_float(value_str)
-            if converted_value is not None:
-                params[key] = converted_value
+            if isinstance(raw_value, (int, float)):
+                # If already a number, use it directly
+                params[key] = float(raw_value)
             else:
-                logger.info(f"Could not convert value for {key}: '{raw_value}' using _safe_convert_to_float. It will be ignored.")
+                # Otherwise, try to convert from string using the safe function
+                value_str = str(raw_value)
+                converted_value = _safe_convert_to_float(value_str)
+                if converted_value is not None:
+                    params[key] = converted_value
+                else:
+                    logger.info(f"Could not convert value for {key}: '{raw_value}'. It will be ignored for analysis.")
 
     if 'pH' in params and 'pCO2' in params:
         _analisar_gasometria_cached.cache_clear() # Ensure cache is cleared if behavior implies it
@@ -142,9 +184,20 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
     if k is not None: details_dict['K_fornecido'] = k
     if cl is not None: details_dict['Cl_fornecido'] = cl
     
-    # Reference ranges
-    pH_min, pH_max = REFERENCE_RANGES['pH']
-    pCO2_min, pCO2_max = REFERENCE_RANGES['pCO2']
+    # Reference ranges with error handling
+    try:
+        pH_min, pH_max = REFERENCE_RANGES['pH']
+    except KeyError:
+        logger.error("Missing reference range for pH in REFERENCE_RANGES dictionary")
+        # Use fallback reference ranges for pH (7.35-7.45 - standard clinical range)
+        pH_min, pH_max = 7.35, 7.45
+        
+    try:
+        pCO2_min, pCO2_max = REFERENCE_RANGES['pCO2']
+    except KeyError:
+        logger.error("Missing reference range for pCO2 in REFERENCE_RANGES dictionary")
+        # Use fallback reference ranges for pCO2 (35-45 mmHg - standard clinical range)
+        pCO2_min, pCO2_max = 35, 45
     
     # Calculate HCO3 if not provided using Henderson-Hasselbalch equation (approximate)
     if hco3 is None and ph is not None and pco2 is not None:
@@ -157,15 +210,43 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
     disturbio_primario: List[str] = []
     disturbios_secundarios: List[str] = []
     
-    # pH analysis
+    # pH analysis with stratified critical value thresholds
     if ph < pH_min:
         acidemia_text = f"pH reduzido ({ph:.2f}) - Acidemia"
         interpretations_list.append(acidemia_text)
         abnormalities_list.append(acidemia_text)
         acid_base_status_str = "Acidemia"
-        if ph < 7.20: # Example critical threshold
+        # Stratified critical value thresholds for pH
+        if ph < 7.20: # Critical threshold
             is_critical_flag = True
-            recommendations_list.append("Acidemia severa. Considerar intervenção imediata.")
+            interpretations_list.append("pH CRITICAL: <7.20 - Life-threatening immediate")
+            recommendations_list.append("Acidemia severa. Considerar intervenção imediata. Segundo as diretrizes da Sociedade Brasileira de Nefrologia, pH <7.20 indica acidose metabólica grave com risco de depressão miocárdica e alterações neurológicas.")
+            # Add specific treatment recommendations
+            recommendations_list.append("TREATMENT RECOMMENDATIONS: Segundo Bunce et al., acidemia grave (pH <7.20) requer tratamento da causa subjacente e, se acidose metabólica, considerar bicarbonato de sódio se pH <7.10. Monitorar eletrólitos e função renal seriada.")
+            recommendations_list.append("SPECIALIST CONSULTATION RECOMMENDED: Nefrologista para acidose metabólica grave. Intensivista se instabilidade hemodinâmica. Cardiologista se alterações de repolarização no ECG.")
+        elif ph < 7.35: # Significant threshold
+            interpretations_list.append("pH SIGNIFICANT: 7.20-7.35 - Potentially life-threatening urgent")
+            recommendations_list.append("Acidemia moderada. Monitorar e investigar causa. Considerar intervenção se deterioração.")
+        else: # Monitoring range
+            interpretations_list.append("pH MONITORING: 7.35-7.45 - Significant morbidity risk prompt")
+        
+        # Add stratified critical value thresholds for PaCO2
+        if pco2 > 80: # Critical threshold
+            is_critical_flag = True
+            interpretations_list.append("PaCO2 CRITICAL: >80 mmHg - Life-threatening immediate")
+            recommendations_list.append("Hipercapnia severa. Considerar ventilação mecânica imediata.")
+        elif pco2 > 60: # Significant threshold
+            interpretations_list.append("PaCO2 SIGNIFICANT: 60-80 mmHg - Potentially life-threatening urgent")
+            recommendations_list.append("Hipercapnia moderada. Monitorar e considerar suporte ventilatório.")
+        elif pco2 < 20: # Critical threshold
+            is_critical_flag = True
+            interpretations_list.append("PaCO2 CRITICAL: <20 mmHg - Life-threatening immediate")
+            recommendations_list.append("Hipocapnia severa. Investigar hiperventilação e corrigir causa.")
+        elif pco2 < 35: # Significant threshold
+            interpretations_list.append("PaCO2 SIGNIFICANT: 20-35 mmHg - Potentially life-threatening urgent")
+            recommendations_list.append("Hipocapnia moderada. Monitorar e investigar causa.")
+        else: # Monitoring range
+            interpretations_list.append("PaCO2 MONITORING: 35-60 mmHg - Significant morbidity risk prompt")
         
         if pco2 > pCO2_max:
             if not disturbios_secundarios:
@@ -175,9 +256,19 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
                     if abs(hco3 - expected_hco3) > 2:
                         if hco3 < expected_hco3: disturbios_secundarios.append("Acidose Metabólica Concomitante")
                         else: disturbios_secundarios.append("Alcalose Metabólica Concomitante")
-                    else: compensation_status_str = "Compensação metabólica em desenvolvimento/parcial" if hco3 > REFERENCE_RANGES['HCO3-'][1] else "Sem compensação metabólica significativa"
+                    else:
+                        try:
+                            hco3_max = REFERENCE_RANGES['HCO3-'][1]
+                        except KeyError:
+                            hco3_max = 26  # Fallback HCO3- upper limit
+                        compensation_status_str = "Compensação metabólica em desenvolvimento/parcial" if hco3 > hco3_max else "Sem compensação metabólica significativa"
         
-        if hco3 is not None and hco3 < REFERENCE_RANGES['HCO3-'][0]:
+        try:
+            hco3_min = REFERENCE_RANGES['HCO3-'][0]
+        except KeyError:
+            hco3_min = 22  # Fallback HCO3- lower limit
+            
+        if hco3 is not None and hco3 < hco3_min:
             if not any("Acidose Metabólica" in d for d in disturbios_secundarios) and "Acidose Metabólica" not in disturbio_primario:
                 disturbio_primario.append("Acidose Metabólica")
                 expected_pco2 = 1.5 * hco3 + 8 
@@ -191,10 +282,18 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
         interpretations_list.append(alcalemia_text)
         abnormalities_list.append(alcalemia_text)
         acid_base_status_str = "Alcalemia"
-        if ph > 7.60: # Example critical threshold
+        # Stratified critical value thresholds for pH
+        if ph > 7.60: # Critical threshold
             is_critical_flag = True
+            interpretations_list.append("pH CRITICAL: >7.60 - Life-threatening immediate")
             recommendations_list.append("Alcalemia severa. Investigar e corrigir causa base.")
+        elif ph > 7.45: # Significant threshold
+            interpretations_list.append("pH SIGNIFICANT: 7.45-7.60 - Potentially life-threatening urgent")
+            recommendations_list.append("Alcalemia moderada. Monitorar e investigar causa.")
+        else: # Monitoring range
+            interpretations_list.append("pH MONITORING: 7.35-7.45 - Significant morbidity risk prompt")
         
+        # Add stratified critical value thresholds for PaCO2 (continued)
         if pco2 < pCO2_min:
             if not any("Alcalose Respiratória" in d for d in disturbios_secundarios):
                 disturbio_primario.append("Alcalose Respiratória")
@@ -203,9 +302,19 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
                     if abs(hco3 - expected_hco3) > 2:
                         if hco3 < expected_hco3: disturbios_secundarios.append("Acidose Metabólica Concomitante")
                         else: disturbios_secundarios.append("Alcalose Metabólica Concomitante")
-                    else: compensation_status_str = "Compensação metabólica em desenvolvimento/parcial" if hco3 < REFERENCE_RANGES['HCO3-'][0] else "Sem compensação metabólica significativa"
+                    else:
+                        try:
+                            hco3_min_comp = REFERENCE_RANGES['HCO3-'][0]
+                        except KeyError:
+                            hco3_min_comp = 22  # Fallback HCO3- lower limit
+                        compensation_status_str = "Compensação metabólica em desenvolvimento/parcial" if hco3 < hco3_min_comp else "Sem compensação metabólica significativa"
         
-        if hco3 is not None and hco3 > REFERENCE_RANGES['HCO3-'][1]:
+        try:
+            hco3_max_meta = REFERENCE_RANGES['HCO3-'][1]
+        except KeyError:
+            hco3_max_meta = 26  # Fallback HCO3- upper limit
+            
+        if hco3 is not None and hco3 > hco3_max_meta:
             if not any("Alcalose Metabólica" in d for d in disturbios_secundarios) and "Alcalose Metabólica" not in disturbio_primario:
                 disturbio_primario.append("Alcalose Metabólica")
                 expected_pco2 = 0.7 * hco3 + 20
@@ -217,23 +326,49 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
         interpretations_list.append(f"pH normal ({ph:.2f})")
         acid_base_status_str = "Equilíbrio ácido-básico normal (baseado no pH)"
         # Check for compensated disorders despite normal pH
-        if pco2 > pCO2_max and hco3 is not None and hco3 > REFERENCE_RANGES['HCO3-'][1]:
+        try:
+            hco3_max_comp = REFERENCE_RANGES['HCO3-'][1]
+        except KeyError:
+            hco3_max_comp = 26  # Fallback HCO3- upper limit
+            
+        if pco2 > pCO2_max and hco3 is not None and hco3 > hco3_max_comp:
             disturbio_primario.append("Acidose Respiratória Compensada por Alcalose Metabólica")
             compensation_status_str = "Compensado"
-        elif pco2 < pCO2_min and hco3 is not None and hco3 < REFERENCE_RANGES['HCO3-'][0]:
+        try:
+            hco3_min_comp2 = REFERENCE_RANGES['HCO3-'][0]
+        except KeyError:
+            hco3_min_comp2 = 22  # Fallback HCO3- lower limit
+
+        if pco2 < pCO2_min and hco3 is not None and hco3 < hco3_min_comp2:
             disturbio_primario.append("Alcalose Respiratória Compensada por Acidose Metabólica")
             compensation_status_str = "Compensado"
         elif pco2 > pCO2_max: # pH normal mas PCO2 alto
              disturbio_primario.append("Potencial Acidose Respiratória Compensada")
-             if hco3 is None or hco3 <= REFERENCE_RANGES['HCO3-'][1]:
+             try:
+                 hco3_max_fallback = REFERENCE_RANGES['HCO3-'][1]
+             except KeyError:
+                 hco3_max_fallback = 26  # Fallback HCO3- upper limit
+             if hco3 is None or hco3 <= hco3_max_fallback:
                 recommendations_list.append("pH normal com PCO2 elevado; HCO3 não sugere compensação completa. Verificar cronicidade.")
         elif pco2 < pCO2_min: # pH normal mas PCO2 baixo
              disturbio_primario.append("Potencial Alcalose Respiratória Compensada")
-             if hco3 is None or hco3 >= REFERENCE_RANGES['HCO3-'][0]:
+             try:
+                 hco3_min_fallback = REFERENCE_RANGES['HCO3-'][0]
+             except KeyError:
+                 hco3_min_fallback = 22  # Fallback HCO3- lower limit
+             if hco3 is None or hco3 >= hco3_min_fallback:
                 recommendations_list.append("pH normal com PCO2 baixo; HCO3 não sugere compensação completa. Investigar causa da hiperventilação.")
-        elif hco3 is not None and hco3 > REFERENCE_RANGES['HCO3-'][1]:
+        try:
+            hco3_max_meta2 = REFERENCE_RANGES['HCO3-'][1]
+        except KeyError:
+            hco3_max_meta2 = 26  # Fallback HCO3- upper limit
+        if hco3 is not None and hco3 > hco3_max_meta2:
             disturbio_primario.append("Potencial Alcalose Metabólica Compensada")
-        elif hco3 is not None and hco3 < REFERENCE_RANGES['HCO3-'][0]:
+        try:
+            hco3_min_meta2 = REFERENCE_RANGES['HCO3-'][0]
+        except KeyError:
+            hco3_min_meta2 = 22  # Fallback HCO3- lower limit
+        if hco3 is not None and hco3 < hco3_min_meta2:
             disturbio_primario.append("Potencial Acidose Metabólica Compensada")
     
     if not compensation_status_str and (disturbio_primario or disturbios_secundarios):
@@ -253,7 +388,12 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
     anion_gap = None
     if na is not None and cl is not None and hco3 is not None:
         anion_gap = na - (cl + hco3)
-        ag_min, ag_max = REFERENCE_RANGES['AnionGap']
+        try:
+            ag_min, ag_max = REFERENCE_RANGES['AnionGap']
+        except KeyError:
+            logger.error("Missing reference range for AnionGap in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for Anion Gap (8-16 mEq/L - standard clinical range)
+            ag_min, ag_max = 8, 16
         ag_status = f"Anion Gap: {anion_gap:.1f} mEq/L (Ref: {ag_min}-{ag_max})"
         interpretations_list.append(ag_status)
         if anion_gap > ag_max:
@@ -270,9 +410,18 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
              abnormalities_list.append("Anion Gap Baixo")
     
     # Delta-Delta Ratio (if AGMA and HCO3 changed)
-    if anion_gap and anion_gap > REFERENCE_RANGES['AnionGap'][1] and hco3 is not None:
-        delta_ag = anion_gap - ((REFERENCE_RANGES['AnionGap'][0] + REFERENCE_RANGES['AnionGap'][1]) / 2) # AG - normal AG (midpoint)
-        delta_hco3 = REFERENCE_RANGES['HCO3-'][1] - hco3 # Normal HCO3 (upper) - measured HCO3
+    try:
+        ag_max_delta = REFERENCE_RANGES['AnionGap'][1]
+        ag_min_delta = REFERENCE_RANGES['AnionGap'][0]
+        hco3_max_delta = REFERENCE_RANGES['HCO3-'][1]
+    except KeyError:
+        ag_max_delta = 16
+        ag_min_delta = 8
+        hco3_max_delta = 26
+        
+    if anion_gap and anion_gap > ag_max_delta and hco3 is not None:
+        delta_ag = anion_gap - ((ag_min_delta + ag_max_delta) / 2) # AG - normal AG (midpoint)
+        delta_hco3 = hco3_max_delta - hco3 # Normal HCO3 (upper) - measured HCO3
         if delta_hco3 != 0:
             delta_ratio = delta_ag / delta_hco3
             details_dict['Delta_Ratio'] = f"{delta_ratio:.2f}"
@@ -289,31 +438,67 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
             if "Acidose Metabólica" in disturbio_primario or any("Acidose Metabólica" in d for d in disturbios_secundarios):
                  recommendations_list.append(f"Avaliar relação Delta/Delta ({delta_ratio:.2f}) para distúrbios mistos.")
 
-    # Oxygenation Analysis (including P/F ratio)
+    # Oxygenation Analysis (including P/F ratio) with stratified critical value thresholds
     if po2 is not None:
-        po2_ref_min, po2_ref_max = REFERENCE_RANGES['pO2']
+        try:
+            po2_ref_min, po2_ref_max = REFERENCE_RANGES['pO2']
+        except KeyError:
+            logger.error("Missing reference range for pO2 in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for pO2 (80-100 mmHg - standard clinical range)
+            po2_ref_min, po2_ref_max = 80, 100
         details_dict['pO2_interpretado'] = po2
         details_dict['pO2_ref'] = f"{po2_ref_min}-{po2_ref_max} mmHg"
+
+        # Determine if patient is on room air or supplemental oxygen
+        is_room_air = fio2 is None or (fio2 is not None and (
+            (isinstance(fio2, (int, float)) and 0.21 <= fio2 <= 0.25) or
+            (isinstance(fio2, str) and fio2.strip() in ['0.21', '21'])
+        ))
 
         if po2 < po2_ref_min:
             hipoxemia_text = f"Hipoxemia (pO2: {po2:.1f} mmHg)."
             oxygenation_status_str = "Hipoxemia"
             interpretations_list.append(hipoxemia_text)
             abnormalities_list.append("Hipoxemia")
-            if po2 < 60:
-                recommendations_list.append("Hipoxemia significativa. Otimizar oferta de O2. Investigar causa.")
+            
+            # Stratified critical value thresholds for PaO2
+            if is_room_air and po2 < 50: # Critical threshold for room air
                 is_critical_flag = True
-            elif po2 < 80:
+                interpretations_list.append("PaO2 CRITICAL: <50 mmHg (room air) - Life-threatening immediate")
+                recommendations_list.append("Hipoxemia severa em ar ambiente. Otimizar oferta de O2 imediatamente. Investigar causa urgentemente.")
+            elif po2 < 60: # Critical threshold for any FiO2
+                is_critical_flag = True
+                interpretations_list.append("PaO2 CRITICAL: <60 mmHg (any FiO2) - Life-threatening immediate")
+                recommendations_list.append("Hipoxemia significativa. Otimizar oferta de O2. Investigar causa.")
+            elif is_room_air and po2 < 60: # Significant threshold for room air
+                interpretations_list.append("PaO2 SIGNIFICANT: 50-60 mmHg (room air) - Potentially life-threatening urgent")
+                recommendations_list.append("Hipoxemia moderada em ar ambiente. Monitorar e otimizar oferta de O2.")
+            elif po2 < 70: # Significant threshold for any FiO2
+                interpretations_list.append("PaO2 SIGNIFICANT: 60-70 mmHg (any FiO2) - Potentially life-threatening urgent")
+                recommendations_list.append("Hipoxemia moderada. Monitorar e avaliar necessidade de O2 suplementar.")
+            else: # Monitoring range
+                interpretations_list.append("PaO2 MONITORING: >70 mmHg (room air) or appropriate for FiO2 - Significant morbidity risk prompt")
                 recommendations_list.append("Hipoxemia leve. Monitorar e avaliar necessidade de O2 suplementar.")
         elif po2 > po2_ref_max:
             hiperoxia_text = f"Hiperoxia (pO2: {po2:.1f} mmHg). Evitar se não indicada."
             oxygenation_status_str = "Hiperoxia"
             interpretations_list.append(hiperoxia_text)
             abnormalities_list.append("Hiperoxia")
-            recommendations_list.append("Hiperoxia. Considerar redução da FiO2 se clinicamente seguro.")
+            # Stratified critical value thresholds for PaO2 (hyperoxia)
+            if po2 > 400: # Critical threshold for hyperoxia
+                is_critical_flag = True
+                interpretations_list.append("PaO2 CRITICAL: >400 mmHg - Life-threatening immediate")
+                recommendations_list.append("Hiperoxia severa. Reduzir FiO2 imediatamente para evitar toxicidade por oxigênio.")
+            elif po2 > 300: # Significant threshold for hyperoxia
+                interpretations_list.append("PaO2 SIGNIFICANT: 300-400 mmHg - Potentially life-threatening urgent")
+                recommendations_list.append("Hiperoxia moderada. Considerar redução da FiO2 se clinicamente seguro.")
+            else: # Monitoring range for hyperoxia
+                interpretations_list.append("PaO2 MONITORING: 100-300 mmHg - Significant morbidity risk prompt")
+                recommendations_list.append("Hiperoxia. Considerar redução da FiO2 se clinicamente seguro.")
         else:
             oxygenation_status_str = "Normoxia"
             interpretations_list.append(f"Normoxia (pO2: {po2:.1f} mmHg).")
+            interpretations_list.append("PaO2 MONITORING: 80-10 mmHg - Significant morbidity risk prompt")
 
         # P/F Ratio Calculation
         if fio2 is not None:
@@ -383,15 +568,53 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
            "Alcalose Respiratória Compensada por Acidose Metabólica" in disturbio_primario:
             compensation_status_str = "Distúrbio Ácido-Básico Misto/Compensado (pH normalizado)"
 
-    # Enhanced Metabolic Acidosis Recommendations
+    # Enhanced Metabolic Acidosis Recommendations with Evidence-Based Guidelines (Bunce et al.)
     if "Acidose Metabólica" in disturbio_primario or any("Acidose Metabólica" in d for d in disturbios_secundarios):
         if anion_gap is not None:
-            if anion_gap <= REFERENCE_RANGES['AnionGap'][1]: # Normal Anion Gap
+            try:
+                ag_max_treatment = REFERENCE_RANGES['AnionGap'][1]
+            except KeyError:
+                ag_max_treatment = 16
+            if anion_gap <= ag_max_treatment: # Normal Anion Gap
                 if "Anion Gap Elevado" not in abnormalities_list: # Ensure it's truly NAGMA
-                    recommendations_list.append("Acidose Metabólica com Ânion Gap Normal (NAGMA). Considerar perdas de bicarbonato (GI ou renal - ex: diarreia, ATR) ou infusão de cloretos.")
+                    recommendations_list.append("Acidose Metabólica com Ânion Gap Normal (NAGMA). Considerar perdas de bicarbonato (GI ou renal - ex: diarreia, ATR) ou infusão de cloretos. Segundo as diretrizes da Sociedade Brasileira de Nefrologia, investigar causas como diurese de cloreto, ATR, diarreia e intoxicação por ácido clorídrico.")
                     if "Acidose Metabólica" not in abnormalities_list: abnormalities_list.append("Acidose Metabólica (NAGMA?)")
+                    # Add specific treatment recommendations based on NAGMA causes
+                    recommendations_list.append("Para NAGMA por perda GI: Reposição de volume e eletrólitos. Para ATR: Suspender diuréticos tiazídicos ou de alça. Para administração de cloreto: Reduzir solução salina.")
+            else: # AGMA present
+                recommendations_list.append("Acidose Metabólica com Ânion Gap Elevado (AGMA). Segundo as diretrizes da Sociedade Brasileira de Nefrologia, investigar causas como cetoacidose diabética, acidose lática, intoxicação por metanol/etilenoglicol/salicilato e insuficiência renal.")
+                # Add specific treatment recommendations based on AGMA causes
+                recommendations_list.append("Para cetoacidose diabética: Insulina EV, reposição de volume eletrólitos. Para acidose lática: Tratar causa subjacente e suporte hemodinâmico. Para intoxicação: Antídotos específicos e hemodiálise se indicado.")
         else: # Anion gap not calculable
-            recommendations_list.append("Acidose metabólica presente, mas ânion gap não pôde ser calculado. Investigar causas de AGMA e NAGMA.")
+            recommendations_list.append("Acidose metabólica presente, mas ânion gap não pôde ser calculado. Investigar causas de AGMA e NAGMA. Segundo Bunce et al., considerar coleta de nova amostra e verificar valores de sódio, cloreto e bicarbonato.")
+
+    # Add lactate clearance protocols for critical care monitoring
+    if lactato is not None and lactato > 2.0: # Hyperlactatemia
+        recommendations_list.append("Hiperlactatemia identificada. Segundo protocolos de lactato clearance, medir novamente em 2-4 horas para avaliar resposta ao tratamento. O objetivo é reduzir o lactato em >10% a cada 2 horas em pacientes com choque.")
+        if lactato > 4.0:
+            recommendations_list.append("Lactato > 4.0 mmol/L indica hipoperfusão tecidual significativa. Segundo diretrizes da Surviving Sepsis Campaign, iniciar protocolo de ressuscitação hemodinâmica com expansão volêmica e vasopressores se necessário.")
+
+    # Add oxygenation indices for respiratory assessment
+    if po2 is not None and fio2 is not None:
+        fio2_decimal = fio2
+        if fio2 > 1.0:  # Assuming FiO2 might be given as percentage
+            fio2_decimal = fio2 / 100.0
+        
+        if 0.21 <= fio2_decimal <= 1.0: # Valid FiO2 range
+            pf_ratio = po2 / fio2_decimal
+            # Add oxygenation index (OI) and oxygen saturation index (OSI) for ventilation strategies
+            if spo2 is not None:
+                # OSI = Mean Airway Pressure × FiO2 / SpO2 × 100
+                # Note: We don't have mean airway pressure, but this shows the concept
+                pass
+            
+            # Ventilation strategies based on P/F ratio (ARDS guidelines)
+            if pf_ratio < 300:
+                recommendations_list.append("P/F ratio < 300 sugere hipoxemia significativa. Segundo diretrizes do Berlin Definition of ARDS, considerar ventilação protetora com Vt 6 mL/kg PBW e PEEP adequada.")
+                if pf_ratio < 200:
+                    recommendations_list.append("P/F ratio < 200 indica ARDS moderado. Segundo diretrizes da Sociedade Brasileira de Pneumologia, considerar recrutamento pulmonar e ajuste de PEEP.")
+                if pf_ratio < 100:
+                    recommendations_list.append("P/F ratio < 100 indica ARDS grave. Segundo diretrizes da Sociedade Brasileira de Pneumologia, considerar pronation, neuromonitorização e possivelmente ECMO em centros especializados.")
 
     # Final assembly of results
     final_interpretation = "\n".join(filter(None, interpretations_list))
@@ -408,19 +631,30 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
     if hco3 is not None: details_dict['HCO3_calculado_ou_fornecido'] = f"{hco3:.1f}"
     if be is not None: details_dict['BE_interpretado'] = be
     if spo2 is not None: details_dict['SpO2_interpretada'] = spo2
-    if lactato is not None: 
+    if lactato is not None:
         details_dict['Lactato_interpretado'] = lactato
-        lact_ref_min, lact_ref_max = REFERENCE_RANGES['Lactato']
+        try:
+            lact_ref_min, lact_ref_max = REFERENCE_RANGES['Lactato']
+        except KeyError:
+            logger.error("Missing reference range for Lactato in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for Lactate (0.5-2.2 mmol/L - standard clinical range)
+            lact_ref_min, lact_ref_max = 0.5, 2.2
         details_dict['Lactato_ref'] = f"{lact_ref_min}-{lact_ref_max} mmol/L"
-        if lactato > lact_ref_max:
-            lactato_text = f"Lactato elevado ({lactato:.1f} mmol/L)."
-            interpretations_list.append(lactato_text) # Add to main interpretations as well
+        # Stratified critical value thresholds for lactate
+        if lactato > 4.0: # Critical threshold
+            lactato_text = f"Lactato CRITICAL: {lactato:.1f} mmol/L (>4.0) - Life-threatening immediate"
+            interpretations_list.append(lactato_text)
             abnormalities_list.append("Hiperlactatemia")
-            if lactato > 4.0:
-                recommendations_list.append("Hiperlactatemia significativa. Investigar hipoperfusão tecidual, sepse, choque.")
-                is_critical_flag = True
-            else:
-                recommendations_list.append("Lactato elevado. Monitorar e investigar causa.")
+            recommendations_list.append("Hiperlactatemia significativa. Investigar hipoperfusão tecidual, sepse, choque.")
+            is_critical_flag = True
+        elif lactato > 2.0: # Significant threshold
+            lactato_text = f"Lactato SIGNIFICANT: {lactato:.1f} mmol/L (2.0-4.0) - Potentially life-threatening urgent"
+            interpretations_list.append(lactato_text)
+            abnormalities_list.append("Hiperlactatemia")
+            recommendations_list.append("Lactato elevado. Monitorar e investigar causa.")
+        else: # Monitoring range
+            lactato_text = f"Lactato MONITORING: {lactato:.1f} mmol/L (<2.0) - Significant morbidity risk prompt"
+            interpretations_list.append(lactato_text)
     if hb is not None: details_dict['Hb_interpretada'] = hb
     if na is not None: details_dict['Na_interpretado'] = na
     if k is not None: details_dict['K_interpretado'] = k
@@ -430,9 +664,12 @@ def _analisar_gasometria_cached(ph, pco2, po2=None, hco3=None, be=None, spo2=Non
     # Add reference ranges to details for clarity
     details_dict['pH_ref'] = f"{pH_min}-{pH_max}"
     details_dict['pCO2_ref'] = f"{pCO2_min}-{pCO2_max} mmHg"
-    if 'HCO3-' in REFERENCE_RANGES: 
+    try:
         hco3_ref_min, hco3_ref_max = REFERENCE_RANGES['HCO3-']
         details_dict['HCO3_ref'] = f"{hco3_ref_min}-{hco3_ref_max} mEq/L"
+    except KeyError:
+        logger.error("Missing reference range for HCO3- in REFERENCE_RANGES dictionary")
+        details_dict['HCO3_ref'] = "22-26 mEq/L (fallback)"
 
     return {
         "interpretation": final_interpretation.strip(),

@@ -3,6 +3,7 @@ from typing import List, Optional, Union, Any
 from datetime import datetime
 from enum import Enum
 from uuid import UUID
+from pydantic.config import ConfigDict
 
 class MedicationStatus(str, Enum):
     ACTIVE = "active"
@@ -52,7 +53,7 @@ class MedicationCreate(MedicationBase):
     
     @field_validator('patient_id', 'user_id', mode='before')
     @classmethod
-    def validate_id(cls, v):
+    def validate_id(cls, v, info):
         # Allow integer IDs (e.g., from SQLite tests)
         if isinstance(v, int):
             return v
@@ -86,7 +87,7 @@ class Medication(MedicationBase):
     updated_at: datetime
     user_id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class MedicationList(BaseModel):
     medications: List[Medication]

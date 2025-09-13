@@ -9,9 +9,18 @@ from .user import (
 
 # Patient schemas
 from .patient import (
-    Sex, Ethnicity, PatientBase, PatientCreate, 
+    Sex, Ethnicity, PatientBase, PatientCreate,
     PatientUpdate, Patient, PatientSummary,
     PatientListResponse
+)
+
+# Group schemas
+from .group import (
+    GroupBase, GroupCreate, GroupUpdate, Group,
+    GroupRole, GroupMembershipBase, GroupMembershipCreate, GroupMembershipUpdate, GroupMembership,
+    GroupPatientBase, GroupPatientCreate, GroupPatient,
+    GroupWithMembersAndPatients, GroupListResponse,
+    GroupMembershipListResponse, GroupPatientListResponse
 )
 
 # Lab Result schemas
@@ -29,7 +38,7 @@ from .test_result import (
 
 # Clinical Score schemas
 from .clinical_score import (
-    ScoreType, ClinicalScoreBase, ClinicalScoreCreate, 
+    ScoreType, ClinicalScoreBase, ClinicalScoreCreate,
     ClinicalScore, ScoreResult
 )
 
@@ -47,7 +56,7 @@ from .lab_analysis import (
 # Medication schemas
 from .medication import (
     MedicationStatus, MedicationRoute, MedicationFrequency,
-    MedicationBase, MedicationCreate, MedicationPatientCreate, MedicationUpdate, 
+    MedicationBase, MedicationCreate, MedicationPatientCreate, MedicationUpdate,
     Medication, MedicationList
 )
 
@@ -99,4 +108,4 @@ from .alert import (
     AlertGenerateResponse,
     AlertStats,
     AlertListResponse
-) 
+)

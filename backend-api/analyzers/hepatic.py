@@ -31,6 +31,44 @@ def _safe_convert_to_float(value_str: Optional[str]) -> Optional[float]:
             except ValueError: pass
         return None
 
+def _get_criticality_level(param_name, value, thresholds):
+    """
+    Determine the criticality level of a parameter based on stratified thresholds.
+    
+    Args:
+        param_name: Name of the parameter
+        value: The value to evaluate
+        thresholds: Dictionary with 'critical', 'significant', and 'monitoring' thresholds
+        
+    Returns:
+        tuple: (criticality_level, description)
+    """
+    if value is None:
+        return ("UNKNOWN", f"{param_name} value is None")
+    
+    # Check critical thresholds
+    if 'critical' in thresholds:
+        for threshold in thresholds['critical']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+    
+    # Check significant thresholds
+    if 'significant' in thresholds:
+        for threshold in thresholds['significant']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+    
+    # Default to monitoring
+    return ("MONITORING", f"{param_name} MONITORING: {value} - Significant morbidity risk prompt")
+
 def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
     """
     Analyze liver function tests and provide clinical interpretation.
@@ -54,17 +92,21 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
     for key, value in dados.items():
         details_dict[key] = value # Store original value first
         if value is not None:
-            # Use _safe_convert_to_float instead of direct float conversion
-            value_str = str(value) if not isinstance(value, str) else value
-            converted_value = _safe_convert_to_float(value_str)
-            if converted_value is not None:
-                processed_dados[key] = converted_value
-                details_dict[key] = converted_value
+            if isinstance(value, (int, float)):
+                processed_dados[key] = float(value)
+                details_dict[key] = float(value)
             else:
-                processed_dados[key] = None
-                logger.info(f"Could not convert hepatic param {key}: '{value}' using _safe_convert_to_float. It will be ignored.")
+                value_str = str(value)
+                converted_value = _safe_convert_to_float(value_str)
+                if converted_value is not None:
+                    processed_dados[key] = converted_value
+                    details_dict[key] = converted_value
+                else:
+                    processed_dados[key] = None
+                    logger.info(f"Could not convert hepatic param {key}: '{value}'. It will be ignored.")
         else:
             processed_dados[key] = None
+            logger.info(f"Hepatic param {key} is None. It will be ignored.")
 
     # Check if there's enough data to analyze for hepatic function
     valid_keys = ['TGO', 'TGP', 'BT', 'BD', 'BI', 'GamaGT', 'FosfAlc', 'Albumina', 'RNI']
@@ -77,6 +119,26 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
     # Analyze transaminases (TGO/AST, TGP/ALT)
     tgo = processed_dados.get('TGO')
     tgp = processed_dados.get('TGP')
+
+    if tgo is not None:
+        tgo_criticality, tgo_description = _get_criticality_level("TGO/AST", tgo, {
+            'critical': [10000],
+            'significant': [(1000, 10000)],
+            'monitoring': [(40, 1000)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if tgo_criticality == "CRITICAL":
+            is_critical_flag = True
+
+    if tgp is not None:
+        tgp_criticality, tgp_description = _get_criticality_level("TGP/ALT", tgp, {
+            'critical': [10000],
+            'significant': [(1000, 10000)],
+            'monitoring': [(56, 1000)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if tgp_criticality == "CRITICAL":
+            is_critical_flag = True
     
     # Ensure TGO and TGP reference ranges are available before accessing
     tgo_ref_min, tgo_ref_max = (None, None)
@@ -100,14 +162,21 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
             abnormalities_list.append("TGO Elevada")
             if tgo > 1000:
                 interpretations_list.append("Elevação muito acentuada de TGO (>25x LSN) - sugere hepatite aguda grave (viral, tóxica, isquêmica).")
-                recommendations_list.append("Investigação urgente para lesão hepática aguda grave. Considerar hospitalização.")
+                recommendations_list.append("Investigação urgente para lesão hepática aguda grave. Considerar hospitalização. Segundo as diretrizes da AASLD, hepatite aguda com TGO/ALT >1000 U/L requer avaliação imediata para transplante hepático.")
                 is_critical_flag = True
+                # Add specific diagnostic workup
+                recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Solicitar vírus da hepatite (A, B, C, EBV, CMV), autoanticorpos (ANA, ASMA, LKM), ceruloplasmina, ferro, alfa-1-antitripsina. Considerar paracetamol e toxinas.")
             elif tgo_ref_max is not None and tgo > 5 * tgo_ref_max: # e.g., > 200 if ref is 40
                 interpretations_list.append("Elevação acentuada de TGO - comum em hepatites virais agudas, hepatite alcoólica, medicamentosa.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, TGO 5-25x LSN indica hepatite moderada. Investigar etiologia viral, alcoólica ou medicamentosa.")
+                recommendations_list.append("TREATMENT RECOMMENDATIONS: Suspender hepatotoxinas. Para hepatite alcoólica: considerar prednisona se Maddrey >32. Para hepatite viral: suporte sintomático.")
             elif tgo_ref_max is not None and tgo > 2 * tgo_ref_max: # e.g., > 80 if ref is 40
                 interpretations_list.append("Elevação moderada de TGO - pode ocorrer em diversas hepatopatias, incluindo DGHNA.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, TGO 2-5x LSN indica hepatopatia leve. Investigar esteatose hepática, medicamentos e doenças autoimunes.")
+                recommendations_list.append("PATIENT EDUCATION: Informar sobre dieta hipocalórica, exercício físico e suspensão de álcool. Monitorar função hepática em 3-6 meses.")
             else:
                 interpretations_list.append("Elevação discreta de TGO - inespecífica, avaliar cronicidade e outros exames.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, TGO leve pode ser normal em alguns pacientes. Repetir em 3-6 meses se persistente.")
         else:
             interpretations_list.append(f"TGO/AST normal ({tgo} U/L).")
 
@@ -118,14 +187,21 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
             abnormalities_list.append("TGP Elevada")
             if tgp > 1000:
                 interpretations_list.append("Elevação muito acentuada de TGP (>25x LSN) - sugere hepatite viral aguda, isquêmica ou medicamentosa/tóxica.")
-                recommendations_list.append("Investigação urgente para lesão hepática aguda grave. Considerar hospitalização.")
+                recommendations_list.append("Investigação urgente para lesão hepática aguda grave. Considerar hospitalização. Segundo as diretrizes da AASLD, ALT >1000 U/L indica hepatite aguda severa com risco de falência hepática.")
                 is_critical_flag = True
+                # Add specific treatment recommendations
+                recommendations_list.append("SPECIALIST CONSULTATION RECOMMENDED: Hepatologista imediatamente para avaliação de transplante hepático. Monitorar INR, bilirrubina, creatinina e grau de encefalopatia.")
             elif tgp_ref_max is not None and tgp > 5 * tgp_ref_max:
                 interpretations_list.append("Elevação acentuada de TGP - comum em hepatites virais, hepatite medicamentosa.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, ALT 5-25x LSN indica hepatite moderada. Investigar hepatite viral (HAV, HBV, HCV, EBV, CMV) e medicamentosa.")
+                recommendations_list.append("TREATMENT RECOMMENDATIONS: Suspender todos os hepatotóxicos. Para hepatite medicamentosa: considerar N-acetilcisteína se suspeita de paracetamol. Para hepatite viral: suporte sintomático.")
             elif tgp_ref_max is not None and tgp > 2 * tgp_ref_max:
                 interpretations_list.append("Elevação moderada de TGP - pode ocorrer em diversas hepatopatias, incluindo DGHNA/NASH.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, ALT 2-5x LSN indica hepatopatia leve. Investigar esteatose hepática não alcoólica e medicamentos.")
+                recommendations_list.append("PATIENT EDUCATION: Informar sobre dieta hipocalórica, exercício físico e perda de peso gradual (5-10% do peso). Evitar álcool e hepatotóxicos.")
             else:
                 interpretations_list.append("Elevação discreta de TGP - inespecífica, avaliar cronicidade.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, ALT leve pode ser normal em alguns pacientes. Repetir em 3-6 meses se persistente e sintomático.")
         else:
             interpretations_list.append(f"TGP/ALT normal ({tgp} U/L).")
 
@@ -173,8 +249,11 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
             abnormalities_list.append("Gama-GT Elevada")
             if ggt_ref_max is not None and ggt > 5 * ggt_ref_max: # e.g. > 300 if ref is 60
                 interpretations_list.append("Elevação acentuada de GGT - sugere obstrução biliar, colangite ou indução enzimática significativa (álcool, medicamentos).")
+                recommendations_list.append("Segundo as diretrizes da AASLD, GGT >5x LSN indica colestase significativa. Investigar obstrução biliar com USG abdominal e colangio-RM.")
+                recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Solicitar USG abdominal imediato. Se obstrução confirmada, considerar colangio-RM ou colangiopancreatografia retrógrada endoscópica (CPRE).")
             else:
                 interpretations_list.append("Elevação de GGT - pode indicar colestase, hepatite alcoólica/medicamentosa ou esteatose.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, GGT leve a moderada pode indicar esteatose hepática ou uso de medicamentos. Investigar etiologia com histórico clínico.")
         else:
             interpretations_list.append(f"Gama-GT normal ({ggt} U/L).")
 
@@ -200,6 +279,16 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
     bt = processed_dados.get('BT')
     bd = processed_dados.get('BD')
     bi = processed_dados.get('BI')
+
+    if bt is not None:
+        bt_criticality, bt_description = _get_criticality_level("Bilirrubina Total", bt, {
+            'critical': [20.0],
+            'significant': [(5.0, 20.0)],
+            'monitoring': [(1.2, 5.0)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if bt_criticality == "CRITICAL":
+            is_critical_flag = True
     
     bt_ref_min, bt_ref_max = (None, None)
     if 'BT' in REFERENCE_RANGES:
@@ -220,11 +309,15 @@ def analisar_funcao_hepatica(dados: Dict[str, any]) -> Dict[str, any]:
             if bt > 12.0:
                 interpretations_list.append("Hiperbilirrubinemia acentuada (>12 mg/dL) - sugere obstrução biliar completa, hepatite grave, ou síndromes raras. Risco de encefalopatia.")
                 is_critical_flag = True
-                recommendations_list.append("Hiperbilirrubinemia crítica. Avaliação urgente da causa e manejo de complicações.")
+                recommendations_list.append("Hiperbilirrubinemia crítica. Avaliação urgente da causa e manejo de complicações. Segundo as diretrizes da AASLD, bilirrubina >12 mg/dL indica falência hepática aguda.")
+                recommendations_list.append("SPECIALIST CONSULTATION RECOMMENDED: Hepatologista imediatamente para avaliação de transplante hepático. Monitorar INR, creatinina, grau de encefalopatia e infecções.")
             elif bt > 3.0:
                 interpretations_list.append("Hiperbilirrubinemia moderada (icterícia clínica) - pode ocorrer em diversas hepatopatias, hemólise ou Sd. Gilbert.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, bilirrubina 3-12 mg/dL indica icterícia clínica. Investigar etiologia com relação BD/BI enzimas hepáticas.")
+                recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Solicitar relação BD/BI, TGO/TGP, fosfatase alcalina e GGT. Para icterícia mista: considerar hepatite viral e obstrução biliar.")
             else:
                 interpretations_list.append("Hiperbilirrubinemia discreta - pode ser fisiológica (Gilbert), ou indicar disfunção hepática/hemólise inicial.")
+                recommendations_list.append("Segundo as diretrizes da AASLD, bilirrubina leve pode ser normal em alguns pacientes ou indicar Síndrome de Gilbert. Repetir se sintomática.")
 
             calculated_bi_from_bt_bd = None
             if bd is not None and bd_ref_max is not None:

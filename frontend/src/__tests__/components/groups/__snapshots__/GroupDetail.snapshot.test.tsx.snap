@@ -1,0 +1,76 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`GroupDetail Snapshot Tests matches snapshot while loading 1`] = `
+<DocumentFragment>
+  <div
+    class="flex justify-center items-center h-64"
+  >
+    <div
+      aria-label="loading"
+      class="inline-block animate-spin rounded-full border-2 border-current border-t-transparent h-8 w-8"
+      role="status"
+    >
+      <span
+        class="sr-only"
+      >
+        Carregando...
+      </span>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`GroupDetail Snapshot Tests matches snapshot with empty group 1`] = `
+<DocumentFragment>
+  <div
+    class="flex justify-center items-center h-64"
+  >
+    <div
+      aria-label="loading"
+      class="inline-block animate-spin rounded-full border-2 border-current border-t-transparent h-8 w-8"
+      role="status"
+    >
+      <span
+        class="sr-only"
+      >
+        Carregando...
+      </span>
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`GroupDetail Snapshot Tests matches snapshot with error 1`] = `
+<DocumentFragment>
+  <div
+    class="relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg~*]:pl-7 border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive"
+    role="alert"
+  >
+    <div
+      class="text-sm [&_p]:leading-relaxed"
+    >
+      Failed to load group details
+    </div>
+  </div>
+</DocumentFragment>
+`;
+
+exports[`GroupDetail Snapshot Tests matches snapshot with group details 1`] = `
+<DocumentFragment>
+  <div
+    class="flex justify-center items-center h-64"
+  >
+    <div
+      aria-label="loading"
+      class="inline-block animate-spin rounded-full border-2 border-current border-t-transparent h-8 w-8"
+      role="status"
+    >
+      <span
+        class="sr-only"
+      >
+        Carregando...
+      </span>
+    </div>
+  </div>
+</DocumentFragment>
+`;

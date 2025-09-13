@@ -1,85 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// GET medications for a patient
-import axios from 'axios';
-
 export async function GET(
   request: NextRequest,
-  context: { params: Record<string, string> }
+  { params }: { params: { id: string } }
 ) {
-  const { params } = context;
   try {
-    const patientId = params["id"];
-    const apiUrl = process.env.API_URL || 'http://backend-api:8000';
-    const response = await axios.get(`${apiUrl}/api/medications/patient/${patientId}`);
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/patients/${params.id}/medications`;
+    const authHeader = request.headers.get('Authorization') || '';
+    
+    const response = await fetch(backendUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader
+      },
+      cache: 'no-store'
+    });
 
-    // Map backend model to frontend model
-    const medications = response.data.medications.map((med: any) => ({
-      id: med.id,
-      name: med.name,
-      dosage: med.dosage,
-      frequency: med.frequency,
-      route: med.route,
-      startDate: med.start_date,
-      endDate: med.end_date || '',
-      notes: med.notes || '',
-      active: med.status === 'active'
-    }));
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.detail || errorData.error || 'Failed to fetch medications' },
+        { status: response.status }
+      );
+    }
 
-    return NextResponse.json({ medications }, { status: 200 });
-  } catch (error: any) {
-    console.error('Error fetching medications:', error);
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('GET medications error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch medications' },
-      { status: error.response?.status || 500 }
+      { error: 'Failed to process request' },
+      { status: 500 }
     );
   }
 }
-// POST a new medication
+
 export async function POST(
   request: NextRequest,
-  context: { params: Record<string, string> }
+  { params }: { params: { id: string } }
 ) {
-  const { params } = context;
   try {
-    const patientId = params["id"];
-    const apiUrl = process.env.API_URL || 'http://backend-api:8000';
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/patients/${params.id}/medications`;
+    const authHeader = request.headers.get('Authorization') || '';
     const body = await request.json();
+    
+    const response = await fetch(backendUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader
+      },
+      body: JSON.stringify(body)
+    });
 
-    // Map frontend model to backend model
-    const medicationPayload = {
-      name: body.name,
-      dosage: body.dosage,
-      frequency: body.frequency,
-      route: body.route,
-      start_date: body.startDate,
-      end_date: body.endDate || null,
-      notes: body.notes || null,
-      status: body.active ? 'active' : 'suspended',
-      patient_id: patientId
-    };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.detail || errorData.error || 'Failed to create medication' },
+        { status: response.status }
+      );
+    }
 
-    const response = await axios.post(`${apiUrl}/api/medications/`, medicationPayload);
-
-    // Map response back to frontend model
-    const medication = {
-      id: response.data.id,
-      name: response.data.name,
-      dosage: response.data.dosage,
-      frequency: response.data.frequency,
-      route: response.data.route,
-      startDate: response.data.start_date,
-      endDate: response.data.end_date || '',
-      notes: response.data.notes || '',
-      active: response.data.status === 'active'
-    };
-
-    return NextResponse.json({ medication }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating medication:', error);
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('POST medication error:', error);
     return NextResponse.json(
-      { error: 'Failed to create medication' },
-      { status: error.response?.status || 500 }
+      { error: 'Failed to process request' },
+      { status: 500 }
     );
   }
 }

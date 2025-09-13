@@ -229,13 +229,17 @@ class SimpleAutonomousResearchService:
         title = getattr(item, 'title', '')
         logger.info(f"Filtered out result: URL='{url}' Title='{title}' | Reason: {reason}")
 
-    def __init__(self, research_mode: str = "comprehensive"):
+    def __init__(self, research_mode: str = "comprehensive", model_preset: Optional[str] = None, progress_callback: Optional[Any] = None):
         self.search_results: List[RawSearchResultItem] = []
         self.query_counts = {}
         self.error_counts = {}
         self.strategy_timings = {}
         self.search_iterations = 0
         self.source_timing: Dict[str, float] = {}
+        # Quick wins: model preset knobs + progress callback + research trace holder
+        self.model_preset = (model_preset or '').lower() if isinstance(model_preset, str) else None
+        self.progress_callback = progress_callback
+        self._trace: Dict[str, Any] = { 'plan': [], 'executions': [], 'citesource': {}, 'synthesis': {} }
 
         # Mode-specific settings
         self.research_mode = research_mode
@@ -249,6 +253,23 @@ class SimpleAutonomousResearchService:
             self.max_iterations = 7 # Allow more strategies
             self.TARGET_RESULT_COUNT_FOR_BREAK = 25 # Aim for more results
             self.MCP_CALL_DELAY_SECONDS = 2 #Standard delay
+
+        # Apply optional model preset tuning (adapter)
+        if self.model_preset == 'fast':
+            self.max_iterations = max(3, int(self.max_iterations * 0.7))
+            self.TARGET_RESULT_COUNT_FOR_BREAK = max(10, int(self.TARGET_RESULT_COUNT_FOR_BREAK * 0.7))
+            self.MCP_CALL_DELAY_SECONDS = max(1.0, self.MCP_CALL_DELAY_SECONDS * 0.7)
+        elif self.model_preset == 'deep':
+            self.max_iterations = int(self.max_iterations * 1.3)
+            self.TARGET_RESULT_COUNT_FOR_BREAK = int(self.TARGET_RESULT_COUNT_FOR_BREAK * 1.3)
+            # keep delay the same to avoid rate issues
+
+    async def _emit(self, event: Dict[str, Any]):
+        if self.progress_callback:
+            try:
+                await self.progress_callback(event)
+            except Exception:
+                pass
 
         # Service clients will be initialized in __aenter__
         self.session: Optional[aiohttp.ClientSession] = None
@@ -884,7 +905,7 @@ class SimpleAutonomousResearchService:
         return filtered_results
 
     async def conduct_autonomous_research(
-        self, research_input: ResearchTaskInput
+        self, research_input: ResearchTaskInput, manual_strategies: Optional[List[Dict[str, Any]]] = None
     ) -> Any:  # TODO: Refine return type if possible
         formulated_strategy_output: Optional[FormulatedSearchStrategyOutput] = None
         synthesis: Optional[SynthesizedResearchOutput] = None
@@ -895,6 +916,7 @@ class SimpleAutonomousResearchService:
         refined_synthesis_query = research_input.user_original_query
 
         try: # Main try block for the entire research process
+            await self._emit({ 'type': 'start', 'query': research_input.user_original_query, 'mode': self.research_mode, 'preset': self.model_preset })
             try: # Inner try for strategy generation
                 formulated_strategy_output = await self._analyze_and_generate_strategies(research_input)
             except Exception as e:
@@ -938,7 +960,42 @@ class SimpleAutonomousResearchService:
             else:
                 logger.warning("Formulated strategy output was None or failed. Using fallback query and no BAML-defined search strategies.")
 
-            # Execute BAML-defined strategies
+            # Merge optional user-specified strategies (user overrides first)
+            if manual_strategies:
+                try:
+                    normalized_manual = []
+                    for s in manual_strategies:
+                        q = s.get('query') or s.get('query_string')
+                        ss = s.get('source_service')
+                        if not q or not ss:
+                            continue
+                        normalized_manual.append({
+                            'query': q,
+                            'source_service': ss,
+                            'description': s.get('description', f"User strategy for {ss}")[:200],
+                            'max_results': s.get('max_results')
+                        })
+                    if normalized_manual:
+                        strategies = normalized_manual + strategies
+                except Exception:
+                    pass
+
+            # Emit plan
+            try:
+                await self._emit({
+                    'type': 'plan',
+                    'strategies': [ { 'source': s.get('source_service'), 'query': s.get('query'), 'desc': s.get('description'), 'max_results': s.get('max_results') } for s in strategies ],
+                    'refined_query': refined_synthesis_query
+                })
+            except Exception:
+                pass
+            # Save into trace
+            try:
+                self._trace['plan'] = [ { 'source': s.get('source_service'), 'query': s.get('query'), 'desc': s.get('description'), 'max_results': s.get('max_results') } for s in strategies ]
+            except Exception:
+                pass
+
+            # Execute strategies
             # Limit strategies based on max_iterations set by research_mode
             if len(strategies) > self.max_iterations:
                 logger.info(f"Research mode '{self.research_mode}': Limiting strategies from {len(strategies)} to {self.max_iterations}.")
@@ -949,6 +1006,7 @@ class SimpleAutonomousResearchService:
                     logger.info(f"Waiting for {self.MCP_CALL_DELAY_SECONDS}s before next strategy: {strategy_item.get('description', 'N/A')}")
                     await asyncio.sleep(self.MCP_CALL_DELAY_SECONDS)
                 
+                await self._emit({ 'type': 'strategy_start', 'source': strategy_item.get('source_service'), 'query': strategy_item.get('query'), 'desc': strategy_item.get('description') })
                 strategy_specific_baml_results: List[RawSearchResultItem] = await self._execute_search_strategy(strategy_item, research_input)
                 
                 if strategy_specific_baml_results:
@@ -957,6 +1015,11 @@ class SimpleAutonomousResearchService:
                     logger.info(f"Total accumulated BAML results: {len(self.search_results)}")
                 else:
                     logger.info(f"Strategy '{strategy_item.get('description', 'N/A')}' ({strategy_item.get('source_service')}) yielded no items.")
+                await self._emit({ 'type': 'strategy_end', 'source': strategy_item.get('source_service'), 'found': len(strategy_specific_baml_results) if strategy_specific_baml_results else 0, 'total_accumulated': len(self.search_results) })
+                try:
+                    self._trace['executions'].append({ 'source': strategy_item.get('source_service'), 'query': strategy_item.get('query'), 'found': len(strategy_specific_baml_results) if strategy_specific_baml_results else 0 })
+                except Exception:
+                    pass
                 
                 self.search_iterations += 1
                 if len(self.search_results) >= self.TARGET_RESULT_COUNT_FOR_BREAK:
@@ -971,6 +1034,10 @@ class SimpleAutonomousResearchService:
             # Process results if any were found
             if self.search_results:
                 logger.info(f"Processing {len(self.search_results)} accumulated results with CiteSource...")
+                try:
+                    await self._emit({ 'type': 'citesource_start', 'count': len(self.search_results) })
+                except Exception:
+                    pass
                 # Ensure process_with_cite_source and other critical functions are defined and imported
                 # from services.cite_source_service import process_with_cite_source (example)
                 deduplicated_results, local_cite_source_report = await process_with_cite_source(
@@ -981,6 +1048,18 @@ class SimpleAutonomousResearchService:
                 cite_source_report_for_metrics = local_cite_source_report # Save for metrics
 
                 logger.info(f"CiteSource: {len(self.search_results)} initial -> {len(deduplicated_results)} deduplicated (removed {local_cite_source_report.deduplication_result.removed_duplicates} duplicates)")
+                try:
+                    await self._emit({ 'type': 'citesource_done', 'initial': len(self.search_results), 'deduplicated': len(deduplicated_results), 'removed_duplicates': getattr(local_cite_source_report.deduplication_result, 'removed_duplicates', None) })
+                except Exception:
+                    pass
+                try:
+                    self._trace['citesource'] = {
+                        'initial': len(self.search_results),
+                        'deduplicated': len(deduplicated_results),
+                        'removed_duplicates': getattr(local_cite_source_report.deduplication_result, 'removed_duplicates', None)
+                    }
+                except Exception:
+                    pass
 
                 trusted_results = self._filter_by_trusted_domains(deduplicated_results)
                 if len(trusted_results) < len(deduplicated_results):
@@ -998,6 +1077,10 @@ class SimpleAutonomousResearchService:
                     end_time_search_processing = time.time()
                     search_duration_seconds = round(end_time_search_processing - start_time, 2)
                     logger.info(f"Total search and processing (including CiteSource) duration: {search_duration_seconds} seconds.")
+                    try:
+                        await self._emit({ 'type': 'synthesis_start', 'count': len(final_results_for_synthesis) })
+                    except Exception:
+                        pass
 
                     # Ensure synthesize_with_fallback is defined and imported
                     # from services.baml_service import synthesize_with_fallback (example)
@@ -1033,6 +1116,25 @@ class SimpleAutonomousResearchService:
                             setattr(synthesis, 'professional_detailed_reasoning_cot', "Detailed professional reasoning attribute was missing and has been defaulted.")
                         except Exception as e_attr: # Catch broader exceptions if setattr fails
                             logger.error(f"Failed to set default 'professional_detailed_reasoning_cot' on synthesis object due to: {e_attr}")
+                    # KAE-lite grounding metrics
+                    try:
+                        grounding = self._compute_grounding_metrics(synthesis, final_results_for_synthesis)
+                        if hasattr(synthesis, 'research_metrics') and synthesis.research_metrics is not None:
+                            rm = synthesis.research_metrics
+                            csm = getattr(rm, 'cite_source_metrics', None)
+                            if csm and hasattr(csm, 'key_quality_insights') and isinstance(csm.key_quality_insights, list):
+                                csm.key_quality_insights.append(
+                                    f"Grounding: support {grounding.get('supported',0)}/{grounding.get('total',0)}, contradictions {grounding.get('contradictions',0)}, omissions {grounding.get('omissions',0)}"
+                                )
+                            if hasattr(rm, 'search_strategy_summary') and rm.search_strategy_summary:
+                                rm.search_strategy_summary += f" Grounding: support {grounding.get('supported',0)}/{grounding.get('total',0)}, contradictions {grounding.get('contradictions',0)}, omissions {grounding.get('omissions',0)}."
+                    except Exception as e_g:
+                        logger.warning(f"KAE-lite grounding computation failed: {e_g}")
+                    try:
+                        preview = getattr(synthesis, 'executive_summary', '')
+                        await self._emit({ 'type': 'synthesis_done', 'summary_preview': (preview[:200] if isinstance(preview, str) else ''), 'references': len(getattr(synthesis, 'relevant_references', []) or []) })
+                    except Exception:
+                        pass
                 else: 
                     logger.info("No trusted results remained after filtering. Skipping synthesis and creating an empty/error result.")
                     synthesis = self._create_error_result(
@@ -1068,6 +1170,33 @@ class SimpleAutonomousResearchService:
                 synthesis.search_duration_seconds = overall_search_duration
 
                 logger.info(f"Final research metrics calculated: {final_metrics}") 
+
+            # Optional: persist research trace for reproducibility
+            try:
+                import os as _os, json as _json, datetime as _dt
+                if _os.getenv('ENABLE_RESEARCH_TRACE', '').lower() in ('1','true','yes'):
+                    trace_dir = _os.path.join(_os.path.dirname(__file__), '..', 'logs', 'research_traces')
+                    trace_dir = _os.path.normpath(trace_dir)
+                    _os.makedirs(trace_dir, exist_ok=True)
+                    fname = _dt.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ') + '_trace.json'
+                    trace_path = _os.path.join(trace_dir, fname)
+                    # Build lightweight research tree
+                    tree = self._build_research_tree(synthesis)
+                    # Minimal trace + tree
+                    trace_obj = {
+                        'query': research_input.user_original_query,
+                        'mode': self.research_mode,
+                        'preset': self.model_preset,
+                        'plan': self._trace.get('plan'),
+                        'executions': self._trace.get('executions'),
+                        'citesource': self._trace.get('citesource'),
+                        'summary_preview': getattr(synthesis, 'executive_summary', '')[:300] if synthesis else '',
+                        'research_tree': tree
+                    }
+                    with open(trace_path, 'w', encoding='utf-8') as f:
+                        _json.dump(trace_obj, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
 
             return synthesis # Return successful synthesis
 
@@ -1152,6 +1281,118 @@ class SimpleAutonomousResearchService:
             llm_token_usage=None, # No LLM synthesis occurred for these paths
             llm_model_name=None   # No LLM synthesis occurred for these paths
         )
+
+    def _compute_grounding_metrics(self, synthesis: SynthesizedResearchOutput, final_results: List[RawSearchResultItem]) -> Dict[str, int]:
+        """KAE-lite: naive grounding by checking if key findings appear in abstracts/snippets of cited results."""
+        try:
+            # Build corpus text from abstracts/snippets
+            corpus = []
+            for item in final_results or []:
+                snip = getattr(item, 'snippet_or_abstract', None)
+                if isinstance(snip, str) and snip.strip():
+                    corpus.append(snip.lower())
+            corpus_text = "\n".join(corpus)
+
+            # Extract claims
+            claims: List[str] = []
+            kf = getattr(synthesis, 'key_findings_by_theme', []) or []
+            for theme in kf:
+                key_list = None
+                if isinstance(theme, dict):
+                    key_list = theme.get('key_findings') or []
+                    if not key_list and theme.get('summary'):
+                        key_list = [theme.get('summary')]
+                else:
+                    key_list = getattr(theme, 'key_findings', None) or []
+                    if not key_list:
+                        summary = getattr(theme, 'summary', None)
+                        if isinstance(summary, str) and summary.strip():
+                            key_list = [summary]
+                for c in key_list or []:
+                    if isinstance(c, str) and len(c.strip()) > 0:
+                        claims.append(c.strip())
+
+            total = len(claims)
+            supported = 0
+            contradictions = 0
+            for claim in claims:
+                tokens = [t for t in re.findall(r"[a-zA-Z]{4,}", claim.lower())]
+                if not tokens:
+                    continue
+                match_count = sum(1 for t in tokens if t in corpus_text)
+                if match_count >= 2:
+                    supported += 1
+            omissions = max(0, total - (supported + contradictions))
+            return { 'total': total, 'supported': supported, 'contradictions': contradictions, 'omissions': omissions }
+        except Exception:
+            return { 'total': 0, 'supported': 0, 'contradictions': 0, 'omissions': 0 }
+
+    def _extract_claims(self, synthesis: SynthesizedResearchOutput) -> List[str]:
+        try:
+            claims: List[str] = []
+            kf = getattr(synthesis, 'key_findings_by_theme', []) or []
+            for theme in kf:
+                if isinstance(theme, dict):
+                    arr = theme.get('key_findings') or []
+                    if not arr and theme.get('summary'):
+                        arr = [theme.get('summary')]
+                else:
+                    arr = getattr(theme, 'key_findings', None) or []
+                    if not arr:
+                        summary = getattr(theme, 'summary', None)
+                        if isinstance(summary, str) and summary.strip():
+                            arr = [summary]
+                for c in arr or []:
+                    if isinstance(c, str) and c.strip():
+                        claims.append(c.strip())
+            return claims
+        except Exception:
+            return []
+
+    def _build_research_tree(self, synthesis: Optional[SynthesizedResearchOutput]) -> Dict[str, Any]:
+        """Construct a lightweight research tree from the persisted trace and synthesis."""
+        try:
+            claims = self._extract_claims(synthesis) if synthesis else []
+            node_plan = {
+                'type': 'plan',
+                'strategies': self._trace.get('plan') or []
+            }
+            node_search = {
+                'type': 'search',
+                'executions': self._trace.get('executions') or []
+            }
+            node_dedup = {
+                'type': 'dedup',
+                **(self._trace.get('citesource') or {})
+            }
+            # Add grounding metrics summary if available in cite_source_metrics
+            grounding_summary = None
+            try:
+                rm = getattr(synthesis, 'research_metrics', None)
+                if rm is not None:
+                    csm = getattr(rm, 'cite_source_metrics', None)
+                    if csm is not None and hasattr(csm, 'key_quality_insights'):
+                        for msg in csm.key_quality_insights or []:
+                            if isinstance(msg, str) and msg.lower().startswith('grounding:'):
+                                grounding_summary = msg
+                                break
+            except Exception:
+                pass
+            node_synthesis = {
+                'type': 'synthesis',
+                'claims': claims,
+                'grounding': grounding_summary
+            }
+            tree = {
+                'schema_version': '1.0',
+                'root': {
+                    'type': 'query',
+                    'children': [node_plan, node_search, node_dedup, node_synthesis]
+                }
+            }
+            return tree
+        except Exception:
+            return {'schema_version': '1.0', 'root': {'type': 'query', 'children': []}}
 
 async def conduct_simple_autonomous_research(research_input: ResearchTaskInput) -> SynthesizedResearchOutput:
     """

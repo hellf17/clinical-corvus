@@ -31,6 +31,10 @@ BASE_RETRY_DELAY = float(os.getenv("DEEPL_BASE_RETRY_DELAY", "2.0"))
 MAX_RETRY_DELAY = float(os.getenv("DEEPL_MAX_RETRY_DELAY", "60.0"))
 RETRY_JITTER = float(os.getenv("DEEPL_RETRY_JITTER", "0.25"))
 
+class DeepLQuotaExceededError(Exception):
+    """Custom exception for DeepL quota exceeded errors."""
+    pass
+
 @dataclass
 class CharacterBucket:
     """Token bucket implementation for character-based rate limiting"""
@@ -113,6 +117,24 @@ daily_tracker = DailyUsageTracker(
 
 rate_limit_lock = asyncio.Lock()
 
+# Global quota exceeded flag
+quota_exceeded = False
+quota_exceeded_time = 0
+QUOTA_RESET_TIMEOUT = 3600  # 1 hour before retrying after quota exceeded
+
+# Persistent storage for quota tracking
+import json
+import os
+from pathlib import Path
+
+# File to store persistent quota data
+QUOTA_DATA_FILE = os.getenv("DEEPL_QUOTA_FILE", "deepl_quota.json")
+QUOTA_DATA_DIR = os.getenv("DEEPL_QUOTA_DIR", "/tmp/clinical_corvus")
+
+# Ensure directory exists
+Path(QUOTA_DATA_DIR).mkdir(parents=True, exist_ok=True)
+QUOTA_FILE_PATH = Path(QUOTA_DATA_DIR) / QUOTA_DATA_FILE
+
 # Circuit breaker for DeepL service
 class DeepLCircuitBreaker:
     def __init__(self, failure_threshold=5, reset_timeout=300):
@@ -182,7 +204,7 @@ async def _wait_for_rate_limit(character_count: int):
         # Check daily limit
         if not daily_tracker.can_use(character_count):
             remaining_chars = DAILY_CHARACTER_LIMIT - daily_tracker.characters_used
-            logger.error(f"Daily DeepL character limit exceeded. Used: {daily_tracker.characters_used}, "
+            logger.error(f"🚫 DAILY LIMIT EXCEEDED: Used: {daily_tracker.characters_used}, "
                         f"Requested: {character_count}, Remaining: {remaining_chars}")
             raise Exception(f"Daily DeepL character limit exceeded. Try again tomorrow.")
         
@@ -190,7 +212,9 @@ async def _wait_for_rate_limit(character_count: int):
         if not burst_bucket.can_consume(character_count):
             wait_time = burst_bucket.time_until_available(character_count)
             if wait_time > 0:
-                logger.info(f"DeepL burst limit reached. Waiting {wait_time:.2f} seconds for {character_count} characters...")
+                logger.warning(f"⏰ BURST LIMIT REACHED: Waiting {wait_time:.2f}s for {character_count} chars...")
+                logger.warning(f"   Current burst: {burst_bucket.tokens:.1f}/{burst_bucket.capacity} chars")
+                logger.warning(f"   Daily usage: {daily_tracker.characters_used}/{DAILY_CHARACTER_LIMIT} chars")
                 await asyncio.sleep(wait_time)
         
         # Consume characters from burst bucket
@@ -202,8 +226,8 @@ async def _wait_for_rate_limit(character_count: int):
         # Record daily usage
         daily_tracker.use_characters(character_count)
         
-        logger.debug(f"DeepL rate limit check passed. Used {character_count} characters. "
-                    f"Daily: {daily_tracker.characters_used}/{DAILY_CHARACTER_LIMIT}, "
+        logger.info(f"✅ RATE LIMIT OK: Used {character_count} chars. "
+                    f"Daily: {daily_tracker.characters_used}/{DAILY_CHARACTER_LIMIT} ({daily_tracker.characters_used/DAILY_CHARACTER_LIMIT*100:.1f}%), "
                     f"Burst: {burst_bucket.tokens:.1f}/{burst_bucket.capacity}")
 
 async def _exponential_backoff_with_jitter(attempt: int) -> float:
@@ -213,29 +237,36 @@ async def _exponential_backoff_with_jitter(attempt: int) -> float:
     return max(0.1, delay + jitter)  # Minimum 100ms delay
 
 async def translate_text_deepl(
-    text: Union[str, List[str]], 
+    text: Union[str, List[str]],
     target_lang: str = "EN-US",
-    source_lang: Optional[str] = None,
-    max_retries: int = MAX_RETRIES
+    source_lang: Optional[str] = None
 ) -> Union[str, List[str]]:
     """
-    Translates text using DeepL API with intelligent character-based rate limiting and retry logic.
+    Translates text using DeepL API. This function makes a single API call attempt.
+    Retries and fallbacks should be handled by the calling service.
     
     Args:
         text: Single string or list of strings to translate
         target_lang: Target language code (e.g., "EN-US", "PT-BR")
         source_lang: Source language code (optional)
-        max_retries: Maximum number of retry attempts
     
     Returns:
         Translated text (string or list of strings)
     
     Raises:
-        Exception: If translation fails after all retries
+        DeepLQuotaExceededError: If the DeepL quota is exceeded.
+        httpx.HTTPStatusError: For other HTTP-related errors.
+        Exception: For other unexpected errors.
     """
     if not DEEPL_API_KEY:
         raise ValueError("DeepL API key not configured. Please set DEEPL_API_KEY environment variable.")
-    
+
+    # Check for pre-existing quota exceeded state to fail fast
+    global quota_exceeded, quota_exceeded_time
+    if quota_exceeded and time.time() - quota_exceeded_time < QUOTA_RESET_TIMEOUT:
+        logger.warning("DeepL quota was previously exceeded. Skipping request to avoid further errors.")
+        raise DeepLQuotaExceededError("DeepL quota exceeded (cached state)")
+
     # Calculate character count for rate limiting
     character_count = _calculate_character_count(text)
     
@@ -258,82 +289,142 @@ async def translate_text_deepl(
     # Use circuit breaker to protect the service
     async def _make_request():
         async with httpx.AsyncClient() as client:
-            response = await client.post(
+            return await client.post(
                 DEEPL_API_URL,
                 json=payload,
                 headers=headers,
                 timeout=30
             )
-            return response
+
+    response = await circuit_breaker.execute(_make_request)
     
-    # Attempt translation with retries and exponential backoff
-    last_exception = None
-    for attempt in range(max_retries + 1):
-        try:
-            response = await circuit_breaker.execute(_make_request)
-            
-            # Handle rate limiting response
-            if response.status_code == 429:
-                retry_after = int(response.headers.get("Retry-After", 60))
-                if attempt < max_retries:
-                    logger.warning(f"DeepL rate limit hit (429). Waiting {retry_after} seconds... (Attempt {attempt + 1}/{max_retries + 1})")
-                    await asyncio.sleep(retry_after)
-                    continue
-                else:
-                    raise Exception(f"DeepL rate limit exceeded after {max_retries + 1} attempts")
-            
-            # Handle quota exceeded
-            if response.status_code == 456:
-                logger.error("DeepL quota exceeded for this billing period")
-                raise Exception("DeepL quota exceeded. Please check your billing.")
-            
-            # Raise for other HTTP errors
-            response.raise_for_status()
-            
-            # Parse successful response
-            data = response.json()
-            translations = [item["text"] for item in data.get("translations", [])]
-            
-            # Log successful translation
-            logger.info(f"DeepL translation successful. Characters: {character_count}, "
-                       f"Daily usage: {daily_tracker.characters_used}/{DAILY_CHARACTER_LIMIT}")
-            
-            # Return result in the same format as input
-            if isinstance(text, list):
-                return translations
-            else:
-                return translations[0] if translations else ""
-                
-        except httpx.HTTPStatusError as e:
-            last_exception = e
-            logger.error(f"HTTP error during DeepL translation: {e.response.status_code} - {e.response.text}")
-            
-            # Don't retry on client errors (4xx) except 429
-            if 400 <= e.response.status_code < 500 and e.response.status_code != 429:
-                raise Exception(f"DeepL client error: {e.response.status_code} - {e.response.text}")
-            
-            if attempt < max_retries:
-                wait_time = await _exponential_backoff_with_jitter(attempt)
-                logger.info(f"Retrying DeepL request in {wait_time:.2f} seconds... (Attempt {attempt + 1}/{max_retries + 1})")
-                await asyncio.sleep(wait_time)
-            
-        except Exception as e:
-            last_exception = e
-            logger.error(f"Error during DeepL translation: {str(e)}")
-            
-            if attempt < max_retries:
-                wait_time = await _exponential_backoff_with_jitter(attempt)
-                logger.info(f"Retrying DeepL request in {wait_time:.2f} seconds... (Attempt {attempt + 1}/{max_retries + 1})")
-                await asyncio.sleep(wait_time)
+    # Enhanced quota and rate limit handling
+    response_text = response.text
+    is_quota_exceeded = _detect_quota_exceeded(response_text, response.status_code)
     
-    # If we get here, all retries failed
-    raise Exception(f"DeepL translation failed after {max_retries + 1} attempts: {str(last_exception)}")
+    if response.status_code == 456 or is_quota_exceeded:
+        logger.error(f"DeepL quota exceeded detected: {response.status_code} - {response_text}")
+        quota_exceeded = True
+        quota_exceeded_time = time.time()
+        _save_persistent_usage()  # Save state immediately
+        raise DeepLQuotaExceededError(f"DeepL quota exceeded: {response_text}")
+
+    # Let the retry handler in the service layer deal with rate limits (429)
+    # and server errors (5xx)
+    response.raise_for_status()
+    
+    # Parse successful response
+    data = response.json()
+    translations = [item["text"] for item in data.get("translations", [])]
+    
+    # Log successful translation
+    logger.info(f"DeepL translation successful. Characters: {character_count}, "
+               f"Daily usage: {daily_tracker.characters_used}/{DAILY_CHARACTER_LIMIT}")
+    
+    # Save persistent usage data
+    _save_persistent_usage()
+    
+    # Reset quota exceeded flag on successful translation
+    if quota_exceeded:
+        logger.info("DeepL translation successful, resetting quota exceeded flag")
+        quota_exceeded = False
+        quota_exceeded_time = 0
+        _save_persistent_usage()
+
+    # Return result in the same format as input
+    if isinstance(text, list):
+        return translations
+    else:
+        return translations[0] if translations else ""
+
+# Persistent storage functions
+def _load_quota_data():
+    """Load quota data from persistent storage"""
+    try:
+        if QUOTA_FILE_PATH.exists():
+            with open(QUOTA_FILE_PATH, 'r') as f:
+                data = json.load(f)
+                return data
+    except Exception as e:
+        logger.warning(f"Failed to load quota data: {e}")
+    return {}
+
+def _save_quota_data(data: dict):
+    """Save quota data to persistent storage"""
+    try:
+        with open(QUOTA_FILE_PATH, 'w') as f:
+            json.dump(data, f)
+    except Exception as e:
+        logger.warning(f"Failed to save quota data: {e}")
+
+def _load_persistent_usage():
+    """Load daily usage from persistent storage"""
+    try:
+        data = _load_quota_data()
+        today = time.strftime("%Y-%m-%d")
+        
+        # Check if we have data for today
+        if data.get("date") == today:
+            daily_tracker.characters_used = data.get("daily_usage", 0)
+            logger.info(f"Loaded persistent daily usage: {daily_tracker.characters_used} characters")
+        else:
+            # New day, reset usage
+            daily_tracker.characters_used = 0
+            logger.info("New day detected, resetting daily usage")
+            
+    except Exception as e:
+        logger.warning(f"Failed to load persistent usage: {e}")
+
+def _save_persistent_usage():
+    """Save daily usage to persistent storage"""
+    try:
+        data = {
+            "date": time.strftime("%Y-%m-%d"),
+            "daily_usage": daily_tracker.characters_used,
+            "last_updated": time.time()
+        }
+        _save_quota_data(data)
+    except Exception as e:
+        logger.warning(f"Failed to save persistent usage: {e}")
+
+# Enhanced quota detection with persistent storage
+def _detect_quota_exceeded(response_text: str, status_code: int) -> bool:
+    """Enhanced quota detection based on response patterns"""
+    text = response_text.lower()
+    
+    # Common quota exceeded patterns
+    quota_patterns = [
+        "quota exceeded",
+        "usage limit",
+        "character limit",
+        "monthly limit",
+        "daily limit",
+        "subscription limit",
+        "plan limit",
+        "insufficient credits",
+        "payment required",
+        "upgrade required"
+    ]
+    
+    # Check for specific HTTP status codes
+    if status_code == 403 or status_code == 429:
+        return True
+    
+    # Check response text for quota patterns
+    for pattern in quota_patterns:
+        if pattern in text:
+            return True
+    
+    return False
 
 # Utility functions for monitoring
 def get_rate_limit_status() -> dict:
     """Get current rate limiting status for monitoring"""
     daily_tracker.reset_if_new_day()
     burst_bucket._refill()
+    
+    # Load persistent data if it's a new day
+    _load_persistent_usage()
     
     return {
         "daily_usage": {
@@ -351,6 +442,12 @@ def get_rate_limit_status() -> dict:
             "state": circuit_breaker.state,
             "failures": circuit_breaker.failures,
             "last_failure": circuit_breaker.last_failure_time
+        },
+        "quota_exceeded": quota_exceeded,
+        "quota_exceeded_time": quota_exceeded_time,
+        "persistent_storage": {
+            "file_path": str(QUOTA_FILE_PATH),
+            "exists": QUOTA_FILE_PATH.exists()
         }
     }
 
@@ -361,3 +458,7 @@ def reset_daily_usage():
         date=time.strftime("%Y-%m-%d"),
         characters_used=0
     )
+    _save_persistent_usage()
+
+# Initialize persistent storage on module load
+_load_persistent_usage()

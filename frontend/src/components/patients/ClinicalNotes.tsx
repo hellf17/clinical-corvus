@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
@@ -519,7 +520,7 @@ export default function ClinicalNotes({ patientId }: ClinicalNotesProps) {
                 <CardContent>
                    <div
                      className="prose dark:prose-invert max-w-none text-sm"
-                     dangerouslySetInnerHTML={{ __html: note.content }}
+                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(note.content || '') }}
                    />
                 </CardContent>
               </Card>

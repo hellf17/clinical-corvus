@@ -1,0 +1,71 @@
+# Optimized Development Dockerfile for Backend API
+# Uses a multi-stage build to create a lean final image and leverages layer caching.
+
+# --- Base Stage ---
+# Use a slim Python image.
+FROM python:3.10-slim as base
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    POETRY_HOME="/opt/poetry" \
+    POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PATH="$POETRY_HOME/bin:$PATH"
+
+# --- Builder Stage ---
+# This stage installs system and Python dependencies.
+FROM base as builder
+WORKDIR /app
+
+# Install essential system dependencies.
+# Reduced set for faster builds; add tools like 'vim' or 'gdb' only if necessary for debugging.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    libtesseract-dev \
+    tesseract-ocr \
+    tesseract-ocr-por \
+    libgl1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a virtual environment.
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip.
+RUN pip install --upgrade pip
+
+# Copy only the requirements files to leverage Docker cache.
+COPY requirements-shared.txt .
+COPY backend-api/requirements.txt .
+COPY backend-api/requirements-dev.txt .
+
+# Install all dependencies in a single layer.
+# This layer is cached and only re-runs if the requirements files change.
+RUN pip install -r requirements.txt -r requirements-dev.txt -r requirements-shared.txt
+
+# --- Development Stage ---
+# This is the final image for development, with the application code.
+FROM builder as development
+WORKDIR /app
+
+# Copy the application code.
+# This is done last, so changes to code don't invalidate the dependency cache.
+COPY backend-api/ .
+COPY baml_client/ /app/baml_client
+
+# Create a non-root user for security.
+RUN useradd -m -u 1000 developer && chown -R developer:developer /app
+USER developer
+
+EXPOSE 8000 5678
+
+# Healthcheck to ensure the service is running.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Command to run the development server with auto-reloading.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app"]

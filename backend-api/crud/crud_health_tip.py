@@ -11,15 +11,10 @@ import schemas.health_tip as health_tip_schemas # Corrected
 def get_health_tips(db: Session, limit: int = 10) -> List[HealthTip]:
     """
     Retrieve a list of general health tips.
-    Returns empty list if no tips are found.
+    TODO: Implement user-specific logic if needed later.
     """
-    try:
-        tips = db.query(HealthTip).order_by(HealthTip.created_at.desc()).limit(limit).all()
-        return tips or []
-    except Exception as e:
-        # Log the error and return empty list
-        print(f"Error fetching health tips: {e}")
-        return []
+    # Currently returns latest N tips, assuming all are general
+    return db.query(HealthTip).order_by(HealthTip.created_at.desc()).limit(limit).all()
 
 # Add functions for create/update/delete/get_specific if needed later
 # def create_health_tip(db: Session, tip: health_tip_schemas.HealthTipCreate):

@@ -14,66 +14,23 @@ export interface EmergencyContact {
 export interface Patient {
   patient_id: number;
   name: string;
-  email?: string;
   birthDate: string;
-  dateOfBirth?: string; // Alternative field used in some places
   gender?: 'male' | 'female' | 'other';
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-  documentNumber?: string;
-  patientNumber?: string;
-  insuranceProvider?: string;
-  insuranceNumber?: string;
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
+  weight?: number;
+  height?: number;
+  ethnicity?: string;
+  comorbidities?: string;
+  primary_diagnosis?: string;
+  secondary_diagnosis?: string;
+  admission_date?: string;
   createdAt?: string;
   updatedAt?: string;
-  medicalRecord?: string;
-  hospital?: string;
-  admissionDate?: string;
-  status?: 'active' | 'inactive' | string; // Added status
-  observations?: string; // Added observations
-  anamnesis?: string;
-  physicalExamFindings?: string;
-  diagnosticHypotheses?: string;
-  primary_diagnosis?: string;
-  diagnosis?: string; // Keeping this as it might be used for general diagnosis
-  exams?: Exam[]; // Correctly typed
-  vitalSigns?: VitalSign[]; // Correctly typed
+  exams?: Exam[];
+  vitalSigns?: VitalSign[];
   age?: number;
-  // lab_results?: any[]; // Removed redundant lab_results
   medications?: Medication[];
-  user_id?: string | null; // Added from previous merge, ensure it's here
-}
-
-export interface PatientCreate {
-  name: string;
-  email: string;
-  birthDate: string;
-  gender: 'male' | 'female' | 'other';
-  phone: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  documentNumber: string;
-  patientNumber: string;
-  insuranceProvider?: string;
-  insuranceNumber?: string;
-  emergencyContact: EmergencyContact;
-}
-
-export interface PatientUpdate {
-  name?: string;
+  user_id?: string | null;
   email?: string;
-  birthDate?: string;
-  gender?: 'male' | 'female' | 'other';
   phone?: string;
   address?: string;
   city?: string;
@@ -84,6 +41,60 @@ export interface PatientUpdate {
   insuranceProvider?: string;
   insuranceNumber?: string;
   emergencyContact?: EmergencyContact;
+  diseaseHistory?: string;
+  familyDiseaseHistory?: string;
+}
+
+export interface PatientCreate {
+  name: string;
+  birthDate: string;
+  gender: 'male' | 'female' | 'other';
+  primary_diagnosis?: string;
+  weight?: number;
+  height?: number;
+  ethnicity?: string;
+  comorbidities?: string;
+  group_id?: number; // Add optional group assignment
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  documentNumber?: string;
+  patientNumber?: string;
+  insuranceProvider?: string;
+  insuranceNumber?: string;
+  emergencyContact?: EmergencyContact;
+  diseaseHistory?: string;
+  familyDiseaseHistory?: string;
+}
+
+export interface PatientUpdate {
+  name?: string;
+  birthDate?: string;
+  gender?: 'male' | 'female' | 'other';
+  weight?: number;
+  height?: number;
+  ethnicity?: string;
+  comorbidities?: string;
+  primary_diagnosis?: string;
+  secondary_diagnosis?: string;
+  admission_date?: string;
+  group_id?: number; // Add optional group assignment
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  documentNumber?: string;
+  patientNumber?: string;
+  insuranceProvider?: string;
+  insuranceNumber?: string;
+  emergencyContact?: EmergencyContact;
+  diseaseHistory?: string;
+  familyDiseaseHistory?: string;
 }
 
 export interface PatientList {

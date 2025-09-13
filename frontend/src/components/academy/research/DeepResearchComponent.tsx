@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
@@ -10,8 +10,8 @@ import { Textarea } from '@/components/ui/Textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import ReactMarkdown from 'react-markdown';
+import DOMPurify from 'isomorphic-dompurify';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/Collapsible';
-import { Separator } from '@/components/ui/Separator';
 import { ScrollArea } from '@/components/ui/ScrollArea';
 import { Progress } from '@/components/ui/Progress';
 import { 
@@ -27,13 +27,11 @@ import {
   AlertTriangle,
   CheckCircle,
   Zap,
-  ArrowRight,
   BookOpen,
   TrendingUp,
   Users,
   Calendar,
   BarChart3,
-  Filter,
   Globe,
   HelpCircle,
   FileText,
@@ -48,7 +46,8 @@ import {
   FlaskConical,
   Activity,
   Brain,
-  Database
+  Database,
+  Timer
 } from 'lucide-react';  
 
 // Interfaces para tipos de dados
@@ -170,35 +169,6 @@ const generateDirectLink = (ref: RelevantReference): string => {
   return `https://scholar.google.com/scholar?q=${searchQuery}`;
 };
 
-// Função para deduplicate referências baseado em title, DOI ou PMID
-const deduplicateReferences = (references: RelevantReference[]): RelevantReference[] => {
-  const seen = new Set<string>();
-  const deduplicated: RelevantReference[] = [];
-  if (!Array.isArray(references)) {
-    console.warn('Referências não são um array:', references);
-    return [];
-  }
-  for (const ref of references) {
-    // Criar chaves únicas baseadas em diferentes critérios
-    const keys = [
-      ref.doi?.toLowerCase(),
-      ref.pmid?.toLowerCase(),
-      ref.title?.toLowerCase().trim()
-    ].filter(Boolean);
-    // Verificar se alguma das chaves já foi vista
-    const isDuplicate = keys.some(key => key && seen.has(key));
-    if (!isDuplicate) {
-      // Adicionar todas as chaves válidas ao set
-      keys.forEach(key => key && seen.add(key));
-      deduplicated.push(ref);
-    }
-  }
-  if (deduplicated.length === 0) {
-    console.warn('Nenhuma referência deduplicada encontrada!', references);
-  }
-  return deduplicated;
-};
-
 export default function DeepResearchComponent({ 
   initialQuestion = '', 
   onResultsGenerated, 
@@ -212,6 +182,7 @@ export default function DeepResearchComponent({
   const [targetAudience, setTargetAudience] = useState('');
   const [quickSearchMode, setQuickSearchMode] = useState<'quick' | 'comprehensive'>('quick');
   const [researchMode, setResearchMode] = useState<'quick' | 'comprehensive' | 'autonomous'>('quick');
+  const [executedMode, setExecutedMode] = useState<'quick' | 'expanded' | 'comprehensive' | null>(null);
   const [picoStructure, setPicoStructure] = useState<PICOStructure>({});
   const [isPicoExpanded, setIsPicoExpanded] = useState(false);
   
@@ -219,10 +190,16 @@ export default function DeepResearchComponent({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<SynthesizedResearchOutput | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
+  // Avançado: predefinição de modelo e plano de estratégia opcional
+  const [modelPreset, setModelPreset] = useState<'fast' | 'balanced' | 'deep' | ''>('');
+  const [strategyOverrideJson, setStrategyOverrideJson] = useState<string>('');
   
   // Estados de progresso para pesquisa autônoma
   const [currentProgressStage, setCurrentProgressStage] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+  const [planPreview, setPlanPreview] = useState<Array<{source?: string; query?: string; desc?: string; max_results?: number}>>([]);
+  const [progressLog, setProgressLog] = useState<string[]>([]);
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(0);
   const [feedbackGiven, setFeedbackGiven] = useState<'like' | 'dislike' | null>(null);
   const [isReasoningCotOpen, setIsReasoningCotOpen] = useState(false);
@@ -314,13 +291,36 @@ export default function DeepResearchComponent({
       }
 
       // Preparar dados para envio */ }
+      // Map front-end modes to backend service modes
+      // quick -> 'quick' | 'comprehensive' (from quickSearchMode)
+      // autonomous -> 'expanded' (deeper loop)
+      let resolvedServiceMode: 'quick' | 'expanded' | 'comprehensive' = 'quick';
+      if (researchMode === 'quick') {
+        resolvedServiceMode = quickSearchMode; // 'quick' or 'comprehensive'
+      } else if (researchMode === 'comprehensive') {
+        resolvedServiceMode = 'comprehensive';
+      } else if (researchMode === 'autonomous') {
+        resolvedServiceMode = 'expanded';
+      }
+
       const requestData = {
         user_original_query: researchQuestion.trim(),
         research_focus: researchFocus.trim() || undefined,
         target_audience: targetAudience.trim() || undefined,
         pico_question: Object.keys(picoStructure).length > 0 ? picoStructure : undefined,
-        research_mode: researchMode === 'quick' ? quickSearchMode : researchMode,
+        research_mode: resolvedServiceMode,
       };
+      if (modelPreset) (requestData as any).model_preset = modelPreset;
+      if (strategyOverrideJson && strategyOverrideJson.trim().length > 2) {
+        try {
+          const parsed = JSON.parse(strategyOverrideJson);
+          if (Array.isArray(parsed)) {
+            (requestData as any).strategy_override = parsed;
+          }
+        } catch (e) {
+          console.warn('strategy_override inválido, ignorando.');
+        }
+      }
 
       { /* Escolher endpoint baseado no modo de pesquisa */ }
       let endpoint = '';
@@ -330,12 +330,9 @@ export default function DeepResearchComponent({
       // is passed in the requestData.research_mode field.
       if (researchMode === 'quick' || researchMode === 'comprehensive') { 
         endpoint = '/api/research-assistant/quick-search-translated';
-      } 
-      else if (researchMode === 'autonomous') {
-        // Placeholder for autonomous research endpoint
-        // endpoint = '/api/research-assistant/autonomous';
-        console.warn(`Autonomous mode endpoint logic might need review, currently unhandled for endpoint selection in this block.`);
-        throw new Error('Autonomous mode endpoint not explicitly defined here, review needed.');
+      } else if (researchMode === 'autonomous') {
+        // Stream progress and final result via SSE proxy
+        endpoint = '/api/research-assistant/quick-search-stream';
       } else {
         // Handle other research modes or throw an error for unconfigured paths
         throw new Error(`Invalid or unhandled researchMode ('${researchMode}') for endpoint determination.`);
@@ -343,6 +340,81 @@ export default function DeepResearchComponent({
 
       console.log(`🔍 Modo: ${researchMode}, Endpoint: ${endpoint}`);
 
+      if (endpoint.indexOf('quick-search-stream') !== -1) {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(requestData),
+        });
+        if (!response.ok || !response.body) {
+          const errorText = await response.text().catch(() => 'Falha ao abrir stream');
+          throw new Error(errorText || `Falha no stream (status: ${response.status})`);
+        }
+        setCurrentProgressStage(0);
+        setProgressMessage('Iniciando...');
+        const reader: ReadableStreamDefaultReader<Uint8Array> = (response as any).body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+          for (const part of parts) {
+            const line = part.trim();
+            if (!line.startsWith('data:')) continue;
+            const jsonStr = line.replace(/^data:\s*/, '');
+            try {
+              const evt = JSON.parse(jsonStr);
+              if (evt.type === 'start') {
+                setProgressMessage('Inicializando...');
+              } else if (evt.type === 'plan') {
+                setProgressMessage('Plano gerado');
+                if (Array.isArray(evt.strategies)) setPlanPreview(evt.strategies);
+                setCurrentProgressStage(1);
+              } else if (evt.type === 'strategy_start') {
+                setProgressMessage(`Buscando em ${evt.source}...`);
+                setProgressLog(prev => [...prev, `Iniciado: ${evt.source}`]);
+              } else if (evt.type === 'strategy_end') {
+                setCurrentProgressStage(Math.min(progressStages.length - 3, currentProgressStage + 1));
+                setProgressLog(prev => [...prev, `Finalizado: ${evt.source} (${evt.found} itens)`]);
+              } else if (evt.type === 'citesource_start') {
+                setProgressMessage('Analisando e removendo duplicatas...');
+                setCurrentProgressStage(progressStages.length - 3);
+              } else if (evt.type === 'citesource_done') {
+                setProgressMessage('Deduplicação concluída');
+                setCurrentProgressStage(progressStages.length - 2);
+              } else if (evt.type === 'synthesis_start') {
+                setProgressMessage('Sintetizando evidências...');
+                setCurrentProgressStage(progressStages.length - 2);
+              } else if (evt.type === 'synthesis_done') {
+                setProgressMessage('Síntese finalizada');
+                setCurrentProgressStage(progressStages.length - 1);
+              } else if (evt.type === 'final_result') {
+                const data = evt.result as SynthesizedResearchOutput;
+                setResults(data);
+                setDebugInfo(data);
+                setExecutedMode(resolvedServiceMode);
+                setProgressMessage('Concluído');
+                setCurrentProgressStage(progressStages.length - 1);
+                if (onResultsGenerated) {
+                  onResultsGenerated({
+                    query: researchQuestion,
+                    suggestedTerms: data.relevant_references?.slice(0, 5).map((ref: any) => ref.title) || []
+                  });
+                }
+              }
+            } catch (e) {
+              console.warn('Invalid SSE JSON chunk', e);
+            }
+          }
+        }
+        return;
+      }
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -364,8 +436,17 @@ export default function DeepResearchComponent({
       }
 
       const data: SynthesizedResearchOutput = await response.json();
+
+      // Debug: Log the response to see if translation is working
+      console.log('🔍 DEBUG - Raw API Response:', data);
+      console.log('🔍 DEBUG - Executive Summary:', data.executive_summary);
+      console.log('🔍 DEBUG - Professional Reasoning:', data.professional_detailed_reasoning_cot);
+      console.log('🔍 DEBUG - Clinical Implications:', data.clinical_implications);
+
+      setDebugInfo(data);
       setResults(data);
-      
+      setExecutedMode(resolvedServiceMode);
+
       { /* Notificar componente pai sobre os resultados */ }
       if (onResultsGenerated) {
         onResultsGenerated({
@@ -528,6 +609,12 @@ export default function DeepResearchComponent({
               </div>
             </div>
 
+            {/* Mode hint */}
+            <div className="mt-2 text-xs text-gray-600">
+              <span className="font-medium">Dica de modo:</span>{' '}
+              Pesquisa Rápida → serviço "quick" (ou "comprehensive"); Autônoma → serviço "expanded".
+            </div>
+
             {/* Mode Selection for Quick Search (only visible if main mode is 'quick') */}
             {researchMode === 'quick' && (
             <div className="my-6 p-4 border border-dashed border-gray-300 rounded-lg bg-slate-50">
@@ -569,6 +656,41 @@ export default function DeepResearchComponent({
               </p>
             </div>
             )}
+
+          {/* Avançado: Predefinição de modelo e plano de estratégia */}
+          <div className="my-6 p-4 border border-dashed border-gray-300 rounded-lg bg-slate-50">
+            <label className="block text-sm font-medium text-gray-800 mb-3">Configurações avançadas (opcional)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="block text-xs font-medium text-gray-700 mb-2">Perfil de Modelo</span>
+                <select
+                  className="border rounded px-2 py-1 text-sm"
+                  value={modelPreset}
+                  onChange={(e) => setModelPreset(e.target.value as any)}
+                  disabled={isLoading}
+                >
+                  <option value="">Padrão</option>
+                  <option value="fast">Rápido</option>
+                  <option value="balanced">Balanceado</option>
+                  <option value="deep">Profundo</option>
+                </select>
+                <p className="text-xs text-muted-foreground mt-2">Controla profundidade/custos da pesquisa.</p>
+              </div>
+              <div>
+                <span className="block text-xs font-medium text-gray-700 mb-2">Plano de Estratégia (JSON)</span>
+                <Textarea
+                  placeholder='[
+  {"source":"pubmed","query_string":"septic shock guidelines","max_results":20}
+]'
+                  rows={4}
+                  value={strategyOverrideJson}
+                  onChange={(e) => setStrategyOverrideJson(e.target.value)}
+                  disabled={isLoading}
+                />
+                <p className="text-xs text-muted-foreground mt-2">Fontes: pubmed, europe_pmc, brave, guideline, google_scholar, cochrane, ncbi_sources, elite_journals, comprehensive_academic.</p>
+              </div>
+            </div>
+          </div>
 
           {/* Campos opcionais */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -695,7 +817,30 @@ export default function DeepResearchComponent({
             </div>
           )}
 
-          {/* Botões */}
+          
+          {isLoading && researchMode === 'autonomous' && (planPreview.length > 0 || progressLog.length > 0) && (
+            <div className="mt-3 text-xs text-green-700 p-3 border border-green-200 rounded bg-green-50">
+              {planPreview.length > 0 && (
+                <div className="mb-2">
+                  <div className="font-medium mb-1">Plano de execução:</div>
+                  <ul className="list-disc ml-6">
+                    {planPreview.map((s, idx) => (
+                      <li key={idx}><span className="font-semibold">{s.source}</span>: {s.desc || s.query}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {progressLog.length > 0 && (
+                <div>
+                  <div className="font-medium mb-1">Progresso:</div>
+                  <ul className="list-disc ml-6">
+                    {progressLog.map((m, i) => (<li key={i}>{m}</li>))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+{/* Botões */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Button type="submit" variant="default" disabled={isLoading || !authIsLoaded} className="flex-1">
               {isLoading ? (
@@ -744,6 +889,22 @@ export default function DeepResearchComponent({
                 </span>
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Debug Information */}
+          {debugInfo && (
+            <div className="mb-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">🔍 Debug Info - Raw Response:</h3>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-blue-600 hover:text-blue-800">Click to view raw response data</summary>
+                <pre className="mt-2 p-2 bg-white border rounded text-xs overflow-auto max-h-96">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </details>
+              <div className="mt-3 text-xs text-gray-600">
+                <strong>Executive Summary (first 100 chars):</strong> {debugInfo.executive_summary?.substring(0, 100)}...
+              </div>
+            </div>
           )}
 
           {/* Exibição dos Resultados */}
@@ -845,7 +1006,6 @@ export default function DeepResearchComponent({
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                       {/* Artigos Analisados */}
                       <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
                         <div className="text-2xl font-bold text-blue-600">
@@ -857,6 +1017,7 @@ export default function DeepResearchComponent({
                       {/* Tempo de Pesquisa */}
                       <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
                         <div className="text-2xl font-bold text-blue-600">
+                          <Timer className="h-6 w-6 mr-2 text-blue-500" />      
                           {typeof results.search_duration_seconds === 'number' 
                             ? results.search_duration_seconds.toFixed(0) 
                             : 'N/A'}
@@ -864,24 +1025,7 @@ export default function DeepResearchComponent({
                         <div className="text-sm text-blue-700 font-medium text-center">Segundos de Pesquisa</div>
                       </div>
                       
-                      {/* Periódicos Únicos */}
-                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {results.research_metrics?.unique_journals_found || 0}
-                        </div>
-                        <div className="text-sm text-blue-700 font-medium text-center">Periódicos Únicos</div>
-                      </div>
-                      
-                      {/* Artigos de Alto Impacto */}
-                      <div className="flex flex-col items-center justify-center p-4 bg-white rounded-lg border border-blue-100 h-full">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {results.research_metrics?.high_impact_studies_count || 0}
-                        </div>
-                        <div className="text-sm text-blue-700 font-medium text-center">Alto Impacto</div>
-                      </div>
-                    </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
-
                       {/* Metanálises */}
                       {results.research_metrics?.meta_analysis_count !== undefined && results.research_metrics.meta_analysis_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -891,7 +1035,6 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">Metanálises</div>
                         </div>
                       )}
-
                       {/* Diretrizes */}
                       {results.research_metrics?.guideline_count !== undefined && results.research_metrics.guideline_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -901,7 +1044,6 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">Diretrizes</div>
                         </div>
                       )}
-
                       {/* RCTs */}
                       {results.research_metrics?.rct_count !== undefined && results.research_metrics.rct_count > 0 && (
                         <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
@@ -911,7 +1053,6 @@ export default function DeepResearchComponent({
                           <div className="text-sm text-blue-700 font-medium">RCTs</div>
                         </div>
                       )}
-                      
                       {/* Fontes com Artigos */}
                       {results.research_metrics?.articles_by_source &&
                         Object.keys(results.research_metrics?.articles_by_source ?? {})
@@ -934,6 +1075,8 @@ export default function DeepResearchComponent({
                     {/* Additional Metrics Grid */}
                     {results.research_metrics && (
                         (results.research_metrics.date_range_searched && results.research_metrics.date_range_searched.trim() !== '') ||
+                        (typeof results.research_metrics.unique_journals_found === 'number' && results.research_metrics.unique_journals_found > 0) ||
+                        (typeof results.research_metrics.high_impact_studies_count === 'number' && results.research_metrics.high_impact_studies_count > 0) ||
                         (typeof results.research_metrics.recent_studies_count === 'number' && results.research_metrics.recent_studies_count > 0)
                       ) && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-6">
@@ -944,6 +1087,24 @@ export default function DeepResearchComponent({
                             {results.research_metrics.date_range_searched}
                           </div>
                           <div className="text-sm text-blue-700 font-medium mt-1">Período Pesquisado</div>
+                        </div>
+                      )}
+                      {typeof results.research_metrics?.unique_journals_found === 'number' && results.research_metrics.unique_journals_found > 0 && (
+                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
+                          <div className="text-2xl font-bold text-blue-600 flex items-center justify-center">
+                            <BookOpen className="h-6 w-6 mr-2 text-blue-500" />
+                            {results.research_metrics.unique_journals_found}
+                          </div>
+                          <div className="text-sm text-blue-700 font-medium mt-1">Periódicos Únicos</div>
+                        </div>
+                      )}
+                      {typeof results.research_metrics?.high_impact_studies_count === 'number' && results.research_metrics.high_impact_studies_count > 0 && (
+                        <div className="text-center p-4 bg-white rounded-lg border border-blue-100">
+                          <div className="text-2xl font-bold text-blue-600 flex items-center justify-center">
+                            <TrendingUp className="h-6 w-6 mr-2 text-blue-500" />
+                            {results.research_metrics.high_impact_studies_count}
+                          </div>
+                          <div className="text-sm text-blue-700 font-medium mt-1">Estudos de Alto Impacto</div>
                         </div>
                       )}
                       {typeof results.research_metrics?.recent_studies_count === 'number' && results.research_metrics.recent_studies_count > 0 && (
@@ -1039,7 +1200,7 @@ export default function DeepResearchComponent({
                           Avaliação da Qualidade da Evidência
                         </h4>
                         <div className="prose prose-sm max-w-none text-gray-700 bg-white/70 p-3 rounded-md border border-blue-100 text-xs">
-                          <ReactMarkdown>{results.evidence_quality_assessment || ''}</ReactMarkdown>
+                          <ReactMarkdown>{DOMPurify.sanitize(results.evidence_quality_assessment || '')}</ReactMarkdown>
                         </div>
                       </div>
                     )}
@@ -1055,7 +1216,7 @@ export default function DeepResearchComponent({
                           {results.research_gaps_identified.map((gap: string, index: number) => (
                             <Badge key={index} variant="outline" className="bg-white/70 text-orange-700 border-orange-200 text-left whitespace-normal h-auto py-1.5 px-2.5">
                               <div className="prose prose-xs max-w-none text-orange-700">
-                                <ReactMarkdown>{gap}</ReactMarkdown>
+                                <ReactMarkdown>{DOMPurify.sanitize(gap || '')}</ReactMarkdown>
                               </div>
                             </Badge>
                           ))}
@@ -1085,7 +1246,7 @@ export default function DeepResearchComponent({
                   </CardHeader>
                   <CardContent className="relative z-10">
                     <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
-                      <ReactMarkdown>{results.executive_summary || ''}</ReactMarkdown>
+                      <ReactMarkdown>{DOMPurify.sanitize(results.executive_summary || '')}</ReactMarkdown>
                     </div>
                   </CardContent>
                 </Card>
@@ -1114,7 +1275,7 @@ export default function DeepResearchComponent({
                         <li key={index} className="flex items-start">
                           <CheckCircle className="h-4 w-4 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                           <span className="text-sm text-gray-700 leading-relaxed">
-                            <div className="prose prose-sm max-w-none text-gray-700"><ReactMarkdown>{implication}</ReactMarkdown></div>
+                            <div className="prose prose-sm max-w-none text-gray-700"><ReactMarkdown>{DOMPurify.sanitize(implication || '')}</ReactMarkdown></div>
                           </span>
                         </li>
                       ))}
@@ -1173,7 +1334,7 @@ export default function DeepResearchComponent({
                                 <li key={findingIndex} className="flex items-start">
                                   <CheckCircle className="h-4 w-4 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
                                   <span className="text-sm text-gray-700 leading-relaxed">
-                                    <div className="prose prose-sm max-w-none text-gray-700"><ReactMarkdown>{finding}</ReactMarkdown></div>
+                                    <div className="prose prose-sm max-w-none text-gray-700"><ReactMarkdown>{DOMPurify.sanitize(finding || '')}</ReactMarkdown></div>
                                   </span>
                                 </li>
                               ))}
@@ -1439,6 +1600,31 @@ export default function DeepResearchComponent({
             </Alert>
           ) : null}
 
+          {isLoading && !results && (
+            <div className="mt-6 flex flex-col items-center justify-center py-12 space-y-6 animate-fade-in">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-green-200 rounded-full animate-spin">
+                  <div className="absolute top-0 left-0 w-16 h-16 border-4 border-green-600 rounded-full animate-pulse border-t-transparent"></div>
+                </div>
+                <Brain className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-green-600 animate-pulse" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-lg font-semibold text-gray-700 animate-pulse">Dr. Corvus está pesquisando evidências...</p>
+                <p className="text-sm text-gray-500">Aguarde enquanto analisamos e sintetizamos as informações.</p>
+              </div>
+              <div className="w-80 h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-full animate-pulse transition-all duration-1000" style={{ width: '75%' }}></div>
+              </div>
+            </div>
+          )}
+
+          {/* Executed mode badge/hint */}
+          {executedMode && (
+            <div className="mt-2">
+              <Badge variant="outline" className="text-xs">Modo executado: {executedMode}</Badge>
+            </div>
+          )}
+
           {/* Helper quando não há resultados */}
           {!results && !isLoading && !error && (
             <div className="mt-6 p-4 border rounded-md bg-sky-50 border-sky-200">
@@ -1447,7 +1633,7 @@ export default function DeepResearchComponent({
                 <h3 className="text-md font-semibold text-sky-700">Pronto para pesquisar?</h3>
               </div>
               <p className="text-sm text-sky-600 mt-1">
-                Insira sua pergunta de pesquisa acima e escolha o modo de busca. 
+                Insira sua pergunta de pesquisa acima e escolha o modo de busca.
                 Para melhores resultados, seja específico sobre população, intervenção e desfechos.
               </p>
             </div>
@@ -1457,3 +1643,4 @@ export default function DeepResearchComponent({
       </Card>
   );
 } 
+

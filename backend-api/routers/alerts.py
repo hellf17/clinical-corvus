@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any, Optional, Tuple
@@ -15,6 +15,7 @@ from security import get_current_user_required, verify_doctor_patient_access
 from crud import is_doctor_assigned_to_patient
 # from ..crud import crud_alert # Likely unused
 # from ..crud import crud_patients # Likely unused
+from utils.group_authorization import is_user_authorized_for_patient
 
 router = APIRouter(
     tags=["alerts"],
@@ -24,6 +25,7 @@ router = APIRouter(
 @router.post("/", response_model=Alert, status_code=201) # Use imported Alert schema
 def create_alert(
     alert: AlertCreate, # Use imported AlertCreate schema
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required) # Use models.User
 ):
@@ -35,9 +37,11 @@ def create_alert(
         
     # Authorization check:
     authorized = False
-    if current_user.role == 'doctor':
-        # Check if doctor is assigned to this patient
-        if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=alert.patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        # Check if doctor is assigned to this patient (directly or through groups)
+        if is_user_authorized_for_patient(db, current_user, alert.patient_id):
             authorized = True
     elif current_user.role == 'patient':
         # Check if patient is creating alert for themselves
@@ -64,6 +68,7 @@ def create_alert(
 @router.get("/{alert_id}", response_model=Alert) # Use imported Alert schema
 def get_alert(
     alert_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required)
 ):
@@ -76,8 +81,10 @@ def get_alert(
     patient_id = alert.patient_id
     authorized = False
     if patient_id: # Only check if alert is linked to a patient
-        if current_user.role == 'doctor':
-            if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        if current_user.role == 'admin':
+            authorized = True
+        elif current_user.role == 'doctor':
+            if is_user_authorized_for_patient(db, current_user, patient_id):
                 authorized = True
         elif current_user.role == 'patient':
             patient_record = db.query(models.Patient.patient_id).filter(models.Patient.user_id == current_user.user_id).first()
@@ -88,7 +95,7 @@ def get_alert(
         # Allow access based on role? Or specific user_id match?
         # For now, assume non-patient alerts are accessible if user_id matches
         if alert.user_id == current_user.user_id:
-             authorized = True 
+             authorized = True
              
     if not authorized:
         raise HTTPException(
@@ -101,6 +108,7 @@ def get_alert(
 @router.get("/patient/{patient_id}", response_model=AlertListResponse)
 async def read_alerts_for_patient(
     patient_id: int,
+    request: Request,
     only_active: bool = Query(True, description="Filter for active (non-acknowledged/resolved) alerts"),
     skip: int = Query(0, ge=0, description="Number of alerts to skip"),
     limit: int = Query(100, ge=1, description="Maximum number of alerts to return"),
@@ -117,10 +125,10 @@ async def read_alerts_for_patient(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente não encontrado")
 
     if current_user.role == 'admin':
-        pass 
+        pass
     elif current_user.role == 'doctor':
-        if not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente.")
+        if not is_user_authorized_for_patient(db, current_user, patient_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Médico não associado a este paciente diretamente ou através de grupos.")
     elif current_user.role == 'patient':
         if patient.user_id != current_user.user_id:
              raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado: Paciente só pode acessar seus próprios alertas.")
@@ -136,6 +144,7 @@ async def read_alerts_for_patient(
 async def update_alert(
     alert_id: int,
     alert_update: AlertUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required)
 ):
@@ -155,9 +164,9 @@ async def update_alert(
 
     can_access = False
     if current_user.role == 'admin':
-        can_access = True 
+        can_access = True
     elif current_user.role == 'doctor':
-        if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        if is_user_authorized_for_patient(db, current_user, patient_id):
             can_access = True
     elif current_user.role == 'patient':
         if patient.user_id == current_user.user_id:
@@ -178,6 +187,7 @@ async def update_alert(
 
 @router.get("/", response_model=AlertListResponse, tags=["Alerts"])
 async def read_alerts(
+    request: Request,
     status: Optional[str] = Query(None, description="Filter by status: 'read' or 'unread'"),
     patient_id: Optional[int] = Query(None, description="Filter by patient ID (requires access)"),
     skip: int = Query(0, ge=0, description="Pagination skip"),
@@ -287,6 +297,7 @@ def generate_alerts_from_lab_results(
 
 @router.get("/stats", response_model=AlertStats)
 def get_alert_stats(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required)
 ):
@@ -323,6 +334,7 @@ def get_alert_stats(
 @router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_alert(
     alert_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required)
 ):
@@ -359,6 +371,7 @@ def delete_alert(
 @router.get("/summary/{patient_id}")
 async def get_alert_summary(
     patient_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user_required)
 ):
@@ -367,10 +380,28 @@ async def get_alert_summary(
     
     - **patient_id**: ID do paciente
     """
-    # Buscar alertas do paciente
+    # Authorization Check
+    current_user = current_user # Get current user from dependency
     patient = patients_crud.get_patient(db, patient_id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente não encontrado")
+    
+    # Check if user is authorized to access this patient
+    authorized = False
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        if is_user_authorized_for_patient(db, current_user, patient_id):
+            authorized = True
+    elif current_user.role == 'patient':
+        if patient.user_id == current_user.user_id:
+            authorized = True
+            
+    if not authorized:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access alerts for this patient."
+        )
     
     # Verificar se o paciente tem exames
     if not patient.exams or len(patient.exams) == 0:
@@ -449,6 +480,7 @@ async def get_alert_summary(
 @router.get("/history/{patient_id}")
 async def get_alert_history(
     patient_id: str,
+    request: Request,
     days: Optional[int] = Query(30, description="Número de dias para analisar (padrão: 30)"),
     category: Optional[str] = Query(None, description="Filtrar por categoria"),
     db: Session = Depends(get_db),
@@ -462,10 +494,28 @@ async def get_alert_history(
     - **days**: Número de dias do histórico a considerar
     - **category**: Filtrar por categoria específica
     """
-    # Buscar paciente no banco de dados
+    # Authorization Check
+    current_user = current_user # Get current user from dependency
     patient = patients_crud.get_patient(db, patient_id=patient_id)
     if not patient:
         raise HTTPException(status_code=404, detail="Paciente não encontrado")
+    
+    # Check if user is authorized to access this patient
+    authorized = False
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        if is_user_authorized_for_patient(db, current_user, patient_id):
+            authorized = True
+    elif current_user.role == 'patient':
+        if patient.user_id == current_user.user_id:
+            authorized = True
+            
+    if not authorized:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access alerts for this patient."
+        )
     
     # Verificar se o paciente tem exames
     if not patient.exams or len(patient.exams) == 0:
@@ -557,4 +607,4 @@ async def get_alert_history(
         "history": history,
         "days_analyzed": days,
         "patient_id": str(patient_id)
-    } 
+    }

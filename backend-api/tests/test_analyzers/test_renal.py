@@ -14,33 +14,45 @@ if os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 from analyzers.renal import analisar_funcao_renal
 
 def test_renal_analyzer_empty_data():
-    """Test that the analyzer returns an empty list when no relevant data is provided."""
+    """Test that the analyzer returns expected dictionary structure when no relevant data is provided."""
     # Empty data
     result = analisar_funcao_renal({})
-    assert result == []
+    assert isinstance(result, dict)
+    assert 'interpretation' in result
+    assert 'abnormalities' in result
+    assert 'is_critical' in result
+    assert 'recommendations' in result
+    assert 'details' in result
+    assert 'insuficientes' in result['interpretation'].lower() or 'insufficient' in result['interpretation'].lower()
     
     # Irrelevant data only
     result = analisar_funcao_renal({"Na+": 140, "K+": 4.5})
-    assert result == []
+    assert isinstance(result, dict)
+    assert 'aparentemente normal' in result['interpretation'].lower() or 'insuficientes' in result['interpretation'].lower()
 
 def test_renal_analyzer_normal_creatinine():
     """Test that normal creatinine values are correctly interpreted."""
     # Normal creatinine (reference range typically 0.7-1.2 mg/dL for men)
     result = analisar_funcao_renal({"Creat": 0.9})
     
-    assert len(result) > 0
-    assert any("normal" in r.lower() for r in result)
-    assert any("0.9" in r for r in result)
+    assert isinstance(result, dict)
+    assert len(result['interpretation']) > 0
+    assert result['is_critical'] is False
+    assert "normal" in result['interpretation'].lower()
+    assert "0.9" in result['interpretation'] or "0.9" in str(result['details'])
 
 def test_renal_analyzer_elevated_creatinine():
     """Test that elevated creatinine values are correctly interpreted."""
     # Elevated creatinine
     result = analisar_funcao_renal({"Creat": 2.5})
     
-    assert len(result) > 0
-    assert any("elevada" in r.lower() for r in result)
-    assert any("2.5" in r for r in result)
-    assert any("moderada" in r.lower() for r in result)
+    assert isinstance(result, dict)
+    assert len(result['interpretation']) > 0
+    assert len(result['abnormalities']) > 0  # Should be abnormal
+    assert "2.5" in result['interpretation'] or "2.5" in str(result['details'])
+    assert "creatinina elevada" in result['interpretation'].lower()
+    assert len(result['recommendations']) > 0  # Should have recommendations
+    assert "moderada" in result['interpretation'].lower() or "disfun" in result['interpretation'].lower()
 
 def test_renal_analyzer_critical_creatinine():
     """Test that critically elevated creatinine values are identified."""

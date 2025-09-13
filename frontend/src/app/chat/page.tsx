@@ -8,12 +8,14 @@ import { usePatientStore } from '@/store/patientStore'; // Keep for patient cont
 import ConversationItem from '@/components/chat/ConversationItem'; // Keep for sidebar
 import ChatMessage from '@/components/chat/ChatMessage'; // Keep for rendering messages
 import PatientSelect from '@/components/chat/PatientSelect'; // Keep for patient context selection
-import { useChat, Message } from 'ai/react'; // Changed CoreMessage to Message
+import { MVPAgentIntegration } from '@/components/chat/MVPAgentIntegration'; // MVP Agents integration
+import { useChat, UIMessage as Message } from '@ai-sdk/react'; // Changed CoreMessage to Message
 import { useAuth } from "@clerk/nextjs";
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { Input } from "@/components/ui/Input"
 import { Button } from "@/components/ui/Button"
 import { ScrollArea } from "@/components/ui/ScrollArea"
-import { SendHorizonal, Loader2, AlertCircle, Trash2 } from 'lucide-react'; // Import icons and Trash2
+import { SendHorizonal, Loader2, AlertCircle, Trash2, Home, Stethoscope, GraduationCap } from 'lucide-react'; // Import icons and Trash2
 import {
     AlertDialog,
     AlertDialogAction,
@@ -70,21 +72,18 @@ export default function ChatPage() {
   const [selectedPatientIdForChat, setSelectedPatientIdForChat] = useState<string | null>(null);
   const { patients } = usePatientStore(); // Get patient list for selector
 
+  // --- MVP Agents State ---
+  const [mvpAgentsEnabled, setMvpAgentsEnabled] = useState<boolean>(false);
+
   // --- AI SDK useChat Hook --- 
   const { 
     messages,
-    input,
-    handleInputChange,
-    handleSubmit: originalHandleSubmit, // Rename original handleSubmit
-    isLoading: isAiLoading, // Rename isLoading from useChat
-    error: aiError, // Rename error from useChat
+    sendMessage,
+    status,
+    error: aiError,
     setMessages,
-    reload,
     stop,
   } = useChat({
-    api: '/api/chat',
-    // Remove body from here, will be added in custom submit handler
-    // initialMessages: [], // Start with empty messages initially
     onFinish(message) {
       console.log('Finished receiving message:', message);
       // Optional: Re-fetch conversation list if title might have changed?
@@ -94,6 +93,19 @@ export default function ChatPage() {
       // Display AI error separately or integrate with other errors
     }
   });
+
+  const [input, setInput] = useState('');
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim() && status === 'ready') {
+      sendMessage({ text: input });
+      setInput('');
+    }
+  };
 
   // --- Fetch Conversations Effect ---
   useEffect(() => {
@@ -141,8 +153,8 @@ export default function ChatPage() {
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
         .map(msg => ({
           id: msg.id,
-          role: msg.role === 'tool' ? 'data' : msg.role, 
-          content: msg.content,
+          role: msg.role === 'tool' ? 'assistant' : msg.role, 
+          parts: [{ type: 'text', text: msg.content }],
           createdAt: new Date(msg.createdAt) // Add createdAt as Date object
         }));
 
@@ -192,9 +204,18 @@ export default function ChatPage() {
     console.log("Submitting message to conversation:", selectedConversationId);
     
     // Pass patient ID in the data field
-    originalHandleSubmit(e, {
-         data: { patientId: selectedPatientIdForChat } // Pass selectedPatientId here
+    sendMessage({ 
+      role: 'user',
+      parts: [{ type: 'text', text: input }]
+    }, {
+        body: {
+            data: { patientId: selectedPatientIdForChat },
+            conversationId: selectedConversationId,
+        }
     });
+    
+    // Clear the input
+    setInput('');
     
     // Optional: Manually add user message to UI state immediately for better UX
     // (useChat might handle this automatically depending on configuration)
@@ -261,7 +282,58 @@ export default function ChatPage() {
   };
   
   return (
-    <div className="flex h-[calc(100vh-theme(space.16))] overflow-hidden"> {/* Adjusted height */}
+    <>
+      {/* Navigation Header */}
+      <header className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 text-white shadow-lg">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-6">
+              <h1 className="text-xl font-bold">Clinical Corvus</h1>
+              <nav className="hidden md:flex space-x-4">
+                <a href="/" className="flex items-center space-x-1 hover:text-blue-200 transition-colors">
+                  <Home className="h-4 w-4" />
+                  <span>Início</span>
+                </a>
+                <a href="/analysis" className="flex items-center space-x-1 hover:text-blue-200 transition-colors">
+                  <Stethoscope className="h-4 w-4" />
+                  <span>Análise</span>
+                </a>
+                <a href="/academy" className="flex items-center space-x-1 hover:text-blue-200 transition-colors">
+                  <GraduationCap className="h-4 w-4" />
+                  <span>Academia</span>
+                </a>
+              </nav>
+            </div>
+            <div className="flex items-center space-x-4">
+              <SignedOut>
+                <div className="flex items-center space-x-2">
+                  <SignInButton mode="modal">
+                    <button className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors">
+                      Entrar
+                    </button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <button className="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors">
+                      Cadastrar
+                    </button>
+                  </SignUpButton>
+                </div>
+              </SignedOut>
+              <SignedIn>
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "h-8 w-8"
+                    }
+                  }}
+                />
+              </SignedIn>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex h-[calc(100vh-theme(space.16)-theme(space.16))] overflow-hidden"> {/* Adjusted height for header */}
       {/* Conversation Sidebar */}
       <div className="w-1/4 border-r border-border bg-background p-4 hidden lg:flex flex-col">
         <div className="flex justify-between items-center mb-4">
@@ -331,7 +403,7 @@ export default function ChatPage() {
             {aiError && !errorLoadingMessages && ( // Show AI error only if not masked by message loading error
                 <div className="p-4 border-b border-destructive bg-destructive/10 text-destructive text-sm flex items-center">
                     <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0"/> Erro na IA: {aiError.message}
-                    <Button variant="ghost" size="sm" onClick={() => reload()} className="ml-auto">Tentar Novamente</Button>
+                    <Button variant="ghost" size="sm" onClick={() => window.location.reload()} className="ml-auto">Tentar Novamente</Button>
                 </div>
             )}
             
@@ -343,20 +415,20 @@ export default function ChatPage() {
                     <ChatMessage key={m.id} message={m} />
                 ))}
                 {/* Show AI loading indicator */}
-                {isAiLoading && (
+                {status === 'streaming' && (
                   <ChatMessage 
                     key="loading" 
                     message={{ 
                       id: 'ai-loading', 
                       role: 'assistant', 
-                      content: '...' 
+                      parts: [{ type: 'text', text: '...' }]
                       // timestamp: Date.now() // Removed timestamp
                     }} 
                   />
                 )}
             </div>
               {/* Show placeholder only if no messages and not loading */}
-              {!isLoadingMessages && messages.length === 0 && !isAiLoading && (
+              {!isLoadingMessages && messages.length === 0 && status !== 'streaming' && (
                  <div className="flex-grow flex items-center justify-center text-muted-foreground">
                      Envie uma mensagem para começar.
                  </div>
@@ -375,17 +447,17 @@ export default function ChatPage() {
                       : "Selecione uma conversa"
                   }
                   className="pr-12"
-                  disabled={!selectedConversationId || isLoadingMessages || isAiLoading} // Disable if no convo or loading
+                  disabled={!selectedConversationId || isLoadingMessages || status === 'streaming'} // Disable if no convo or loading
                 data-testid="message-input"
               />
               <Button 
                 type="submit"
                   size="icon"
                   className="absolute right-2 top-1/2 -translate-y-1/2"
-                  disabled={!selectedConversationId || isLoadingMessages || isAiLoading || !input.trim()} // More comprehensive disable check
+                  disabled={!selectedConversationId || isLoadingMessages || status === 'streaming' || !input.trim()} // More comprehensive disable check
                 data-testid="send-message-button"
               >
-                  {isAiLoading ? (
+                  {status === 'streaming' ? (
                      <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                   <SendHorizonal className="h-4 w-4" />
@@ -397,7 +469,7 @@ export default function ChatPage() {
         )}
       </div>
       
-      {/* Patient Context Sidebar */} 
+      {/* Patient Context Sidebar */}
       <div className="w-1/4 border-l border-border bg-background p-4 hidden xl:flex flex-col">
         <h3 className="text-lg font-semibold mb-4">Contexto do Paciente</h3>
         {selectedPatientIdForChat && (
@@ -405,6 +477,14 @@ export default function ChatPage() {
                 Contexto: {patients.find(p => String(p.patient_id) === selectedPatientIdForChat)?.name || 'N/A'} {/* Use patient_id and compare as strings */}
             </div>
         )}
+
+        {/* MVP Agents Integration */}
+        <div className="mt-6">
+          <MVPAgentIntegration
+            patientId={selectedPatientIdForChat || undefined}
+            conversationId={selectedConversationId || undefined}
+          />
+        </div>
       </div>
 
       {/* Delete Confirmation Dialog */}
@@ -431,6 +511,7 @@ export default function ChatPage() {
             </AlertDialogContent>
         </AlertDialog>
 
-    </div>
+      </div>
+    </>
   );
-} 
+}

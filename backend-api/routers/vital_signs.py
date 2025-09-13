@@ -9,6 +9,7 @@ from crud import crud_vital_sign
 from database import get_db
 from security import get_current_user_required
 from crud import patients as crud_patients
+from utils.group_authorization import is_user_authorized_for_patient
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +32,9 @@ async def check_patient_access(
     if patient_profile and patient_profile.patient_id == patient_id:
         return True
         
-    # Check if user is a managing doctor for the patient
+    # Check if user is a managing doctor for the patient (direct or through groups)
     if current_user.role == "doctor":
-        from crud.associations import is_doctor_assigned_to_patient
-        if await is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        if is_user_authorized_for_patient(db, current_user, patient_id):
             return True
 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to access this patient's data")

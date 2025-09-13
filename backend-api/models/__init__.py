@@ -21,6 +21,9 @@ from database.models import (
     # Users & Patients
     User,
     Patient,
+    Group,
+    GroupMembership,
+    GroupPatient,
     
     # Laboratory related models
     TestCategory,
@@ -42,7 +45,7 @@ from database.models import (
 
 # All models are now available by importing from models package
 __all__ = [
-    'User', 'Patient', 
+    'User', 'Patient', 'Group', 'GroupMembership', 'GroupPatient',
     'TestCategory', 'LabResult', 'LabInterpretation',
     'Medication', 'MedicationStatus', 'MedicationRoute', 
     'ClinicalScore', 'ClinicalNote', 'NoteType',

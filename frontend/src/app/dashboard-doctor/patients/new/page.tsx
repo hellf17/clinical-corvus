@@ -14,8 +14,10 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Patient, PatientCreate, EmergencyContact } from "@/types/patient"; // Import types
-import { createPatientClient } from "@/services/patientService.client"; // TODO: Implement createPatient in service
+import { createPatientWithGroupAssignment } from "@/services/patientService.client"; // TODO: Implement createPatient in service
 import { useAuth } from "@clerk/nextjs"; // Import client-side auth hook
+import { listGroups, assignPatientToGroup } from "@/services/groupService"; // Import group service
+import { Group } from "@/types/group"; // Import group types
 import {
   Form,
   FormControl,
@@ -37,25 +39,12 @@ const emergencyContactSchema = z.object({
 
 const patientFormSchema = z.object({
   name: z.string().min(1, { message: "Nome completo é obrigatório." }),
-  email: z.string().email({ message: "Email inválido." }).min(1, { message: "Email é obrigatório." }),
   birthDate: z.string().min(1, { message: "Data de nascimento é obrigatória." })
      .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Use o formato AAAA-MM-DD." }),
   gender: z.enum(['male', 'female', 'other'], { required_error: "Gênero é obrigatório." }),
-  phone: z.string()
-    .min(1, { message: "Telefone é obrigatório." })
-    .regex(/^\d{10,11}$/, { message: "Telefone deve ter 10 ou 11 dígitos." }), // Basic digit check
-  documentNumber: z.string()
-    .min(1, { message: "Documento (CPF/RG) é obrigatório." })
-    .regex(/^\d{7,11}$/, { message: "CPF/RG deve ter entre 7 e 11 dígitos." }), // Basic digit check (CPF or RG)
-  patientNumber: z.string().min(1, { message: "Número do paciente (prontuário) é obrigatório." }),
-  address: z.string().min(1, { message: "Logradouro é obrigatório." }),
-  city: z.string().min(1, { message: "Cidade é obrigatória." }),
-  state: z.string().min(1, { message: "Estado é obrigatório." }),
-  zipCode: z.string()
-    .min(1, { message: "CEP é obrigatório." })
-    .regex(/^\d{5}-?\d{3}$/, { message: "CEP inválido (use XXXXX-XXX ou XXXXXXXX)." }), // Basic CEP format
-  insuranceProvider: z.string().optional(),
-  insuranceNumber: z.string().optional(),
+  ethnicity: z.string().optional(),
+  diseaseHistory: z.string().optional(),
+  familyDiseaseHistory: z.string().optional(),
   emergencyContact: emergencyContactSchema
 });
 
@@ -64,24 +53,40 @@ type PatientFormData = z.infer<typeof patientFormSchema>;
 export default function NewPatientPage() {
     const router = useRouter();
     const { getToken } = useAuth(); // Get client-side token function
+    const [groups, setGroups] = React.useState<Group[]>([]);
+    const [selectedGroupId, setSelectedGroupId] = React.useState<number | null>(null);
+    const [groupsLoading, setGroupsLoading] = React.useState(true);
+    const [groupsError, setGroupsError] = React.useState<string | null>(null);
+    
+    // Fetch groups for selection
+    React.useEffect(() => {
+        const fetchGroups = async () => {
+            try {
+                setGroupsLoading(true);
+                setGroupsError(null);
+                const response = await listGroups();
+                setGroups(response.items);
+            } catch (err: any) {
+                console.error("Error fetching groups:", err);
+                setGroupsError(err.message || "Falha ao buscar grupos.");
+            } finally {
+                setGroupsLoading(false);
+            }
+        };
+        
+        fetchGroups();
+    }, []);
     
     // Initialize react-hook-form
     const form = useForm<PatientFormData>({
         resolver: zodResolver(patientFormSchema),
         defaultValues: {
             name: '',
-            email: '',
-            birthDate: '', 
+            birthDate: '',
             gender: undefined, // Default to undefined for Select placeholder
-            phone: '',
-            documentNumber: '',
-            patientNumber: '',
-            address: '',
-            city: '',
-            state: '',
-            zipCode: '',
-            insuranceProvider: '',
-            insuranceNumber: '',
+            ethnicity: '',
+            diseaseHistory: '',
+            familyDiseaseHistory: '',
             emergencyContact: {
                 name: '',
                 relationship: '',
@@ -104,23 +109,25 @@ export default function NewPatientPage() {
         const patientData: PatientCreate = {
             ...data,
             gender: data.gender, // Already correct type from enum
-            // Ensure optional fields are undefined if empty string (or handle in backend)
-            insuranceProvider: data.insuranceProvider || undefined,
-            insuranceNumber: data.insuranceNumber || undefined,
+            ethnicity: data.ethnicity || undefined,
+            diseaseHistory: data.diseaseHistory || undefined,
+            familyDiseaseHistory: data.familyDiseaseHistory || undefined,
+            group_id: selectedGroupId || undefined, // Add group assignment to patient data
         };
 
         try {
-            // Pass the token to the service function
-            const newPatient: Patient = await createPatientClient(patientData, token);
+            // Pass the token and group ID to the service function
+            const newPatient: Patient = await createPatientWithGroupAssignment(patientData, selectedGroupId || undefined);
             toast.success(`Paciente "${newPatient.name}" criado com sucesso!`);
+            
             // Use the patient_id from the response for navigation
             // Ensure backend returns consistent ID field (patient_id or id)
-            router.push(`/patients/${newPatient.patient_id}`); // Use patient_id assuming it exists
+            router.push(`/dashboard-doctor/patients/${newPatient.patient_id}/overview`); // Use patient_id assuming it exists
         } catch (error: any) {
             console.error("Failed to create patient:", error);
             // Display the detailed error message from the service function
             toast.error("Falha ao Criar Paciente", { description: error.message || 'Erro desconhecido ao salvar paciente.' });
-        } 
+        }
         // No need for manual setIsSubmitting(false), react-hook-form handles it
         }
 
@@ -152,21 +159,6 @@ export default function NewPatientPage() {
                                 />
                                 <FormField
                                     control={form.control}
-                                    name="email"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Email</FormLabel>
-                                            <FormControl>
-                                                <Input type="email" placeholder="email@example.com" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
                                     name="birthDate"
                                     render={({ field }) => (
                                         <FormItem>
@@ -178,164 +170,107 @@ export default function NewPatientPage() {
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                  control={form.control}
-                                  name="gender"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Gênero</FormLabel>
-                                      <Select 
-                                        onValueChange={field.onChange} 
-                                        defaultValue={field.value} 
-                                        disabled={formState.isSubmitting}
-                                      >
-                                        <FormControl>
-                                          <SelectTrigger>
-                                        <SelectValue placeholder="Selecione..." />
-                                    </SelectTrigger>
-                                        </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="male">Masculino</SelectItem>
-                                        <SelectItem value="female">Feminino</SelectItem>
-                                        <SelectItem value="other">Outro</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FormField
+                                  <FormField
                                     control={form.control}
-                                    name="phone"
+                                    name="gender"
                                     render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Telefone</FormLabel>
-                                            <FormControl>
-                                                <Input type="tel" placeholder="(XX) XXXXX-XXXX" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="documentNumber"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Documento (CPF/RG)</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Número do Documento" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="patientNumber"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Número do Paciente (Prontuário)</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Número Interno" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                            
-                            {/* Address Section */}
-                            <h3 className="text-lg font-semibold border-b pb-2 mt-6 mb-4">Endereço</h3>
-                            <FormField
-                                control={form.control}
-                                name="address"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Logradouro</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder="Rua, Avenida, etc." {...field} disabled={formState.isSubmitting} />
-                                        </FormControl>
+                                      <FormItem>
+                                        <FormLabel>Gênero</FormLabel>
+                                        <Select
+                                          onValueChange={field.onChange}
+                                          defaultValue={field.value}
+                                          disabled={formState.isSubmitting}
+                                        >
+                                          <FormControl>
+                                            <SelectTrigger>
+                                          <SelectValue placeholder="Selecione..." />
+                                      </SelectTrigger>
+                                          </FormControl>
+                                      <SelectContent>
+                                          <SelectItem value="male">Masculino</SelectItem>
+                                          <SelectItem value="female">Feminino</SelectItem>
+                                          <SelectItem value="other">Outro</SelectItem>
+                                      </SelectContent>
+                                  </Select>
                                         <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="city"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Cidade</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Cidade" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
+                                      </FormItem>
                                     )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="state"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Estado</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="UF" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="zipCode"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>CEP</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="XXXXX-XXX" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            {/* Insurance Section */}
-                            <h3 className="text-lg font-semibold border-b pb-2 mt-6 mb-4">Convênio (Opcional)</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <FormField
-                                    control={form.control}
-                                    name="insuranceProvider"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Nome do Convênio</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Nome da Seguradora" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name="insuranceNumber"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Número da Carteirinha</FormLabel>
-                                            <FormControl>
-                                                <Input placeholder="Número do Plano" {...field} disabled={formState.isSubmitting} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
+                                  />
+                              </div>
+  
+                              {/* New fields for medical reasons */}
+                              <FormField
+                                  control={form.control}
+                                  name="ethnicity"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel>Etnia (Opcional)</FormLabel>
+                                          <FormControl>
+                                              <Input placeholder="Ex: Caucasiana, Afrodescendente, Asiática, etc." {...field} disabled={formState.isSubmitting} />
+                                          </FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="diseaseHistory"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel>Histórico de Doenças (Opcional)</FormLabel>
+                                          <FormControl>
+                                              <Textarea placeholder="Doenças pré-existentes, cirurgias, internações, etc." {...field} disabled={formState.isSubmitting} rows={4} />
+                                          </FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              <FormField
+                                  control={form.control}
+                                  name="familyDiseaseHistory"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel>Histórico Familiar de Doenças (Opcional)</FormLabel>
+                                          <FormControl>
+                                              <Textarea placeholder="Doenças relevantes na família (pais, avós, irmãos, etc.)" {...field} disabled={formState.isSubmitting} rows={4} />
+                                          </FormControl>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
+                              
+                              {/* Group Assignment - Moved up */}
+                              <h3 className="text-lg font-semibold border-b pb-2 mt-6 mb-4">Atribuição de Grupo (Opcional)</h3>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div className="space-y-2">
+                                      <Label htmlFor="group">Grupo (Opcional)</Label>
+                                      {groupsLoading ? (
+                                          <div className="flex items-center text-sm text-muted-foreground">
+                                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                              Carregando grupos...
+                                          </div>
+                                      ) : groupsError ? (
+                                          <div className="text-sm text-destructive">{groupsError}</div>
+                                      ) : (
+                                          <Select
+                                              value={selectedGroupId?.toString() || ''}
+                                              onValueChange={(value) => setSelectedGroupId(value ? parseInt(value) : null)}
+                                          >
+                                              <SelectTrigger>
+                                                  <SelectValue placeholder="Selecione um grupo" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                  <SelectItem value="">Nenhum grupo</SelectItem>
+                                                  {groups.map((group) => (
+                                                      <SelectItem key={group.id} value={group.id.toString()}>
+                                                          {group.name}
+                                                      </SelectItem>
+                                                  ))}
+                                              </SelectContent>
+                                          </Select>
+                                      )}
+                                  </div>
+                              </div>
 
                             {/* Emergency Contact Section */}
                             <h3 className="text-lg font-semibold border-b pb-2 mt-6 mb-4">Contato de Emergência</h3>

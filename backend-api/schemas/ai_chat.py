@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, Field, UUID4, field_validator
+from pydantic import BaseModel, Field, UUID4, field_validator, ConfigDict
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from uuid import UUID
@@ -54,7 +54,7 @@ class AIChatMessage(AIChatMessageBase):
                 return {}
         return v
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class AIChatConversationBase(BaseModel):
     title: str
@@ -117,7 +117,7 @@ class AIChatConversation(AIChatConversationBase):
                 return {}
         return v
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class AIChatConversationSummary(BaseModel):
     id: UUID4
@@ -148,7 +148,7 @@ class AIChatConversationSummary(BaseModel):
                 return {}
         return v
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class AIChatConversationList(BaseModel):
     conversations: List[AIChatConversationSummary]
@@ -190,4 +190,18 @@ class SendMessageResponse(BaseModel):
     message_id: Optional[str] = None
     assistant_message: str
     response: Optional[str] = None
-    web_results: Optional[List[Dict[str, Any]]] = None 
+    web_results: Optional[List[Dict[str, Any]]] = None
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class QuickChatRequest(BaseModel):
+    history: List[ChatMessage]
+    patient_id: Optional[int] = None
+
+
+class QuickChatResponse(BaseModel):
+    response: str
+    citations: Optional[List[str]] = None

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from '@clerk/nextjs';
+import { useAuth, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/nextjs';
+import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import DOMPurify from 'isomorphic-dompurify';
 import MultiAnalysisResult from '@/components/analysis/MultiAnalysisResult';
 import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/Alert';
-import { AlertTriangle, UploadCloud, FileText, Trash2, CheckCircle, RefreshCw, UserPlus, Info, History, BookOpen, Copy, Sparkles, Brain, Bird, Eye, EyeOff, FileDown, FlaskConical, HelpCircle, Lightbulb, Loader2, XCircle } from 'lucide-react';
+import { AlertTriangle, UploadCloud, FileText, Trash2, CheckCircle, RefreshCw, UserPlus, Info, History, BookOpen, Copy, Sparkles, Brain, Bird, Eye, EyeOff, FileDown, FlaskConical, HelpCircle, Lightbulb, Loader2, XCircle, Home } from 'lucide-react';
 import { Switch } from "@/components/ui/Switch";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/Input";
@@ -101,92 +103,153 @@ const EXAM_CATEGORIES: Record<string, {title: string, tests: string[]}> = {
   pancreatic: {
     title: "Função Pancreática",
     tests: ["Amilase", "Lipase"]
+  },
+  thyroid: {
+    title: "Função Tireoidiana",
+    tests: ["TSH", "T4 Livre", "T3 Livre", "Anti-TPO", "Anti-TG", "TRAb"]
+  },
+  boneMetabolism: {
+    title: "Metabolismo Ósseo",
+    tests: ["Cálcio", "Fósforo", "PTH", "Vitamina D", "Fosfatase Alcalina", "Cálcio Iônico", "Albumina"]
+  },
+  tumorMarkers: {
+    title: "Marcadores Tumorais",
+    tests: ["PSA", "CA 125", "CEA", "AFP", "CA 19-9", "Beta-HCG", "LDH"]
+  },
+  autoimmune: {
+    title: "Marcadores Autoimunes",
+    tests: ["ANA", "Anti-dsDNA", "Anti-Sm", "Anti-RNP", "Anti-SSA", "Anti-SSB", "ANCA", "C3", "C4", "Fator Reumatoide", "Anti-CCP"]
+  },
+  infectiousDisease: {
+    title: "Doenças Infecciosas",
+    tests: ["HIV", "HBsAg", "Anti-HBs", "Anti-HBc", "HCV", "Syphilis", "EBV", "CMV", "Toxoplasma"]
+  },
+  hormones: {
+    title: "Hormônios",
+    tests: ["Cortisol AM", "Cortisol PM", "Prolactina", "Testosterona", "Estradiol", "Progesterona", "LH", "FSH", "DHEA-S"]
+  },
+  drugMonitoring: {
+    title: "Monitoramento de Medicamentos",
+    tests: ["Digoxina", "Fenitoína", "Carbamazepina", "Ácido Valproico", "Lítio", "Gentamicina", "Vancomicina", "Teofilina"]
   }
 };
 
-// Frontend reference ranges with Portuguese unit names
+// Frontend reference ranges with Portuguese unit names - DEPRECATED
+// This is now handled by the backend, but kept for now for the unit list.
 const FRONTEND_REFERENCE_RANGES: Record<string, { unit: string; low?: number; high?: number; isMicrobiology?: boolean }> = {
-  // Hematology
-  "Hemoglobina": { unit: "g/dL", low: 12, high: 16 },
-  "Leucócitos": { unit: "/mm³", low: 4000, high: 10000 },
-  "Plaquetas": { unit: "/mm³", low: 150000, high: 450000 },
-  "Hematócrito": { unit: "%", low: 36, high: 46 },
+  // This is now a unit mapping, not for reference ranges
+  "Hemoglobina": { unit: "g/dL" },
+  "Leucócitos": { unit: "/mm³" },
+  "Plaquetas": { unit: "/mm³" },
+  "Hematócrito": { unit: "%" },
   "Eritrócitos": { unit: "milhões/mm³" },
   "VCM": { unit: "fL" },
   "HCM": { unit: "pg" },
   "CHCM": { unit: "g/dL" },
   "RDW": { unit: "%" },
   "Hemácias": { unit: "/µL" },
-
-  // Renal
-  "Creatinina": { unit: "mg/dL", low: 0.6, high: 1.2 },
-  "Ureia": { unit: "mg/dL", low: 10, high: 50 },
+  "Creatinina": { unit: "mg/dL" },
+  "Ureia": { unit: "mg/dL" },
   "TFG": { unit: "mL/min/1.73m²" },
-  "Ácido Úrico": { unit: "mg/dL", low: 3.5, high: 7.2 },
+  "Ácido Úrico": { unit: "mg/dL" },
   "Microalbuminúria": { unit: "mg/L" },
-
-  // Hepatic
   "TGO": { unit: "U/L" },
   "TGP": { unit: "U/L" },
   "GGT": { unit: "U/L" },
   "Fosfatase Alcalina": { unit: "U/L" },
   "Bilirrubina": { unit: "mg/dL" },
-  "Albumina": { unit: "g/dL", low: 3.5, high: 5.2 },
+  "Albumina": { unit: "g/dL" },
   "Proteínas Totais": { unit: "g/dL" },
-
-  // Electrolytes
-  "Sódio": { unit: "mmol/L", low: 135, high: 145 },
-  "Potássio": { unit: "mmol/L", low: 3.5, high: 5.0 },
+  "Sódio": { unit: "mmol/L" },
+  "Potássio": { unit: "mmol/L" },
   "Cloro": { unit: "mmol/L" },
-  "Cálcio": { unit: "mg/dL", low: 8.5, high: 10.5 },
-  "Magnésio": { unit: "mg/dL", low: 1.5, high: 2.5 },
-  "Fósforo": { unit: "mg/dL", low: 2.5, high: 4.5 },
-
-  // Blood Gas
-  "pH": { unit: "", low: 7.35, high: 7.45 },
-  "pCO2": { unit: "mmHg", low: 35, high: 45 },
-  "pO2": { unit: "mmHg", low: 80, high: 100 },
-  "HCO3": { unit: "mmol/L", low: 22, high: 26 },
-  "BE": { unit: "mmol/L", low: -3, high: 3 },
-  "Lactato": { unit: "mg/dL", low: 4.5, high: 19.8 },
-  "SatO2": { unit: "%", low: 95, high: 100 },
+  "Cálcio": { unit: "mg/dL" },
+  "Magnésio": { unit: "mg/dL" },
+  "Fósforo": { unit: "mg/dL" },
+  "pH": { unit: "" },
+  "pCO2": { unit: "mmHg" },
+  "pO2": { unit: "mmHg" },
+  "HCO3": { unit: "mmol/L" },
+  "BE": { unit: "mmol/L" },
+  "Lactato": { unit: "mg/dL" },
+  "SatO2": { unit: "%" },
   "FiO2": { unit: "%" },
-
-  // Cardiac Markers
   "Troponina": { unit: "ng/mL" },
-  "CK": { unit: "U/L", low: 26, high: 192 },
+  "CK": { unit: "U/L" },
   "CK-MB": { unit: "U/L" },
   "BNP": { unit: "pg/mL" },
   "NT-proBNP": { unit: "pg/mL" },
-  "LDH": { unit: "U/L", low: 140, high: 280 },
-
-  // Metabolic
-  "Glicose": { unit: "mg/dL", low: 70, high: 100 },
-  "HbA1c": { unit: "%", low: 4.0, high: 5.7 },
+  "LDH": { unit: "U/L" },
+  "Glicose": { unit: "mg/dL" },
+  "HbA1c": { unit: "%" },
   "Triglicérides": { unit: "mg/dL" },
   "Colesterol Total": { unit: "mg/dL" },
   "HDL": { unit: "mg/dL" },
   "LDL": { unit: "mg/dL" },
-  "TSH": { unit: "µUI/mL", low: 0.4, high: 4.0 },
-  "T4 Livre": { unit: "ng/dL", low: 0.7, high: 1.8 },
-
-  // Inflammatory Markers
-  "PCR": { unit: "mg/dL", low: 0, high: 0.5 },
+  "PCR": { unit: "mg/dL" },
   "Procalcitonina": { unit: "ng/mL" },
   "VHS": { unit: "mm/h" },
   "Ferritina": { unit: "ng/mL" },
   "Fibrinogênio": { unit: "mg/dL" },
   "D-dímero": { unit: "ng/mL FEU" },
-
-  // Pancreatic
-  "Amilase": { unit: "U/L", low: 28, high: 100 },
+  "Amilase": { unit: "U/L" },
   "Lipase": { unit: "U/L" },
-
-  // Microbiology tests
   "Hemocultura": { unit: "", isMicrobiology: true },
   "Urocultura": { unit: "", isMicrobiology: true },
   "Cultura de Escarro": { unit: "", isMicrobiology: true },
-  "Cultura de Secreção": { unit: "", isMicrobiology: true }
+  "Cultura de Secreção": { unit: "", isMicrobiology: true },
+  "TSH": { unit: "µUI/mL" },
+  "T4 Livre": { unit: "ng/dL" },
+  "T3 Livre": { unit: "pg/mL" },
+  "Anti-TPO": { unit: "IU/mL" },
+  "Anti-TG": { unit: "IU/mL" },
+  "TRAb": { unit: "IU/L" },
+  "PTH": { unit: "pg/mL" },
+  "Vitamina D": { unit: "ng/mL" },
+  "Cálcio Iônico": { unit: "mg/dL" },
+  "PSA": { unit: "ng/mL" },
+  "CA 125": { unit: "U/mL" },
+  "CEA": { unit: "ng/mL" },
+  "AFP": { unit: "ng/mL" },
+  "CA 19-9": { unit: "U/mL" },
+  "Beta-HCG": { unit: "mIU/mL" },
+  "ANA": { unit: "U/mL" },
+  "Anti-dsDNA": { unit: "IU/mL" },
+  "Anti-Sm": { unit: "Index" },
+  "Anti-RNP": { unit: "Index" },
+  "Anti-SSA": { unit: "Index" },
+  "Anti-SSB": { unit: "Index" },
+  "ANCA": { unit: "AU/mL" },
+  "C3": { unit: "mg/dL" },
+  "C4": { unit: "mg/dL" },
+  "Fator Reumatoide": { unit: "UI/mL" },
+  "Anti-CCP": { unit: "U/mL" },
+  "HIV": { unit: "Index" },
+  "HBsAg": { unit: "Index" },
+  "Anti-HBs": { unit: "mIU/mL" },
+  "Anti-HBc": { unit: "Index" },
+  "HCV": { unit: "Index" },
+  "Syphilis": { unit: "Index" },
+  "EBV": { unit: "Index" },
+  "CMV": { unit: "Index" },
+  "Toxoplasma": { unit: "Index" },
+  "Cortisol AM": { unit: "µg/dL" },
+  "Cortisol PM": { unit: "µg/dL" },
+  "Prolactina": { unit: "ng/mL" },
+  "Testosterona": { unit: "ng/dL" },
+  "Estradiol": { unit: "pg/mL" },
+  "Progesterona": { unit: "ng/mL" },
+  "LH": { unit: "mIU/mL" },
+  "FSH": { unit: "mIU/mL" },
+  "DHEA-S": { unit: "µg/dL" },
+  "Digoxina": { unit: "ng/mL" },
+  "Fenitoína": { unit: "µg/mL" },
+  "Carbamazepina": { unit: "µg/mL" },
+  "Ácido Valproico": { unit: "µg/mL" },
+  "Lítio": { unit: "mEq/L" },
+  "Gentamicina": { unit: "µg/mL" },
+  "Vancomicina": { unit: "µg/mL" },
+  "Teofilina": { unit: "µg/mL" },
 };
 
 // Create ordered categories for manual input display
@@ -235,16 +298,9 @@ interface LabAnalysisInputForLLM {
 
 // Lab insights output interface
 interface LabInsightsOutputFromLLM {
-  patient_friendly_summary?: string;
-  potential_health_implications_patient?: string[];
-  lifestyle_tips_patient?: string[];
-  questions_to_ask_doctor_patient?: string[];
-  key_abnormalities_professional?: string[];
-  potential_patterns_and_correlations?: string[];
-  differential_considerations_professional?: string[];
-  suggested_next_steps_professional?: string[];
-  important_results_to_discuss_with_doctor?: string[];
   professional_detailed_reasoning_cot?: string;
+  clinical_summary?: string;
+  important_results_to_discuss_with_doctor?: string[];
 }
 
 // Loading Component
@@ -379,16 +435,16 @@ export default function AnalysisPage() {
       const initialData: ManualTestEntry[] = [];
       orderedManualCategories.forEach(category => {
         category.tests.forEach(testName => {
-          const refRange = FRONTEND_REFERENCE_RANGES[testName] || { unit: 'N/A', isMicrobiology: false };
+          const unitInfo = FRONTEND_REFERENCE_RANGES[testName] || { unit: 'N/A', isMicrobiology: false };
           initialData.push({
             id: `${category.key}-${testName}`,
             categoryKey: category.key,
             categoryTitle: category.title,
             testName: testName,
             value: '',
-            unit: refRange.isMicrobiology ? '' : refRange.unit,
-            refLow: refRange.isMicrobiology || refRange.low === undefined ? '' : String(refRange.low),
-            refHigh: refRange.isMicrobiology || refRange.high === undefined ? '' : String(refRange.high),
+            unit: unitInfo.isMicrobiology ? '' : unitInfo.unit,
+            refLow: '', // Ref ranges are now handled by the backend
+            refHigh: '', // Ref ranges are now handled by the backend
           });
         });
       });
@@ -458,15 +514,17 @@ export default function AnalysisPage() {
       const token = await getToken();
 
       // Prepare lab results payload
-      const labResultsPayload: ManualLabResultInput[] = filteredManualResults.map(item => ({
-        test_name: item.testName,
-        value_numeric: (FRONTEND_REFERENCE_RANGES[item.testName]?.isMicrobiology || isNaN(parseFloat(item.value))) ? undefined : parseFloat(item.value),
-        value_text: (FRONTEND_REFERENCE_RANGES[item.testName]?.isMicrobiology || !isNaN(parseFloat(item.value))) ? item.value : undefined,
-        unit: item.unit === 'N/A' ? undefined : item.unit,
-        timestamp: new Date(manualExamDate).toISOString(),
-        reference_range_low: item.refLow !== '' ? parseFloat(item.refLow) : undefined,
-        reference_range_high: item.refHigh !== '' ? parseFloat(item.refHigh) : undefined,
-      }));
+      const labResultsPayload: ManualLabResultInput[] = filteredManualResults.map(item => {
+        const valueNum = (FRONTEND_REFERENCE_RANGES[item.testName]?.isMicrobiology || isNaN(parseFloat(item.value))) ? undefined : parseFloat(item.value);
+        
+        return {
+          test_name: item.testName,
+          value_numeric: valueNum,
+          value_text: (FRONTEND_REFERENCE_RANGES[item.testName]?.isMicrobiology || !isNaN(parseFloat(item.value))) ? item.value : undefined,
+          unit: item.unit === 'N/A' ? undefined : item.unit,
+          timestamp: new Date(manualExamDate).toISOString(),
+        };
+      });
       
       const effectivePatientId = manualPatientId.trim() !== '' ? manualPatientId.trim() : null;
 
@@ -557,30 +615,20 @@ export default function AnalysisPage() {
       if (drCorvusInsights) {
         copyText += "🧠 INSIGHTS DO DR. CORVUS:\n";
         
-        // Future patient support (commented out for now)
-        // if (currentUserRoleForLLM === UserRoleForLLM.PATIENT) {
-        //   if (drCorvusInsights.patient_friendly_summary) {
-        //     copyText += `\nResumo Amigável:\n${drCorvusInsights.patient_friendly_summary}\n`;
-        //   }
-        //   if (drCorvusInsights.potential_health_implications_patient) {
-        //     copyText += "\nImplicações para Saúde:\n";
-        //     drCorvusInsights.potential_health_implications_patient.forEach(impl => {
-        //       copyText += `• ${impl}\n`;
-        //     });
-        //   }
-        // } else {
-          if (drCorvusInsights.key_abnormalities_professional) {
-            copyText += "\nPrincipais Anormalidades:\n";
-            drCorvusInsights.key_abnormalities_professional.forEach(abnormality => {
-              copyText += `• ${abnormality}\n`;
-            });
-          }
-          if (drCorvusInsights.differential_considerations_professional) {
-            copyText += "\nConsiderações Diagnósticas:\n";
-            drCorvusInsights.differential_considerations_professional.forEach(consideration => {
-              copyText += `• ${consideration}\n`;
-            });
-          }
+        if (drCorvusInsights.clinical_summary) {
+          copyText += `\nResumo Clínico:\n${drCorvusInsights.clinical_summary}\n`;
+        }
+        
+        if (drCorvusInsights.professional_detailed_reasoning_cot) {
+          copyText += `\nRaciocínio Detalhado:\n${drCorvusInsights.professional_detailed_reasoning_cot}\n`;
+        }
+        
+        if (drCorvusInsights.important_results_to_discuss_with_doctor) {
+          copyText += "\nResultados Importantes:\n";
+          drCorvusInsights.important_results_to_discuss_with_doctor.forEach(result => {
+            copyText += `• ${result}\n`;
+          });
+        }
       }
 
       copyText += `\n=== Relatório gerado em ${new Date().toLocaleString('pt-BR')} ===`;
@@ -817,12 +865,70 @@ export default function AnalysisPage() {
   ) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-6">
-      <div className="container mx-auto px-4 md:px-8">
-        <div className="w-full max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Navigation Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            {/* Logo and Navigation */}
+            <div className="flex items-center space-x-8">
+              <Link href="/" className="flex items-center space-x-2">
+                <img
+                  src="/Icon.png"
+                  alt="Clinical Corvus"
+                  className="h-8 w-8 rounded-full"
+                />
+                <span className="text-xl font-semibold text-gray-900">Clinical Corvus</span>
+              </Link>
+              
+              <nav className="flex items-center space-x-6">
+                <Link href="/" className="text-gray-600 hover:text-blue-600 transition-colors font-medium flex items-center">
+                  <Home className="w-4 h-4 mr-1" />
+                  Home
+                </Link>
+                <Link href="/analysis" className="text-blue-600 font-semibold flex items-center">
+                  <FlaskConical className="w-4 h-4 mr-1" />
+                  Análise
+                </Link>
+                <Link href="/academy" className="text-gray-600 hover:text-blue-600 transition-colors font-medium flex items-center">
+                  <BookOpen className="w-4 h-4 mr-1" />
+                  Academia
+                </Link>
+              </nav>
+            </div>
 
-          
-          
+            {/* Authentication Section */}
+            <div className="flex items-center space-x-3">
+              <SignedIn>
+                <UserButton
+                  afterSignOutUrl="/"
+                  userProfileMode="navigation"
+                  userProfileUrl="/dashboard-doctor/settings"
+                  showName={true}
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: "w-8 h-8",
+                      userButtonPopoverCard: "bg-background border border-border",
+                      userButtonPopoverActionButton: "text-foreground hover:bg-accent",
+                    }
+                  }}
+                />
+              </SignedIn>
+              <SignedOut>
+                <SignInButton mode="modal">
+                  <Button size="sm" variant="outline">Entrar</Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Cadastrar</Button>
+                </SignUpButton>
+              </SignedOut>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 md:px-8 py-6">
+        <div className="w-full max-w-6xl mx-auto bg-white shadow-xl rounded-lg overflow-hidden">
           {/* Header Section - Standardized */}
           <section className="text-center py-12 academy-gradient-header rounded-xl border border-primary/20 shadow-lg">
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white flex items-center justify-center mb-4">
@@ -1154,153 +1260,49 @@ export default function AnalysisPage() {
                 </div>
 
                 <Accordion type="multiple" className="w-full space-y-3">
-                  {/* Future patient support sections (commented out for now) */}
-                  {/* {currentUserRoleForLLM === UserRoleForLLM.PATIENT && (
-                    <>
-                      {drCorvusInsights.patient_friendly_summary && (
-                        <AccordionItem value="patient-summary" className="border border-blue-200 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-blue-800 hover:text-blue-900">
-                            📋 Resumo Amigável
-                          </AccordionTrigger>
-                          <AccordionContent className="text-base text-gray-700 whitespace-pre-wrap pt-2 pb-4">
-                            {drCorvusInsights.patient_friendly_summary}
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.potential_health_implications_patient && drCorvusInsights.potential_health_implications_patient.length > 0 && (
-                        <AccordionItem value="patient-implications" className="border border-blue-200 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-blue-800 hover:text-blue-900">
-                            🏥 O que isso pode significar para sua saúde?
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.potential_health_implications_patient.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.lifestyle_tips_patient && drCorvusInsights.lifestyle_tips_patient.length > 0 && (
-                        <AccordionItem value="patient-lifestyle" className="border border-blue-200 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-blue-800 hover:text-blue-900">
-                            💡 Dicas de Estilo de Vida
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.lifestyle_tips_patient.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.questions_to_ask_doctor_patient && drCorvusInsights.questions_to_ask_doctor_patient.length > 0 && (
-                        <AccordionItem value="patient-questions" className="border border-blue-200 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-blue-800 hover:text-blue-900">
-                            ❓ Perguntas para seu Médico
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.questions_to_ask_doctor_patient.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                    </>
-                  )} */}
-
-                  {/* Professional Sections */}
-                  {currentUserRoleForLLM === UserRoleForLLM.DOCTOR_STUDENT && (
-                    <>
-                      {drCorvusInsights.professional_detailed_reasoning_cot && (
-                        <AccordionItem value="prof-detailed-reasoning" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                            🧠 Processo de Pensamento Detalhado
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <div className="prose prose-sm max-w-none text-gray-700">
-                              <ReactMarkdown
-                                components={{
-                                  strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                                  p: ({ children }) => <p className="mb-3 leading-relaxed">{children}</p>,
-                                  ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
-                                  ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
-                                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                                }}
-                              >
-                                {drCorvusInsights.professional_detailed_reasoning_cot}
-                              </ReactMarkdown>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.key_abnormalities_professional && drCorvusInsights.key_abnormalities_professional.length > 0 && (
-                        <AccordionItem value="prof-abnormalities" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                            🔍 Principais Anormalidades Notadas
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.key_abnormalities_professional.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.potential_patterns_and_correlations && drCorvusInsights.potential_patterns_and_correlations.length > 0 && (
-                        <AccordionItem value="prof-patterns" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                            📊 Padrões e Correlações Potenciais
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.potential_patterns_and_correlations.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.differential_considerations_professional && drCorvusInsights.differential_considerations_professional.length > 0 && (
-                        <AccordionItem value="prof-differential" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                            🎯 Considerações Diagnósticas Diferenciais
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.differential_considerations_professional.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                      {drCorvusInsights.suggested_next_steps_professional && drCorvusInsights.suggested_next_steps_professional.length > 0 && (
-                        <AccordionItem value="prof-next-steps" className="border border-blue-900 rounded-lg px-4">
-                          <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                            🚀 Próximos Passos Sugeridos
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <ul className="list-disc list-inside text-base text-gray-700 space-y-2">
-                              {drCorvusInsights.suggested_next_steps_professional.map((item, idx) => (
-                                <li key={idx} className="leading-relaxed">{item}</li>
-                              ))}
-                            </ul>
-                          </AccordionContent>
-                        </AccordionItem>
-                      )}
-                    </>
+                  {/* Clinical Summary Section */}
+                  {drCorvusInsights.clinical_summary && (
+                    <AccordionItem value="clinical-summary" className="border border-blue-900 rounded-lg px-4 bg-blue-50">
+                      <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
+                        📋 Resumo Clínico Objetivo
+                      </AccordionTrigger>
+                      <AccordionContent className="text-base text-gray-700 whitespace-pre-wrap pt-2 pb-4">
+                        {drCorvusInsights.clinical_summary}
+                      </AccordionContent>
+                    </AccordionItem>
                   )}
 
-                  {/* Common Section for Both User Types */}
-                  {drCorvusInsights.important_results_to_discuss_with_doctor && drCorvusInsights.important_results_to_discuss_with_doctor.length > 0 && (
-                    <AccordionItem value="common-discuss" className="border border-blue-900 rounded-lg px-4 bg-blue-50">
+                  {/* Detailed Reasoning Section */}
+                  {drCorvusInsights.professional_detailed_reasoning_cot && (
+                    <AccordionItem value="detailed-reasoning" className="border border-blue-900 rounded-lg px-4">
                       <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-blue-900">
-                        💬 {/* {currentUserRoleForLLM === UserRoleForLLM.PATIENT ? 'Resultados Importantes para Discutir com o Médico' : */ 'Resultados Importantes para Discutir com o Paciente' /* } */}
+                        🧠 Raciocínio Clínico Detalhado
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 pb-4">
+                        <div className="prose prose-sm max-w-none text-gray-700">
+                          <ReactMarkdown
+                            components={{
+                              strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                              p: ({ children }) => <p className="mb-3 leading-relaxed">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
+                              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                              h2: ({ children }) => <h2 className="text-lg font-bold text-blue-800 mt-6 mb-3 border-b border-gray-200 pb-2">{children}</h2>,
+                              hr: () => <hr className="my-4 border-gray-300" />,
+                            }}
+                          >
+                            {DOMPurify.sanitize(drCorvusInsights.professional_detailed_reasoning_cot || '', {ALLOWED_TAGS: [], ALLOWED_ATTR: []})}
+                          </ReactMarkdown>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  )}
+
+                  {/* Important Results Section */}
+                  {drCorvusInsights.important_results_to_discuss_with_doctor && drCorvusInsights.important_results_to_discuss_with_doctor.length > 0 && (
+                    <AccordionItem value="important-results" className="border border-red-200 rounded-lg px-4 bg-red-50">
+                      <AccordionTrigger className="text-lg font-semibold text-foreground hover:text-red-900">
+                        ⚠️ Resultados Importantes para Discussão Imediata
                       </AccordionTrigger>
                       <AccordionContent className="pt-2 pb-4">
                         <ul className="list-disc list-inside text-base text-gray-700 space-y-2">

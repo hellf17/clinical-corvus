@@ -16,7 +16,7 @@ if parent_dir not in sys.path:
 # Import using package approach
 import database.models as models
 from main import app
-from security import create_access_token, get_password_hash, verify_password
+from security import get_password_hash, verify_password
 
 # This client is only for simple tests that don't require DB access
 client = TestClient(app)

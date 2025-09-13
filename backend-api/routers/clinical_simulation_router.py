@@ -383,8 +383,11 @@ async def execute_snapps_step(payload: SNAPPSStepRequest):
         # Convert back to our Pydantic model
         updated_session_state = SessionState(**session_state.model_dump())
         
+        # Translate the feedback before returning
+        translated_feedback = await _translate_field_batched(feedback, "PT", field_name="feedback")
+
         return SNAPPSStepResponse(
-            feedback=feedback,
+            feedback=translated_feedback,
             updated_session_state=updated_session_state
         )
     except Exception as e:

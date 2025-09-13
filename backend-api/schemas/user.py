@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr, Field
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -26,7 +26,7 @@ class User(UserBase):
     created_at: datetime
     role: Optional[str] = None
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class UserInDB(User):
     """Schema for internal representation (not exposed in API)"""

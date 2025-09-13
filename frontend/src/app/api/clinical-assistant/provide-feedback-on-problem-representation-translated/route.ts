@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+    console.log('Frontend Proxy Received (from backend):', JSON.stringify(data, null, 2));
     return NextResponse.json(data);
 
   } catch (error) {

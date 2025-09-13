@@ -1,49 +1,38 @@
-# Development Tools for Backend
-black==24.2.0
-isort==5.13.2
-flake8==7.0.0
-mypy==1.8.0
+# Development dependencies for backend-api
+# These are only needed for development, not production
 
-# BAML for development
-baml-py==0.87.0
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0
 
-# Research libraries for development
-scholarly
-googletrans
+# Code quality
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.0.0
+pre-commit>=3.0.0
 
-# Debugging and Development Server
-ipython==8.22.1
-debugpy==1.8.1
-watchdog==6.0.0
-watchfiles==1.0.5
+# Debugging
+debugpy>=1.6.0
+ipdb>=0.13.0
 
-# Code Intelligence
-jedi==0.19.1
-parso==0.8.3
-asttokens==2.4.1
-executing==2.0.1
-
-# Development Dependencies
-jupyter_client==8.6.0
-jupyter_core==5.7.1
-matplotlib-inline==0.1.6
-prompt-toolkit==3.0.43
-pure-eval==0.2.2
-stack-data==0.6.3
-traitlets==5.14.1
-wcwidth==0.2.13
-decorator==5.1.1
-comm==0.2.1
+# Development server
+watchdog>=3.0.0
 
 # Documentation
-Jinja2==3.1.6
-MarkupSafe==3.0.2
+mkdocs>=1.5.0
+mkdocs-material>=9.0.0
 
-# Type Checking Support
-types-PyYAML
-types-python-dateutil
-types-requests
-types-urllib3
+# Profiling
+memory-profiler>=0.60.0
+line-profiler>=4.0.0
 
-# Install backend production dependencies as well
--r requirements.txt 
+# Database tools
+alembic>=1.12.0
+psycopg2-binary>=2.9.0
+
+# API testing
+httpx>=0.24.0

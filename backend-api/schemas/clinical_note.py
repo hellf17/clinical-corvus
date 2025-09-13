@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Any
 from typing import List, Optional
 from datetime import datetime
@@ -33,7 +33,7 @@ class ClinicalNote(ClinicalNoteBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class ClinicalNoteList(BaseModel):
     notes: List[ClinicalNote]

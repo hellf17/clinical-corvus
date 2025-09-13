@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import ChatMessage from './ChatMessage';
 import QuickReplies from './QuickReplies'; // Path is correct, ensure file exists and extension matches (should be .tsx)
 import { PatientContext } from '../../types/chat'; // Remove Message import
-import { Message } from 'ai/react'; // Import Message from ai/react
+import { UIMessage as Message } from '@ai-sdk/react'; // Import Message from ai/react
 
 interface ChatWindowProps {
   messages: Message[]; // Use imported Message type
@@ -10,12 +10,32 @@ interface ChatWindowProps {
   quickReplies?: string[];
   onQuickReply?: (reply: string) => void;
   patientContext?: PatientContext; // Use PatientContext type
+  input?: string;
+  setInput?: React.Dispatch<React.SetStateAction<string>>;
+  handleSubmit?: (event: React.FormEvent) => void;
+  isSending?: boolean;
 }
 
-const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patientContext }: ChatWindowProps) => {
+const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patientContext, input, setInput, handleSubmit, isSending }: ChatWindowProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isSending, setIsSending] = useState<boolean>(false); // Loading state
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [internalInputText, setInternalInputText] = useState('');
+  const inputText = input !== undefined ? input : internalInputText;
+  const setInputText = setInput !== undefined ? setInput : setInternalInputText;
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(event.target.value);
+  };
+
+  const internalHandleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (inputText.trim()) {
+      onSendMessage(inputText);
+      setInputText('');
+    }
+  };
+
+  const submitHandler = handleSubmit !== undefined ? handleSubmit : internalHandleSubmit;
 
   // Foco automático no input ao abrir o chat
   useEffect(() => {
@@ -26,21 +46,6 @@ const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patie
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // State for the input field
-  const [inputText, setInputText] = useState('');
-
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setInputText(event.target.value);
-  };
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (inputText.trim()) {
-      onSendMessage(inputText);
-      setInputText('');
-    }
-  };
 
   // Handler para cliques nas Quick Replies
   const handleQuickReply = (replyText: string) => {
@@ -71,7 +76,7 @@ const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patie
       {quickReplies && quickReplies.length > 0 && (
         <QuickReplies onReplyClick={onQuickReply} />
       )}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-border-primary dark:border-border-foreground flex gap-2">
+      <form onSubmit={submitHandler} className="p-4 border-t border-border-primary dark:border-border-foreground flex gap-2">
         <input
           ref={inputRef}
           type="text"
@@ -79,7 +84,7 @@ const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patie
           placeholder={isSending ? "Sending..." : "Digite sua mensagem..."}
           tabIndex={0}
           aria-label="Digite sua mensagem"
-          disabled={isSending}
+          disabled={!!isSending}
           value={inputText}
           onChange={handleInputChange}
         />
@@ -87,7 +92,7 @@ const ChatWindow = ({ messages, onSendMessage, quickReplies, onQuickReply, patie
           type="submit"
           className="rounded bg-primary text-white px-4 py-2 min-w-[44px] min-h-[44px] disabled:opacity-50"
           tabIndex={0}
-          disabled={isSending}
+          disabled={!!isSending}
         >
           {isSending ? '...' : 'Enviar'}
         </button>

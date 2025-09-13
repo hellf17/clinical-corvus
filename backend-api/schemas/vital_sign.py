@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+from pydantic.config import ConfigDict
 
 # Base model for Vital Sign data points
 class VitalSignBase(BaseModel):
@@ -25,4 +26,4 @@ class VitalSign(VitalSignBase):
     created_at: datetime
     # recorded_by_user_id: Optional[int] # Include if added to model
 
-    model_config = {"from_attributes": True} 
+    model_config = ConfigDict(from_attributes=True)

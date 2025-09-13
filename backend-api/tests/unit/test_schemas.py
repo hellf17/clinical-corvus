@@ -90,14 +90,16 @@ def test_medication_update_schema():
 def test_medication_schema():
     """Test the Medication model schema."""
     # Valid data including id and timestamps
-    medication_id = uuid4()
-    patient_id = uuid4()
+    medication_id = 12345  # Use integer instead of UUID
+    patient_id = 67890  # Use integer instead of UUID
+    user_id = 11111
     created_at = datetime.now() - timedelta(days=1)
     updated_at = datetime.now()
-    
+
     medication = Medication(
-        id=medication_id,
+        medication_id=medication_id,
         patient_id=patient_id,
+        user_id=user_id,
         name="Lisinopril",
         dosage="10mg",
         route=MedicationRoute.ORAL,
@@ -105,14 +107,14 @@ def test_medication_schema():
         start_date=datetime.now(),
         end_date=None,
         status=MedicationStatus.ACTIVE,
-        instructions="Take in the morning",
         notes="For blood pressure",
         created_at=created_at,
         updated_at=updated_at
     )
-    
-    assert medication.id == medication_id
+
+    assert medication.medication_id == medication_id
     assert medication.patient_id == patient_id
+    assert medication.user_id == user_id
     assert medication.name == "Lisinopril"
     assert medication.created_at == created_at
     assert medication.updated_at == updated_at
@@ -176,37 +178,37 @@ def test_patient_create_schema():
     # Valid data
     valid_data = {
         "name": "John Doe",
-        "idade": 40,
-        "sexo": "M",
-        "peso": 75.5,
-        "altura": 1.80,
-        "etnia": "branco"
+        "birthDate": datetime(1984, 1, 1),  # 40 years old
+        "gender": "M",
+        "weight": 75.5,
+        "height": 1.80,
+        "ethnicity": "branco"
     }
-    
+
     patient = PatientCreate(**valid_data)
     assert patient.name == "John Doe"
-    assert patient.idade == 40
-    assert patient.sexo == "M"
-    assert patient.peso == 75.5
-    assert patient.altura == 1.80
-    
+    assert patient.birthDate == datetime(1984, 1, 1).date()  # Compare with date object
+    assert patient.gender == "M"
+    assert patient.weight == 75.5
+    assert patient.height == 1.80
+
     # Test with missing required fields
     with pytest.raises(ValidationError):
         PatientCreate(
             # Missing name
-            idade=40,
-            sexo="M"
+            birthDate=datetime(1984, 1, 1),
+            gender="M"
         )
 
 def test_patient_update_schema():
     """Test PatientUpdate schema validation."""
     # All fields are optional in update
     update = PatientUpdate(
-        peso=80.0,
-        altura=1.82
+        weight=80.0,
+        height=1.82
     )
-    assert update.peso == 80.0
-    assert update.altura == 1.82
+    assert update.weight == 80.0
+    assert update.height == 1.82
     assert update.name is None
 
 #

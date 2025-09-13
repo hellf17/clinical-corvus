@@ -60,4 +60,33 @@ def delete_vital_sign(db: Session, vital_id: int) -> Optional[models.VitalSign]:
 
 # Potential future functions:
 # def update_vital_sign(...)
-# def get_vital_signs_in_range(...) 
+# def get_vital_signs_in_range(...)
+
+
+class VitalSignCRUD:
+    """CRUD operations for VitalSign model."""
+
+    def get_by_patient_id(self, db: Session, patient_id: int, limit: int = 10) -> List[models.VitalSign]:
+        """Get vital signs for a specific patient."""
+        return get_vital_signs_for_patient(db, patient_id, limit=limit)
+
+    def get(self, db: Session, vital_id: int) -> Optional[models.VitalSign]:
+        """Get a vital sign by ID."""
+        return db.query(models.VitalSign).filter(models.VitalSign.vital_id == vital_id).first()
+
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[models.VitalSign]:
+        """Get multiple vital signs."""
+        return db.query(models.VitalSign).offset(skip).limit(limit).all()
+
+    def create(self, db: Session, *, obj_in, patient_id: int) -> models.VitalSign:
+        """Create a new vital sign."""
+        return create_vital_sign(db, obj_in, patient_id)
+
+    def remove(self, db: Session, *, vital_id: int) -> bool:
+        """Remove a vital sign."""
+        result = delete_vital_sign(db, vital_id)
+        return result is not None
+
+
+# Create instance for easy import
+vital_sign = VitalSignCRUD()

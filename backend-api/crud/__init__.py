@@ -26,8 +26,22 @@ from . import crud_lab_summary # Corrected
 # import crud.alerts # Incorrect style
 from . import alerts # Corrected
 
+# Import group CRUD
+from . import groups # New group module
+
+# Import vital signs and lab result CRUD
+from . import crud_vital_sign
+from . import lab_result
+
 # Expose association functions
 from .associations import is_doctor_assigned_to_patient, assign_doctor_to_patient, remove_doctor_from_patient
+
+# Expose CRUD objects for easy import
+from .patients import patient
+from .medication import medication
+from .crud_vital_sign import vital_sign
+from .lab_result import lab_result
+from .clinical_note import clinical_note
 
 # Remove duplicate imports below
 # # New CRUD modules

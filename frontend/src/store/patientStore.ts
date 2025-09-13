@@ -114,11 +114,63 @@ export const usePatientStore = create<PatientState>()(
       setPatients: (patients) => set({ patients }),
 
       fetchInitialPatients: async () => {
-        // ... (keep fetch logic using getPatientsService)
+        set({ isLoading: true, error: null });
+        try {
+          // Note: Token should be passed from component using useAuth hook
+          // This is a fallback implementation - components should pass token
+          const response = await fetch('/api/patients');
+          if (!response.ok) {
+            throw new Error('Failed to fetch patients');
+          }
+          const data = await response.json();
+          
+          const patientsWithAge = (data.items || []).map((p: any) => ({
+            ...p,
+            age: calculateAge(p.birthDate),
+            exams: p.exams || [],
+            vitalSigns: p.vitalSigns || [],
+            lab_results: p.lab_results || []
+          }));
+          
+          set({ patients: patientsWithAge, isLoading: false });
+        } catch (error: any) {
+          console.error('Error fetching patients:', error);
+          set({ error: error.message || 'Failed to fetch patients', isLoading: false });
+        }
       },
 
       addPatient: async (patientData) => {
-        // ... (keep add logic using createPatientService)
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch('/api/patients', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(patientData),
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to create patient');
+          }
+
+          const newPatient = await response.json();
+          const patientWithAge = {
+            ...newPatient,
+            age: calculateAge(newPatient.birthDate),
+            exams: [],
+            vitalSigns: [],
+            lab_results: []
+          };
+          
+          set((state) => ({
+            patients: [...state.patients, patientWithAge],
+            isLoading: false
+          }));
+        } catch (error: any) {
+          console.error('Error adding patient:', error);
+          set({ error: error.message || 'Failed to add patient', isLoading: false });
+        }
       },
 
       updatePatient: async (patient_id, data) => {
@@ -127,11 +179,29 @@ export const usePatientStore = create<PatientState>()(
       },
 
       deletePatient: async (patient_id) => {
-        // ... (keep delete logic using deletePatientService)
+        set({ isLoading: true, error: null });
+        try {
+          const response = await fetch(`/api/patients/${patient_id}`, {
+            method: 'DELETE',
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to delete patient');
+          }
+          
+          set((state) => ({
+            patients: state.patients.filter(p => p.patient_id !== patient_id),
+            selectedPatientId: state.selectedPatientId === patient_id ? null : state.selectedPatientId,
+            isLoading: false
+          }));
+        } catch (error: any) {
+          console.error('Error deleting patient:', error);
+          set({ error: error.message || 'Failed to delete patient', isLoading: false });
+        }
       },
 
       selectPatient: (patient_id) => {
-        // ... (keep select logic)
+        set({ selectedPatientId: patient_id });
       },
 
       getPatient: (patient_id) => {
@@ -144,16 +214,16 @@ export const usePatientStore = create<PatientState>()(
           ...examData,
           exam_timestamp: examData.exam_timestamp || new Date().toISOString()
         };
-        await addExamClient(patient_id, dataToSend, token);
+        await addExamClient(patient_id, dataToSend);
         // TODO: Optionally update the local state if addExamClient doesn't trigger a refetch
       },
 
       deleteExam: async (patient_id, exam_id, token) => {
-        await deleteExamClient(patient_id, exam_id, token);
+        await deleteExamClient(patient_id, exam_id);
       },
 
       addVitalSigns: async (patient_id, vitalSignsData, token) => {
-        await addVitalSignClient(patient_id, vitalSignsData, token);
+        await addVitalSignClient(patient_id, vitalSignsData);
       },
 
       clearError: () => set({ error: null }),

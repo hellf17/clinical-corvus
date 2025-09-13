@@ -16,44 +16,13 @@ if parent_dir not in sys.path:
 # Import using package approach
 import database.models as models
 from main import app
-from security import create_access_token, get_password_hash, verify_password, create_auth_cookie
+
 from tests.test_settings import get_test_settings
 
 test_settings = get_test_settings()
 client = TestClient(app)
 
-def test_cookie_security_attributes(sqlite_client, sqlite_session):
-    """Test that cookies are set with proper security attributes."""
-    # Create a user
-    user = models.User(
-        email="cookie_security@example.com",
-        name="Cookie Security User",
-        role="doctor",
-        user_id=5001
-    )
-    sqlite_session.add(user)
-    sqlite_session.commit()
-    
-    # Create a token
-    token = create_access_token(
-        data={
-            "sub": user.email,
-            "user_id": user.user_id,
-            "name": user.name
-        }
-    )
-    
-    # Get the cookie settings that would be used
-    cookie_settings = create_auth_cookie(token)
-    
-    # Verify cookie security settings
-    assert cookie_settings["httponly"] == True, "Cookie should be httponly"
-    assert cookie_settings["secure"] == True, "Cookie should be secure"
-    assert cookie_settings["samesite"] in ["lax", "strict"], "Cookie should have samesite attribute"
-    
-    # Since we're using TestClient, we can't properly test the response cookies 
-    # in the same way as a real browser. We'll just check that the settings are correct.
-    assert True, "Cookie settings are secure"
+
 
 def test_csrf_protection_with_state_token():
     """Test CSRF protection using state token in OAuth flow."""

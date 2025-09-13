@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { LabResult } from '@/types/health';
-import ResultsTimelineChart from './charts/ResultsTimelineChart';
+import { EnhancedResultsTimelineChart } from './charts/EnhancedResultsTimelineChart';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { Badge } from '@/components/ui/Badge';
@@ -99,7 +99,7 @@ export const ExamResultsDashboard: React.FC<ExamResultsDashboardProps> = ({ pati
             const token = await getToken();
             if (!token) throw new Error("Authentication token not found.");
             
-            const response = await getPatientLabResultsClient(patientId, token, { limit: 1000 });
+            const response = await getPatientLabResultsClient(patientId, { limit: 1000 });
             setLabResults(response.items);
         } catch (err: any) {
             console.error("Failed to fetch lab results:", err);
@@ -304,7 +304,7 @@ export const ExamResultsDashboard: React.FC<ExamResultsDashboardProps> = ({ pati
           if (chartData.length < 1) return null; 
           
           return (
-            <ResultsTimelineChart 
+            <EnhancedResultsTimelineChart 
               key={category}
               results={chartData}
               title={title}

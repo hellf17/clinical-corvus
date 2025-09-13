@@ -3,7 +3,7 @@ Renal function analysis module for interpreting kidney-related lab tests.
 """
 
 import math
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 
 from utils.reference_ranges import REFERENCE_RANGES
@@ -31,6 +31,44 @@ def _safe_convert_to_float(value_str: Optional[str]) -> Optional[float]:
             except ValueError: pass
         return None
 
+def _get_criticality_level(param_name, value, thresholds):
+    """
+    Determine the criticality level of a parameter based on stratified thresholds.
+    
+    Args:
+        param_name: Name of the parameter
+        value: The value to evaluate
+        thresholds: Dictionary with 'critical', 'significant', and 'monitoring' thresholds
+        
+    Returns:
+        tuple: (criticality_level, description)
+    """
+    if value is None:
+        return ("UNKNOWN", f"{param_name} value is None")
+    
+    # Check critical thresholds
+    if 'critical' in thresholds:
+        for threshold in thresholds['critical']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+    
+    # Check significant thresholds
+    if 'significant' in thresholds:
+        for threshold in thresholds['significant']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+    
+    # Default to monitoring
+    return ("MONITORING", f"{param_name} MONITORING: {value} - Significant morbidity risk prompt")
+
 def analisar_funcao_renal(exams, **patient_kwargs):
     """
     Analyze renal function parameters and provide clinical interpretation.
@@ -54,21 +92,32 @@ def analisar_funcao_renal(exams, **patient_kwargs):
     if isinstance(exams, list):
         for exam in exams:
             if 'test' in exam and 'value' in exam:
-                value_str = str(exam['value']) if exam['value'] is not None else None
-                converted_value = _safe_convert_to_float(value_str)
-                if converted_value is not None:
-                    standardized_params[exam['test']] = converted_value
+                if exam['value'] is not None:
+                    if isinstance(exam['value'], (int, float)):
+                        standardized_params[exam['test']] = float(exam['value'])
+                    else:
+                        value_str = str(exam['value'])
+                        converted_value = _safe_convert_to_float(value_str)
+                        if converted_value is not None:
+                            standardized_params[exam['test']] = converted_value
+                        else:
+                            logger.info(f"Could not convert renal param {exam['test']}: '{exam['value']}'. It will be ignored.")
                 else:
-                    logger.info(f"Could not convert renal param {exam['test']}: '{exam['value']}' using _safe_convert_to_float. It will be ignored.")
+                    logger.info(f"Renal param {exam['test']} is None. It will be ignored.")
     elif isinstance(exams, dict):
         for key, value in exams.items():
             if value is not None:
-                value_str = str(value) if not isinstance(value, str) else value
-                converted_value = _safe_convert_to_float(value_str)
-                if converted_value is not None:
-                    standardized_params[key] = converted_value
+                if isinstance(value, (int, float)):
+                    standardized_params[key] = float(value)
                 else:
-                    logger.info(f"Could not convert renal param {key}: '{value}' using _safe_convert_to_float. It will be ignored.")
+                    value_str = str(value)
+                    converted_value = _safe_convert_to_float(value_str)
+                    if converted_value is not None:
+                        standardized_params[key] = converted_value
+                    else:
+                        logger.info(f"Could not convert renal param {key}: '{value}'. It will be ignored.")
+            else:
+                logger.info(f"Renal param {key} is None. It will be ignored.")
     else:
         return {
             "interpretation": "Dados de entrada inválidos para análise renal.",
@@ -101,22 +150,33 @@ def analisar_funcao_renal(exams, **patient_kwargs):
         creat_min_ref, creat_max_ref = REFERENCE_RANGES['Creat']
         details_dict['Creat_ref'] = f"{creat_min_ref}-{creat_max_ref} mg/dL"
         
+        creat_criticality, creat_description = _get_criticality_level("Creatinina", creat_value, {
+            'critical': [5.0],
+            'significant': [(2.0, 5.0)],
+            'monitoring': [(creat_max_ref, 2.0)]
+        })
+        interpretations_list.append(creat_description)
+
         if creat_value < creat_min_ref:
             interpretations_list.append(f"Creatinina reduzida: {creat_value} mg/dL. Pode indicar desnutrição ou baixa massa muscular.")
             abnormalities_list.append("Creatinina Baixa")
         elif creat_value > creat_max_ref:
             interpretations_list.append(f"Creatinina elevada: {creat_value} mg/dL.")
             abnormalities_list.append("Creatinina Elevada")
-            if creat_value > 3.0:
+            if creat_criticality == "CRITICAL":
                 interpretations_list.append("Disfunção renal significativa/importante - considerar lesão renal aguda ou doença renal crônica avançada.")
-                recommendations_list.append("Avaliação nefrológica urgente. Monitorar débito urinário e sinais de uremia.")
+                recommendations_list.append("Avaliação nefrológica urgente. Monitorar débito urinário e sinais de uremia. Segundo as diretrizes da Sociedade Brasileira de Nefrologia, considerar nefrologista em 24-48 horas para DRC estágio 4-5.")
                 is_critical_flag = True
-            elif creat_value > 2.0:
+                # Add specific KDIGO guidelines for AKI staging
+                recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Avaliar história de pré-renal (desidratação, uso de diuréticos), renal (medicações nephrotóxicas, glomerulonefrites) e pós-renal (obstrução). Solicitar sódio urinário, osmolaridade urinária e sedimento urinário.")
+            elif creat_criticality == "SIGNIFICANT":
                 interpretations_list.append("Disfunção renal moderada - avaliar causa e evolução.")
-                recommendations_list.append("Monitorar função renal. Investigar causa da elevação da creatinina.")
+                recommendations_list.append("Monitorar função renal. Investigar causa da elevação da creatinina. Segundo as diretrizes da Sociedade Brasileira de Nefrologia, considerar nefrologista para DRC estágio 3b.")
+                recommendations_list.append("TREATMENT RECOMMENDATIONS: Suspender nefrotoxicidade (AINES, aminoglicosídeos, contraste iodado). Otimizar volume e verificar medicações. Monitorar eletrólitos e acidose metabólica.")
             else: # creat_value > creat_max_ref but <= 2.0
                 interpretations_list.append("Disfunção renal leve - avaliar contexto clínico.")
-                recommendations_list.append("Repetir exame, avaliar histórico e fatores de risco.")
+                recommendations_list.append("Repetir exame, avaliar histórico e fatores de risco. Segundo as diretrizes da Sociedade Brasileira de Nefrologia, pacientes com DRC estágio 3a devem ser monitorados por nefrologista.")
+                recommendations_list.append("PATIENT EDUCATION: Informar sobre dieta pobre em proteína, sódio e potássio. Evitar AINES e medicações nephrotóxicas. Manter hidratação adequada.")
         else:
             interpretations_list.append(f"Creatinina normal: {creat_value} mg/dL.")
         
@@ -155,23 +215,32 @@ def analisar_funcao_renal(exams, **patient_kwargs):
                 elif egfr >= 60:
                     interpretations_list.append("Estágio G2: Redução leve da função renal. Monitorar e controlar fatores de risco.")
                     abnormalities_list.append("TFG Reduzida (Estágio G2)")
+                    # Add KDIGO guidelines for G2 stage
+                    recommendations_list.append("Segundo as diretrizes KDIGO, estágio G2 requer monitoramento anual da TFG e proteinúria. Controlar pressão arterial <140/90 mmHg e diabetes (HbA1c <7.0%).")
                 elif egfr >= 45:
                     interpretations_list.append("Estágio G3a: Redução leve a moderada da função renal. Evitar nefrotóxicos, ajustar doses.")
                     abnormalities_list.append("TFG Reduzida (Estágio G3a)")
+                    # Add KDIGO guidelines for G3a stage
+                    recommendations_list.append("Segundo as diretrizes KDIGO, estágio G3a requer monitoramento semestral da TFG e proteinúria. Considerar nefrologista para avaliação da causa subjacente e retardo da progressão.")
                 elif egfr >= 30:
                     interpretations_list.append("Estágio G3b: Redução moderada a grave da função renal. Encaminhar para nefrologista.")
                     abnormalities_list.append("TFG Reduzida (Estágio G3b)")
-                    if creat_value > creat_max_ref: recommendations_list.append("Acompanhamento nefrológico para DRC estágio G3b.")
+                    if creat_value > creat_max_ref: recommendations_list.append("Acompanhamento nefrológico para DRC estágio G3b. Segundo as diretrizes KDIGO, estágio G3b requer monitoramento trimestral da TFG e proteinúria.")
+                    # Add specific treatment recommendations
+                    recommendations_list.append("TREATMENT RECOMMENDATIONS: Iniciar inibidores de SRAA (IECA/ARA-II) se não contraindicado. Controlar fósforo, cálcio e PTH. Considerar suplementação de vitamina D e bicarbonato se acidose metabólica.")
                 elif egfr >= 15:
                     interpretations_list.append("Estágio G4: Redução grave da função renal. Acompanhamento nefrológico regular, preparo para TRS.")
                     abnormalities_list.append("TFG Reduzida (Estágio G4)")
                     is_critical_flag = True # Stage G4 is considered severe/critical by many guidelines for action
-                    recommendations_list.append("DRC Estágio G4. Acompanhamento nefrológico intensivo e planejamento de terapia renal substitutiva.")
+                    recommendations_list.append("DRC Estágio G4. Acompanhamento nefrológico intensivo e planejamento de terapia renal substitutiva. Segundo as diretrizes KDIGO, estágio G4 requer monitoramento mensal da TFG e preparação para diálise.")
+                    # Add specific treatment recommendations
+                    recommendations_list.append("SPECIALIST CONSULTATION RECOMMENDED: Nefrologista para preparação para TRS (avaliação de acesso vascular, modo de diálise, modalidade preferida). Cardiologia para avaliação pré-diálise.")
                 else: # egfr < 15
                     interpretations_list.append("Estágio G5: Falência renal. Necessidade de terapia renal substitutiva.")
                     abnormalities_list.append("TFG Reduzida (Estágio G5 - Falência Renal)")
                     is_critical_flag = True
-                    recommendations_list.append("DRC Estágio G5 (Falência Renal). Iniciar/avaliar terapia renal substitutiva urgentemente.")
+                    recommendations_list.append("DRC Estágio G5 (Falência Renal). Iniciar/avaliar terapia renal substitutiva urgentemente. Segundo as diretrizes KDIGO, estágio G5 requer diálise ou transplante renal.")
+                    recommendations_list.append("SPECIALIST CONSULTATION RECOMMENDED: Nefrologista imediatamente para início de TRS. Considerar internação se sintomático (uremia, hiperkalemia, acidose).")
             except Exception as e:
                 interpretations_list.append(f"Não foi possível calcular TFG estimada: {e}")
     
@@ -181,17 +250,25 @@ def analisar_funcao_renal(exams, **patient_kwargs):
         ur_min_ref, ur_max_ref = REFERENCE_RANGES['Ur']
         details_dict['Ur_ref'] = f"{ur_min_ref}-{ur_max_ref} mg/dL"
         
+        bun_value = urea_value / 2.14
+        bun_criticality, bun_description = _get_criticality_level("BUN", bun_value, {
+            'critical': [200],
+            'significant': [(100, 200)],
+            'monitoring': [(ur_max_ref, 100)]
+        })
+        interpretations_list.append(bun_description)
+
         if urea_value < ur_min_ref:
             interpretations_list.append(f"Ureia reduzida: {urea_value} mg/dL. Causas: baixa ingesta proteica, hepatopatia grave, hiperhidratação.")
             abnormalities_list.append("Ureia Baixa")
         elif urea_value > ur_max_ref:
             interpretations_list.append(f"Ureia elevada: {urea_value} mg/dL.")
             abnormalities_list.append("Ureia Elevada (Azotemia)")
-            if urea_value > 200:
+            if bun_criticality == "CRITICAL":
                 interpretations_list.append("Azotemia muito grave - alta probabilidade de síndrome urêmica.")
                 recommendations_list.append("Azotemia crítica. Avaliação urgente para uremia e necessidade de diálise.")
                 is_critical_flag = True
-            elif urea_value > 100:
+            elif bun_criticality == "SIGNIFICANT":
                 interpretations_list.append("Azotemia grave - indicativo de disfunção renal significativa ou outras causas de hipercatabolismo/sangramento digestivo.")
                 recommendations_list.append("Investigar causa da azotemia grave. Monitorar função renal e hidratação.")
             else: # urea_value > ur_max_ref but <= 100
@@ -242,14 +319,18 @@ def analisar_funcao_renal(exams, **patient_kwargs):
             abnormalities_list.append("Proteinúria (Relação Prot/Creat Elevada)")
             if pcr_value > 3.0: # Nephrotic range (e.g., >3-3.5 g/g)
                 interpretations_list.append("Proteinúria em nível nefrótico. Sugere glomerulopatia. Investigação nefrológica urgente.")
-                recommendations_list.append("Avaliação nefrológica para síndrome nefrótica.")
+                recommendations_list.append("Avaliação nefrológica para síndrome nefrótica. Segundo as diretrizes KDIGO, proteinúria >3.5g/24h indica síndrome nefrótica.")
                 is_critical_flag = True # Nephrotic range proteinuria is often managed urgently
+                # Add specific treatment recommendations
+                recommendations_list.append("TREATMENT RECOMMENDATIONS: Iniciar IECA/ARA-II para redução de proteinúria. Considerar estatinas e aspirina para profilaxia cardiovascular. Avaliar necessidade de imunossupressores com nefrologista.")
             elif pcr_value > 1.0:
                 interpretations_list.append("Proteinúria significativa. Indica lesão glomerular/renal relevante.")
-                recommendations_list.append("Investigar causa da proteinúria. Acompanhamento nefrológico.")
+                recommendations_list.append("Investigar causa da proteinúria. Acompanhamento nefrológico. Segundo as diretrizes KDIGO, proteinúria 0.5-3.5g/24h indica doença renal crônica.")
+                recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Solicitar sódio urinário, microscopia de urina, complementos (C3, C4), fator reumatoide, anti-CCP, ANA. Considerar biópsia renal se persistente.")
             else: # pcr_value > pcr_ref_max but <= 1.0
                 interpretations_list.append("Proteinúria leve a moderada. Pode indicar nefropatia incipiente ou outras causas.")
-                recommendations_list.append("Monitorar proteinúria, função renal e pressão arterial.")
+                recommendations_list.append("Monitorar proteinúria, função renal e pressão arterial. Segundo as diretrizes KDIGO, proteinúria 30-300mg/g creatinina indica microalbuminúria.")
+                recommendations_list.append("PATIENT EDUCATION: Informar sobre importância do controle glicêmico (se diabético), pressão arterial e estilo de vida saudável. Evitar medicamentos nephrotóxicos.")
         else:
             interpretations_list.append(f"Relação Proteína/Creatinina urinária normal: {pcr_value}.")
     
@@ -297,26 +378,45 @@ def analisar_funcao_renal(exams, **patient_kwargs):
 
     if acr_value_mg_g is not None:
         # Interpret using mg/g
-        rac_ref_min_mg_g, rac_ref_max_mg_g = REFERENCE_RANGES['RAC_mg_g']
-        details_dict['RAC_ref_mg_g'] = f"Normal: <{rac_ref_max_mg_g} mg/g; Microalbuminúria: {rac_ref_max_mg_g}-300 mg/g; Macroalbuminúria: >300 mg/g"
+        try:
+            rac_ref_min_mg_g, rac_ref_max_mg_g = REFERENCE_RANGES['RAC_mg_g']
+            details_dict['RAC_ref_mg_g'] = f"Normal: <{rac_ref_max_mg_g} mg/g; Microalbuminúria: {rac_ref_max_mg_g}-300 mg/g; Macroalbuminúria: >300 mg/g"
+        except KeyError:
+            logger.error("Missing reference range for RAC_mg_g in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for ACR (0-30 mg/g - standard clinical range)
+            rac_ref_min_mg_g, rac_ref_max_mg_g = 0, 30
+            details_dict['RAC_ref_mg_g'] = f"Normal: <{rac_ref_max_mg_g} mg/g; Microalbuminúria: {rac_ref_max_mg_g}-300 mg/g; Macroalbuminúria: >300 mg/g (fallback)"
         interpretation_acr = f"Relação Albumina/Creatinina (RAC): {acr_value_mg_g} mg/g. "
         if acr_value_mg_g > 300:
             interpretation_acr += "Albumina urinária severamente aumentada (Macroalbuminúria)."
             abnormalities_list.append("Macroalbuminúria (RAC > 300 mg/g)")
             recommendations_list.append("Macroalbuminúria indica dano renal significativo. Acompanhamento nefrológico e manejo agressivo dos fatores de risco (PA, glicemia, dislipidemia) são essenciais. Considerar IECA/BRA.")
             is_critical_flag = True # Often considered a marker for more severe/urgent attention
+            # Add specific KDIGO guidelines
+            recommendations_list.append("Segundo as diretrizes KDIGO, macroalbuminúria (>300 mg/g) indica doença renal crônica estágio A2/A3. Iniciar/otimizar IECA/ARA-II para redução de proteinúria.")
         elif acr_value_mg_g >= rac_ref_max_mg_g: # 30-300 mg/g
             interpretation_acr += "Albumina urinária moderadamente aumentada (Microalbuminúria)."
             abnormalities_list.append("Microalbuminúria (RAC 30-300 mg/g)")
             recommendations_list.append("Microalbuminúria é um marcador precoce de doença renal, especialmente em diabetes e hipertensão. Recomenda-se otimizar controle da PA, glicemia, e considerar IECA/BRA conforme diretrizes.")
+            # Add specific KDIGO guidelines
+            recommendations_list.append("Segundo as diretrizes KDIGO, microalbuminúria (30-300 mg/g) indica doença renal crônica estágio A1. Monitorar anualmente e iniciar IECA/ARA-II se persistente.")
+            recommendations_list.append("TREATMENT RECOMMENDATIONS: Controlar pressão arterial <130/80 mmHg. Para diabéticos, manter HbA1c <7.0%. Iniciar IECA/ARA-II mesmo com PA controlada.")
         else: # < 30 mg/g
             interpretation_acr += "Albumina urinária normal."
+            # Add preventive recommendations
+            recommendations_list.append("Albumina urinária normal. Segundo as diretrizes KDIGO, manter estilo de vida saudável e monitorar anualmente em pacientes de risco (diabetes, hipertensão, obesidade).")
         interpretations_list.append(interpretation_acr)
     
     elif acr_value_mg_mmol is not None:
         # Interpret using mg/mmol
-        rac_ref_min_mg_mmol, rac_ref_max_mg_mmol = REFERENCE_RANGES['RAC_mg_mmol']
-        details_dict['RAC_ref_mg_mmol'] = f"Normal: <{rac_ref_max_mg_mmol} mg/mmol; Microalbuminúria: {rac_ref_max_mg_mmol}-34 mg/mmol; Macroalbuminúria: >34 mg/mmol"
+        try:
+            rac_ref_min_mg_mmol, rac_ref_max_mg_mmol = REFERENCE_RANGES['RAC_mg_mmol']
+            details_dict['RAC_ref_mg_mmol'] = f"Normal: <{rac_ref_max_mg_mmol} mg/mmol; Microalbuminúria: {rac_ref_max_mg_mmol}-34 mg/mmol; Macroalbuminúria: >34 mg/mmol"
+        except KeyError:
+            logger.error("Missing reference range for RAC_mg_mmol in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for ACR (0-3.4 mg/mmol - standard clinical range)
+            rac_ref_min_mg_mmol, rac_ref_max_mg_mmol = 0, 3.4
+            details_dict['RAC_ref_mg_mmol'] = f"Normal: <{rac_ref_max_mg_mmol} mg/mmol; Microalbuminúria: {rac_ref_max_mg_mmol}-34 mg/mmol; Macroalbuminúria: >34 mg/mmol (fallback)"
         interpretation_acr = f"Relação Albumina/Creatinina (RAC): {acr_value_mg_mmol} mg/mmol. "
         if acr_value_mg_mmol > 34: # Corresponds to >300 mg/g
             interpretation_acr += "Albumina urinária severamente aumentada (Macroalbuminúria)."
@@ -334,8 +434,14 @@ def analisar_funcao_renal(exams, **patient_kwargs):
     # Urinalysis - Hematuria
     if 'UrineHem' in standardized_params and standardized_params['UrineHem'] is not None:
         hem_value = standardized_params['UrineHem'] # Assuming cells/campo or qualitative
-        hem_ref_max = REFERENCE_RANGES['UrineHem'][1] # e.g., 2-5 cells/HPF
-        details_dict['UrineHem_ref'] = f"< {hem_ref_max} células/campo"
+        try:
+            hem_ref_max = REFERENCE_RANGES['UrineHem'][1] # e.g., 2-5 cells/HPF
+            details_dict['UrineHem_ref'] = f"< {hem_ref_max} células/campo"
+        except KeyError:
+            logger.error("Missing reference range for UrineHem in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for urine hemoglobin (0-5 cells/HPF - standard clinical range)
+            hem_ref_max = 5
+            details_dict['UrineHem_ref'] = f"< {hem_ref_max} células/campo (fallback)"
         if hem_value > hem_ref_max:
             interpretations_list.append(f"Hematúria presente: {hem_value} (valor conforme lab).")
             abnormalities_list.append("Hematúria")
@@ -344,8 +450,14 @@ def analisar_funcao_renal(exams, **patient_kwargs):
     # Urinalysis - Leukocyturia
     if 'UrineLeuco' in standardized_params and standardized_params['UrineLeuco'] is not None:
         leuco_value = standardized_params['UrineLeuco'] # Assuming cells/campo or qualitative
-        leuco_ref_max = REFERENCE_RANGES['UrineLeuco'][1] # e.g., 5 cells/HPF
-        details_dict['UrineLeuco_ref'] = f"< {leuco_ref_max} células/campo"
+        try:
+            leuco_ref_max = REFERENCE_RANGES['UrineLeuco'][1] # e.g., 5 cells/HPF
+            details_dict['UrineLeuco_ref'] = f"< {leuco_ref_max} células/campo"
+        except KeyError:
+            logger.error("Missing reference range for UrineLeuco in REFERENCE_RANGES dictionary")
+            # Use fallback reference ranges for urine leukocytes (0-10 cells/HPF - standard clinical range)
+            leuco_ref_max = 10
+            details_dict['UrineLeuco_ref'] = f"< {leuco_ref_max} células/campo (fallback)"
         if leuco_value > leuco_ref_max:
             interpretations_list.append(f"Leucocitúria presente: {leuco_value} (valor conforme lab).")
             abnormalities_list.append("Leucocitúria")

@@ -1,108 +1,197 @@
+import { openai } from '@ai-sdk/openai';
 import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { convertToModelMessages, streamText, createIdGenerator } from 'ai';
+import { NextRequest } from 'next/server';
+import type { ClinicalUIMessage } from '@/types/clinical-chat';
+import { clinicalTools } from '@/lib/clinical-tools';
 
-// Define the expected request body structure from the frontend (useChat hook)
-interface ChatApiRequest {
-  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string; }>;
-  conversationId?: string;
-  data?: {
-    patientId?: string;
-    // Other potential data from useChat options
-  };
-}
-
-const BACKEND_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend-api:8000'; // fallback for Docker Compose
-
-// Allow streaming responses up to 30 seconds (or more if needed)
-export const maxDuration = 60;
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authentication & Authorization
     const { userId, getToken } = await auth();
+
     if (!userId) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-    }
-    const token = await getToken();
-    if (!token) {
-      return new NextResponse(JSON.stringify({ error: 'Unauthorized: Could not retrieve token.' }), { status: 401 });
+      return new Response('Authentication required', { status: 401 });
     }
 
-    // 2. Parse request body
-    const { messages, conversationId, data }: ChatApiRequest = await req.json();
+    const token = await getToken();
+
+    const body = await req.json();
+    const { messages, data, conversationId: existingConversationId }: { messages: ClinicalUIMessage[]; data?: any, conversationId?: string } = body;
     const patientId = data?.patientId;
 
-    // 3. Prepare request for the backend streaming endpoint
-    // The backend now expects SendMessageRequest format
-    const backendPayload = {
-      conversation_id: conversationId,
-      patient_id: patientId, // Pass optional patientId
-      content: messages.find(m => m.role === 'user')?.content || '', // Extract last user message content
-      // Add any other relevant fields expected by SendMessageRequest if necessary
-    };
-
-    // Validate payload before sending
-    if (!backendPayload.conversation_id || !backendPayload.content) {
-      return new NextResponse(JSON.stringify({ error: 'Missing required payload fields' }), { status: 400 });
+    if (!messages || messages.length === 0) {
+      return new Response('Messages are required', { status: 400 });
     }
 
-    // 4. Call the backend streaming endpoint
-    const backendStreamEndpoint = `${BACKEND_API_URL}/api/ai-chat/stream`;
-    const fetchOptions: RequestInit = {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        // Pass any other required headers
+    // Get the last user message content
+    let lastUserMessage = '';
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'user') {
+      // Extract text content from parts
+      const textParts = lastMessage.parts.filter(part => part.type === 'text');
+      lastUserMessage = textParts.map(part => (part as any).text).join(' ');
+    }
+
+    // Simplified system prompt. The intelligence is now in the backend agent.
+    const systemPrompt = `Você é um assistente de IA. Sua principal função é rotear todas as perguntas clínicas ou de pesquisa para a ferramenta 'drCorvusClinicalAssistant'. Use esta ferramenta para responder a qualquer consulta do usuário. Não tente responder diretamente.`;
+
+    // Use streamText with our clinical tools
+    const result = streamText({
+      model: openai('gpt-4o'),
+      system: systemPrompt,
+      messages: convertToModelMessages(messages),
+      tools: {
+          ...clinicalTools,
+          drCorvusClinicalAssistant: clinicalTools.drCorvusClinicalAssistant,
       },
-      body: JSON.stringify(backendPayload),
-      // IMPORTANT: If running Next.js on Node < 18, you might need `duplex: 'half'` 
-      // See: https://nextjs.org/docs/app/api-reference/functions/fetch#optionsduplex
-      // duplex: 'half' // Uncomment if needed
-    };
+      toolChoice: 'auto', // Let the AI decide when to use tools
+      temperature: 0.1, // Lower temperature for more consistent medical advice
+    });
 
-    console.log(`Proxying chat request for conv ${conversationId} to backend: ${backendStreamEndpoint}`);
-    const backendResponse = await fetch(backendStreamEndpoint, fetchOptions);
+    return result.toUIMessageStreamResponse({
+      originalMessages: messages,
+      
+      // Generate consistent server-side IDs for message persistence
+      generateMessageId: createIdGenerator({
+        prefix: 'clinical-msg',
+        size: 16,
+      }),
+      
+      // Add clinical metadata to messages
+      messageMetadata: ({ part }) => {
+        const baseMetadata = {
+          timestamp: Date.now(),
+          model: 'gpt-4o',
+          consultationType: 'quick-chat' as const,
+        };
 
-    // 5. Check if backend response is valid
-    if (!backendResponse.ok) {
-        const errorText = await backendResponse.text();
-        console.error(`Backend stream error: ${backendResponse.status} ${backendResponse.statusText}`, errorText);
-        // Return an appropriate error response to the client
-        return new NextResponse(JSON.stringify({ error: `Backend Error: ${errorText || backendResponse.statusText}` }), { status: backendResponse.status });
-    }
+        if (patientId) {
+          (baseMetadata as any).patientId = patientId;
+        }
 
-    if (!backendResponse.body) {
-      return new NextResponse(JSON.stringify({ error: 'Backend response missing body' }), { status: 500 });
-    }
+        // Add token usage on completion
+        if (part.type === 'finish') {
+          return {
+            ...baseMetadata,
+            totalTokens: part.totalUsage.totalTokens,
+            confidenceScore: 0.8, // Default confidence for AI responses
+          };
+        }
 
-    // Return the stream directly as a standard Response
-    return new Response(backendResponse.body, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8', // Match expected content type for streaming
-        // You might need to copy other relevant headers from backendResponse if necessary
-        // e.g., backendResponse.headers.get('X-Some-Header')
+        // Add model info on start
+        if (part.type === 'start') {
+          return baseMetadata;
+        }
+
+        return baseMetadata;
+      },
+
+      // Handle clinical consultation persistence
+      onFinish: async ({ messages, responseMessage }) => {
+        try {
+            // Extract the first message content for conversation title
+            let firstMessageContent = '';
+            if (messages.length > 0) {
+              const firstMessage = messages[0];
+              if (firstMessage.role === 'user') {
+                // Extract text content from parts
+                const textParts = firstMessage.parts.filter(part => part.type === 'text');
+                firstMessageContent = textParts.map(part => (part as any).text).join(' ').substring(0, 100) || 'New Conversation';
+              }
+            }
+
+            let conversationId = existingConversationId;
+
+            // If no conversationId, create a new one
+            if (!conversationId) {
+                const createConvoResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/conversations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        title: firstMessageContent,
+                        patient_id: patientId,
+                    }),
+                });
+                if (!createConvoResponse.ok) {
+                    throw new Error('Failed to create conversation');
+                }
+                const newConversation = await createConvoResponse.json();
+                conversationId = newConversation.id;
+            }
+
+            // Save user message
+            const userMessage = messages[messages.length - 2];
+            if (userMessage) {
+                await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/conversations/${conversationId}/messages`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({
+                        role: userMessage.role,
+                        content: userMessage.parts.filter(part => part.type === 'text').map(part => (part as any).text).join(' '),
+                    }),
+                });
+            }
+
+            // Save AI response
+            await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/conversations/${conversationId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    role: responseMessage.role,
+                    content: responseMessage.parts.filter(part => part.type === 'text').map(part => (part as any).text).join(' '),
+                    message_metadata: responseMessage.metadata,
+                }),
+            });
+
+        } catch (error) {
+          console.error('Failed to save clinical consultation:', error);
+          // Don't fail the response if saving fails
+        }
+      },
+
+      // Handle tool execution errors gracefully
+      onError: (error) => {
+        console.error('Clinical chat error:', error);
+        
+        if (error instanceof Error) {
+          if (error.message.includes('tool')) {
+            return `Erro ao executar ferramenta clínica: ${error.message}`;
+          }
+          return `Erro no processamento clínico: ${error.message}`;
+        }
+        
+        return 'Ocorreu um erro inesperado no processamento clínico. Tente novamente.';
       },
     });
 
-  } catch (error: any) {
-    console.error('Error in frontend /api/chat proxy route:', error);
-    let errorMessage = 'An unknown error occurred';
-    let errorStatus = 500;
-
-    if (error instanceof Error) {
-        errorMessage = error.message;
-    }
-    // Add specific error handling if needed (e.g., JSON parsing errors)
-
-    return new NextResponse(
-      JSON.stringify({ error: errorMessage }), 
-      { status: errorStatus, headers: { 'Content-Type': 'application/json' } }
+  } catch (error) {
+    console.error('Error in clinical chat API:', error);
+    
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Erro desconhecido no sistema de chat clínico';
+      
+    return new Response(
+      JSON.stringify({ 
+        error: `Erro no chat clínico: ${errorMessage}`,
+        details: 'Verifique sua conexão e tente novamente. Se o problema persistir, contate o suporte técnico.' 
+      }), 
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 }
-
-export async function GET() {
-  return NextResponse.json({ message: 'Chat API placeholder' }, { status: 501 });
-} 

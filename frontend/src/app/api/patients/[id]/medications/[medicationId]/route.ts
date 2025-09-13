@@ -1,39 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
-
-// GET a specific medication
-export async function GET(
-  request: NextRequest,
-  context: { params: Record<string, string> }
-) {
-  const { params } = context;
-  try {
-    const medicationId = params["medicationId"];
-    const apiUrl = process.env.API_URL || 'http://backend-api:8000';
-    const response = await axios.get(`${apiUrl}/api/medications/${medicationId}`);
-
-    // Map backend model to frontend model
-    const medication = {
-      id: response.data.id,
-      name: response.data.name,
-      dosage: response.data.dosage,
-      frequency: response.data.frequency,
-      route: response.data.route,
-      startDate: response.data.start_date,
-      endDate: response.data.end_date || '',
-      notes: response.data.notes || '',
-      active: response.data.status === 'active'
-    };
-
-    return NextResponse.json({ medication }, { status: 200 });
-  } catch (error: any) {
-    console.error('Error fetching medication:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch medication' },
-      { status: error.response?.status || 500 }
-    );
-  }
-}
 
 // PUT update a medication
 export async function PUT(
@@ -43,42 +8,34 @@ export async function PUT(
   const { params } = context;
   try {
     const medicationId = params["medicationId"];
-    const apiUrl = process.env.API_URL || 'http://backend-api:8000';
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/medications/${medicationId}`;
+    const authHeader = request.headers.get('Authorization') || '';
     const body = await request.json();
 
-    // Map frontend model to backend model
-    const medicationPayload = {
-      name: body.name,
-      dosage: body.dosage,
-      frequency: body.frequency,
-      route: body.route,
-      start_date: body.startDate,
-      end_date: body.endDate || null,
-      notes: body.notes || null,
-      status: body.active ? 'active' : 'suspended'
-    };
+    const response = await fetch(backendUrl, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader
+      },
+      body: JSON.stringify(body)
+    });
 
-    const response = await axios.put(`${apiUrl}/api/medications/${medicationId}`, medicationPayload);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.detail || errorData.error || 'Failed to update medication' },
+        { status: response.status }
+      );
+    }
 
-    // Map response back to frontend model
-    const medication = {
-      id: response.data.id,
-      name: response.data.name,
-      dosage: response.data.dosage,
-      frequency: response.data.frequency,
-      route: response.data.route,
-      startDate: response.data.start_date,
-      endDate: response.data.end_date || '',
-      notes: response.data.notes || '',
-      active: response.data.status === 'active'
-    };
-
-    return NextResponse.json({ medication }, { status: 200 });
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error: any) {
     console.error('Error updating medication:', error);
     return NextResponse.json(
       { error: 'Failed to update medication' },
-      { status: error.response?.status || 500 }
+      { status: 500 }
     );
   }
 }
@@ -91,16 +48,30 @@ export async function DELETE(
   const { params } = context;
   try {
     const medicationId = params["medicationId"];
-    const apiUrl = process.env.API_URL || 'http://backend-api:8000';
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/medications/${medicationId}`;
+    const authHeader = request.headers.get('Authorization') || '';
     
-    await axios.delete(`${apiUrl}/api/medications/${medicationId}`);
+    const response = await fetch(backendUrl, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': authHeader
+      }
+    });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.detail || errorData.error || 'Failed to delete medication' },
+        { status: response.status }
+      );
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error deleting medication:', error);
     return NextResponse.json(
       { error: 'Failed to delete medication' },
-      { status: error.response?.status || 500 }
+      { status: 500 }
     );
   }
-} 
+}

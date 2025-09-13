@@ -5,6 +5,9 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { Button } from '@/components/ui/Button';
 import { Patient, Exam } from '@/store/patientStore';
 import { VitalSign } from '@/types/health';
+import { GroupPatient } from '@/types/group';
+import { Badge } from '@/components/ui/Badge';
+import { Users } from 'lucide-react';
 
 // Format date helper
 const formatDate = (dateString: string | undefined): string => {
@@ -102,6 +105,7 @@ const VitalSigns = ({ vitalSigns }: { vitalSigns: VitalSign[] }) => {
 
 interface PatientCardProps {
   patient: Patient;
+  groups?: GroupPatient[]; // Optional group membership information
   onDelete: (id: string) => void;
   onSelect: (id: string) => void;
 }
@@ -115,8 +119,23 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, onDelete, onSelect }
   // Calculate age if missing, using correct property name
   const age = patient.age || calculateAge(patient.birthDate);
 
+  // Display group information if available
+  const groupBadges = (patient as any).groups?.slice(0, 3).map((group: any) => (
+    <Badge key={group.id} variant="secondary" className="flex items-center gap-1">
+      <Users className="h-3 w-3" />
+      Grupo #{group.group_id}
+    </Badge>
+  )) || [];
+
+  const patientGroups = (patient as any).groups;
+  if (patientGroups && patientGroups.length > 3) {
+    groupBadges.push(
+      <Badge key="more" variant="secondary">+{patientGroups.length - 3} mais</Badge>
+    );
+  }
+
   return (
-    <Card 
+    <Card
       className="w-full hover:shadow-md transition-shadow cursor-pointer"
       onClick={() => onSelect(String(patient.patient_id))}
     >
@@ -125,6 +144,11 @@ const PatientCard: React.FC<PatientCardProps> = ({ patient, onDelete, onSelect }
           <GenderIcon gender={patient.gender} />
           {patient.name} <span className="text-sm font-normal text-foreground">({age} anos)</span>
         </CardTitle>
+        {groupBadges.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {groupBadges}
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="pb-4 space-y-3">

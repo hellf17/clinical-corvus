@@ -8,8 +8,16 @@ from typing import Optional
 # O código Python simplesmente as usa, esperando que existam no ambiente.
 from baml_client import b
 from config import get_settings
-from routers import auth, patients, me, lab_analysis, alerts, files, stored_analyses, vital_signs, scores, clinical_assistant_router, research_assistant_router, translator_router, clinical_simulation_router
+from routers import auth, patients, me, lab_analysis, alerts, files, stored_analyses, vital_signs, scores, general_scores, clinical_assistant_router, research_assistant_router, translator_router, clinical_simulation_router, chat, exams, groups, medications, clinical_notes, agents_router, user_preferences_router, agent_research_router
+from routers import rag as rag_router
+from routers import rag_ingest as rag_ingest_router
 from clients.mcp_client import MCPClient
+from middleware.agent_security import AgentSecurityMiddleware
+from middleware.error_handling import ErrorHandlingMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+from utils.rate_limit import limiter
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -40,54 +48,29 @@ app = FastAPI(
 
 # Configure CORS
 origins = settings.cors_origins.split(",") if settings.cors_origins else []
-# Ensure localhost:3000 is included for development
-if "http://localhost:3000" not in origins:
-    origins.append("http://localhost:3000")
 
-# Clean up origins (remove whitespace)
-origins = [origin.strip() for origin in origins if origin.strip()]
-logger.info(f"Configured CORS origins: {origins}")
+logger.info(f"🌐 CORS Origins: {origins}")
+logger.info(f"🔑 Frontend URL: {settings.frontend_url}")
 
-# Enhanced CORS middleware for development
-if settings.environment == "development":
-    logger.info("Running in development mode - using permissive CORS settings")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+)
 
-# Add debug middleware to log CORS-related headers
-@app.middleware("http")
-async def log_cors_headers(request, call_next):
-    response = await call_next(request)
-    
-    # Log CORS headers for debugging
-    origin = request.headers.get("origin")
-    if origin:
-        logger.info(f"CORS request from origin: {origin}")
-        logger.info(f"Response CORS headers: {response.headers.get('Access-Control-Allow-Origin')}")
-    
-    # Ensure CORS headers are set for all responses
-    if origin and (settings.environment == "development" or origin in origins):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin, X-Requested-With"
-    
-    return response
+# Add Agent Security Middleware
+app.add_middleware(AgentSecurityMiddleware)
+
+# Add Error Handling Middleware
+app.add_middleware(ErrorHandlingMiddleware)
+
+# Global Rate Limiting (shared limiter instance)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+logger.info("SlowAPI rate limiting middleware enabled")
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -95,14 +78,27 @@ app.include_router(patients.router, prefix="/api/patients", tags=["Patients"])
 app.include_router(me.router, prefix="/api/me", tags=["Me"])
 app.include_router(lab_analysis.router, prefix="/api/lab-analysis", tags=["Lab Analysis"])  # CLEAR: Lab analysis
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(medications.router, prefix="/api/medications", tags=["Medications"])
 app.include_router(files.router, prefix="/api/files", tags=["Files"])
 app.include_router(stored_analyses.router, prefix="/api/stored-analyses", tags=["Stored Analyses"])  # CLEAR: CRUD for analyses
 app.include_router(vital_signs.router, prefix="/api/vital-signs", tags=["Vital Signs"])
-app.include_router(scores.router, prefix="/api/scores", tags=["Scores"])
+app.include_router(scores.router, prefix="/api", tags=["Scores"])
+app.include_router(general_scores.router, prefix="/api", tags=["General Scores"])
 app.include_router(research_assistant_router.router, prefix="/api/research", tags=["Research with Dr. Corvus"])
 app.include_router(translator_router.router, prefix="/api/translate", tags=["Translation"])
 app.include_router(clinical_simulation_router.router, prefix="/api/simulation", tags=["Clinical Simulation"])
 app.include_router(clinical_assistant_router.router, prefix="/api/clinical")
+app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
+app.include_router(exams.router, prefix="/api/patients", tags=["Exams"])
+app.include_router(groups.router, prefix="/api/groups", tags=["Groups"])
+app.include_router(clinical_notes.router, prefix="/api/clinical-notes", tags=["Clinical Notes"])
+# Expose consolidated agents endpoints under both prefixes for compatibility
+app.include_router(agents_router, prefix="/api/agents", tags=["AI Agents"])
+app.include_router(agents_router, prefix="/api/mvp-agents", tags=["MVP Agents"])  # legacy path shim
+app.include_router(agent_research_router.router, prefix="/api/research", tags=["Agent Clinical Research"])
+app.include_router(user_preferences_router.router, prefix="/api/user", tags=["User Preferences"])
+app.include_router(rag_router, prefix="/api", tags=["Hybrid RAG"])
+app.include_router(rag_ingest_router, prefix="/api", tags=["Hybrid RAG Ingest"])
 
 # Root endpoint
 @app.get("/", tags=["Root"])

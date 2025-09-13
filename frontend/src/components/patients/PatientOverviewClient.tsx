@@ -156,7 +156,7 @@ export default function PatientOverviewClient({
 
     const toastId = toast.loading(`Excluindo paciente ${patient.name}...`);
     try {
-      await deletePatientService(patient.patient_id, currentToken);
+      await deletePatientService(patient.patient_id);
       toast.success("Paciente excluído", {
         id: toastId,
         description: `Paciente ${patient.name} foi removido.`, 

@@ -2,7 +2,7 @@
  * Types for chat interactions
  */
 
-import { Message } from 'ai';
+import { CoreMessage } from 'ai';
 import { Medication } from './medication'; // Import Medication type
 
 // Define a specific type for exam summaries
@@ -50,7 +50,7 @@ export interface ChatContextValue {
 }
 
 export interface ChatState {
-  messages: Message[];
+  messages: CoreMessage[];
   input: string;
   isLoading: boolean;
   error: Error | null;
@@ -67,4 +67,4 @@ export interface ChatMessage {
   metadata?: Record<string, any>;
 }
 
-export type { Message }; 
+export type { CoreMessage as Message }; 

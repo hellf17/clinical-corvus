@@ -1,5 +1,5 @@
 import React from 'react';
-import ResultsTimelineChart from './ResultsTimelineChart';
+import ResultsTimelineChart from './EnhancedResultsTimelineChart';
 import { Exam } from '@/store/patientStore';
 import { LabResult } from '@/types/health';
 

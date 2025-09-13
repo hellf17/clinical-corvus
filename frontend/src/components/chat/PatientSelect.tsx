@@ -6,39 +6,47 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { usePatientStore } from '@/store/patientStore';
 
 interface PatientSelectProps {
-  onSelect: (patientId: string) => void;
+  onSelect: (patientId: string | null) => void;
+  selectedPatientId: string | null;
 }
 
-const PatientSelect: React.FC<PatientSelectProps> = ({ onSelect }) => {
+const PatientSelect: React.FC<PatientSelectProps> = ({ onSelect, selectedPatientId }) => {
   const { patients, isLoading } = usePatientStore();
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [localSelectedPatientId, setLocalSelectedPatientId] = useState<string>('');
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const patientId = e.target.value;
-    setSelectedPatientId(patientId);
+  const handleSelectChange = (patientId: string) => {
+    setLocalSelectedPatientId(patientId);
   };
 
   const handleApplyPatient = () => {
-    if (selectedPatientId) {
-      onSelect(selectedPatientId);
+    if (localSelectedPatientId === 'todos') {
+      onSelect(null);
+    } else if (localSelectedPatientId) {
+      onSelect(localSelectedPatientId);
     }
   };
 
+  const handleClearPatient = () => {
+    setLocalSelectedPatientId('');
+    onSelect(null);
+  };
+
   if (isLoading) {
-    return <div>Carregando pacientes...</div>;
+    return <div className="text-sm text-gray-600">Carregando pacientes...</div>;
   }
 
   return (
-    <div className="patient-select">
+    <div className="patient-select flex items-center gap-2">
       <Select
-        value={selectedPatientId}
-        onValueChange={setSelectedPatientId}
+        value={localSelectedPatientId}
+        onValueChange={handleSelectChange}
         data-testid="patient-select"
       >
-        <SelectTrigger className="patient-dropdown">
-          <SelectValue placeholder="Selecione um paciente" />
+        <SelectTrigger className="w-48">
+          <SelectValue placeholder="Todos os Pacientes" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="todos">Todos os Pacientes</SelectItem>
           {patients.map(patient => (
             <SelectItem key={patient.patient_id} value={String(patient.patient_id)}>
               {patient.name}
@@ -47,15 +55,28 @@ const PatientSelect: React.FC<PatientSelectProps> = ({ onSelect }) => {
         </SelectContent>
       </Select>
       
-      <Button 
+      <Button
         onClick={handleApplyPatient}
-        disabled={!selectedPatientId}
+        disabled={!localSelectedPatientId}
+        size="sm"
+        variant="outline"
         data-testid="apply-patient-button"
       >
         Aplicar
       </Button>
+      
+      {selectedPatientId && (
+        <Button
+          onClick={handleClearPatient}
+          size="sm"
+          variant="ghost"
+          className="text-xs"
+        >
+          Limpar
+        </Button>
+      )}
     </div>
   );
 };
 
-export default PatientSelect; 
+export default PatientSelect;

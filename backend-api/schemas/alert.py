@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Dict, Optional, Any, List
 from datetime import datetime
 
@@ -45,7 +45,7 @@ class AlertInDBBase(AlertBase):
     acknowledged_by: Optional[str] = None
     acknowledged_at: Optional[datetime] = None
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class Alert(AlertInDBBase):
     pass

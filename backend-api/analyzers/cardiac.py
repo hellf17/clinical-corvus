@@ -3,7 +3,7 @@ Cardiac markers analysis module for interpreting cardiac-related lab tests.
 """
 
 import math
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import logging
 
 from utils.reference_ranges import REFERENCE_RANGES
@@ -31,6 +31,44 @@ def _safe_convert_to_float(value_str: Optional[str]) -> Optional[float]:
             except ValueError: pass
         return None
 
+def _get_criticality_level(param_name, value, thresholds):
+    """
+    Determine the criticality level of a parameter based on stratified thresholds.
+    
+    Args:
+        param_name: Name of the parameter
+        value: The value to evaluate
+        thresholds: Dictionary with 'critical', 'significant', and 'monitoring' thresholds
+        
+    Returns:
+        tuple: (criticality_level, description)
+    """
+    if value is None:
+        return ("UNKNOWN", f"{param_name} value is None")
+    
+    # Check critical thresholds
+    if 'critical' in thresholds:
+        for threshold in thresholds['critical']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("CRITICAL", f"{param_name} CRITICAL: {value} - Life-threatening immediate")
+    
+    # Check significant thresholds
+    if 'significant' in thresholds:
+        for threshold in thresholds['significant']:
+            if isinstance(threshold, tuple):  # Range (low, high)
+                if threshold[0] <= value <= threshold[1]:
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+            elif isinstance(threshold, (int, float)):  # Single value comparison
+                if (threshold < 0 and value < abs(threshold)) or (threshold > 0 and value > threshold):
+                    return ("SIGNIFICANT", f"{param_name} SIGNIFICANT: {value} - Potentially life-threatening urgent")
+    
+    # Default to monitoring
+    return ("MONITORING", f"{param_name} MONITORING: {value} - Significant morbidity risk prompt")
+
 def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
     """
     Analyze cardiac markers to assess for myocardial injury and heart failure.
@@ -49,23 +87,28 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
     abnormalities_list: List[str] = []
     recommendations_list: List[str] = []
     is_critical_flag: bool = False
-    details_dict: Dict[str, any] = {}
+    details_dict: Dict[str, Any] = {}
 
     # Process all numeric values using _safe_convert_to_float
     processed_dados = {}
     for key, value in dados.items():
         details_dict[key] = value  # Store original value
         if value is not None:
-            value_str = str(value) if not isinstance(value, str) else value
-            converted_value = _safe_convert_to_float(value_str)
-            if converted_value is not None:
-                processed_dados[key] = converted_value
-                details_dict[key] = converted_value
+            if isinstance(value, (int, float)):
+                processed_dados[key] = float(value)
+                details_dict[key] = float(value)
             else:
-                processed_dados[key] = None
-                logger.info(f"Could not convert cardiac param {key}: '{value}' using _safe_convert_to_float. It will be ignored.")
+                value_str = str(value)
+                converted_value = _safe_convert_to_float(value_str)
+                if converted_value is not None:
+                    processed_dados[key] = converted_value
+                    details_dict[key] = converted_value
+                else:
+                    processed_dados[key] = None
+                    logger.info(f"Could not convert cardiac param {key}: '{value}'. It will be ignored.")
         else:
             processed_dados[key] = None
+            logger.info(f"Cardiac param {key} is None. It will be ignored.")
 
     # Standardize input parameters and populate details_dict
     # Prioritize high-sensitivity troponin if available
@@ -108,13 +151,22 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
     if not any([trop_val is not None, ckmb_val is not None, bnp_val is not None, nt_pro_bnp_val is not None, cpk_val is not None, ldh_val is not None]):
         return {
             "interpretation": "Dados insuficientes para análise dos marcadores cardíacos.",
-            "abnormalities": [], "is_critical": False, "recommendations": [], "details": {}
+            "abnormalities": [], "is_critical": False, "recommendations": [], "details": details_dict
         }
     
     # Analyze troponin
     has_troponin_elevation = False
     if trop_val is not None and trop_key_used:
         details_dict[trop_key_used] = trop_val
+        
+        trop_criticality, trop_description = _get_criticality_level("Troponina", trop_val, {
+            'critical': [1.0],
+            'significant': [(0.04, 1.0)],
+            'monitoring': [(0, 0.04)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if trop_criticality == "CRITICAL":
+            is_critical_flag = True
         # General 99th percentile. Specific assays and sex-specific cutoffs for hs-Tn are crucial.
         # Example: hs-TnT <14 ng/L (pg/mL), hs-TnI varies more (e.g., <16 F, <34 M ng/L for some assays)
         # Using a generic 0.04 ng/mL (40 pg/mL) for conventional/unspecified hs-Tn as a higher threshold example.
@@ -164,10 +216,14 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
                 interpretations_list.append("Elevação acentuada de troponina - sugere dano miocárdico significativo, altamente provável IAM se contexto clínico compatível.")
                 if hora_dor_inicio is not None and hora_dor_inicio < 6:
                     interpretations_list.append("Início recente de dor (<6h) com troponina muito elevada reforça suspeita de infarto agudo do miocárdio (IAM).")
+                # Add ESC guidelines for STEMI/NSTEMI management
+                recommendations_list.append("Segundo as diretrizes ESC 2017 para SCA, troponina >1.0 ng/mL indica lesão miocárdica significativa. Considerar cateterismo cardíaco emergencial (<120 min) para STEMI ou invasivo precoce (<24h) para NSTEMI.")
             elif trop_val > 0.1: # ng/mL - Moderate elevation
                 interpretations_list.append("Elevação moderada de troponina - consistente com lesão miocárdica. Avaliar Sinais de Alerta Cardiovascular (SCA) e outras causas (miocardite, TEP, IC descompensada, DRC).")
+                recommendations_list.append("Segundo as diretrizes ESC 2017, troponina 0.04-1.0 ng/mL indica lesão miocárdica leve a moderada. Investigar causa com ECG, ecocardiograma e clínica. Considerar estratégia invasiva em 24-72h.")
             else: # Lower elevation (e.g., 0.04 to 0.1 ng/mL)
                 interpretations_list.append("Elevação discreta de troponina - pode ocorrer em diversas condições incluindo SCA de menor extensão, ou causas não-isquêmicas como IC descompensada, TEP, sepse, miocardite, insuficiência renal crônica (DRC).")
+                recommendations_list.append("Segundo as diretrizes ESC 2017, troponina 0.04-0.1 ng/mL pode indicar lesão miocárdica inicial. Repetir em 3-6h com ECG seriado. Considerar tomografia coronária se SCA de baixa probabilidade.")
             
             recommendations_list.append("Elevação de troponina detectada. Recomenda-se avaliação clínica urgente, ECG seriado, e considerar algoritmos para SCA (ex: 0/1h ou 0/2h para hs-Troponina) se aplicável.")
         else:
@@ -254,6 +310,16 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
     if nt_pro_bnp_val is not None:
         details_dict['NTproBNP'] = nt_pro_bnp_val
         interpretations_list.append(f"NT-proBNP: {nt_pro_bnp_val} pg/mL.")
+        
+        nt_pro_bnp_criticality, nt_pro_bnp_description = _get_criticality_level("NT-proBNP", nt_pro_bnp_val, {
+            'critical': [5000],
+            'significant': [(1800, 5000)],
+            'monitoring': [(300, 1800)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if nt_pro_bnp_criticality in ["CRITICAL", "SIGNIFICANT"]:
+            is_critical_flag = True
+        
         # Age-dependent cutoffs for NT-proBNP are crucial
         # <50 anos: >450 pg/mL sugere IC
         # 50-75 anos: >900 pg/mL sugere IC
@@ -286,17 +352,31 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
             if nt_pro_bnp_val > 450: # General indicative, less specific than age-adjusted
                 interpretations_list.append(f"NT-proBNP elevado ({nt_pro_bnp_val} pg/mL). Sugestivo de disfunção ventricular/IC. Recomenda-se correlação com idade e clínica.")
                 abnormalities_list.append(f"NT-proBNP Elevado ({nt_pro_bnp_val} pg/mL)")
-                recommendations_list.append("NT-proBNP elevado: Avaliar clinicamente para IC, considerar ecocardiograma.")
+                recommendations_list.append("NT-proBNP elevado: Avaliar clinicamente para IC, considerar ecocardiograma. Segundo as diretrizes ESC 2016 para IC, NT-proBNP >450 pg/mL indica disfunção ventricular.")
+                # Add specific treatment recommendations
+                recommendations_list.append("TREATMENT RECOMMENDATIONS: Para IC confirmada, iniciar IECA/ARA-II, betabloqueadores e diuréticos conforme tolerância. Considerar antagonistas do receptor de mineralocorticóide em IC sintomática.")
                 is_critical_flag = True
             elif nt_pro_bnp_val < 300:
                 interpretations_list.append(f"NT-proBNP ({nt_pro_bnp_val} pg/mL) < 300 pg/mL. Baixa probabilidade de IC descompensada.")
+                recommendations_list.append("Segundo as diretrizes ESC 2016 para IC, NT-proBNP <300 pg/mL tem alto valor preditivo negativo para exclusão de IC. Repetir se sintomas persistentes.")
             else:
                 interpretations_list.append(f"NT-proBNP ({nt_pro_bnp_val} pg/mL) entre 300-450 pg/mL. Zona cinzenta, avaliar clinicamente.")
+                recommendations_list.append("Segundo as diretrizes ESC 2016 para IC, NT-proBNP 300-450 pg/mL indica zona cinzenta. Considerar repetição em 2-4 semanas ou teste de esforço.")
         bnp_processed = True
 
     if bnp_val is not None and not bnp_processed:
         details_dict['BNP'] = bnp_val
         interpretations_list.append(f"BNP: {bnp_val} pg/mL.")
+
+        bnp_criticality, bnp_description = _get_criticality_level("BNP", bnp_val, {
+            'critical': [1000],
+            'significant': [(400, 1000)],
+            'monitoring': [(100, 400)]
+        })
+        # Note: criticality assessment integrated into detailed interpretation below
+        if bnp_criticality in ["CRITICAL", "SIGNIFICANT"]:
+            is_critical_flag = True
+
         # General BNP cutoffs
         # <100 pg/mL: IC improvável
         # 100-400 pg/mL: IC possível, considerar outros fatores (idade, DRC)
@@ -304,14 +384,17 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
         if bnp_val > 400:
             interpretations_list.append(f"BNP marcadamente elevado ({bnp_val} pg/mL). Altamente sugestivo de insuficiência cardíaca descompensada.")
             abnormalities_list.append(f"BNP Elevado ({bnp_val} pg/mL)")
-            recommendations_list.append("BNP elevado: Avaliar clinicamente para IC, considerar ecocardiograma.")
-            is_critical_flag = True
+            recommendations_list.append("BNP elevado: Avaliar clinicamente para IC, considerar ecocardiograma. Segundo as diretrizes ESC 2016 para IC, BNP >400 pg/mL indica insuficiência cardíaca descompensada.")
+            # Add specific treatment recommendations
+            recommendations_list.append("TREATMENT RECOMMENDATIONS: Para IC confirmada, iniciar IECA/ARA-II, betabloqueadores e diuréticos conforme tolerância. Considerar antagonistas do receptor de mineralocorticóide em IC sintomática.")
         elif bnp_val > 100:
             interpretations_list.append(f"BNP elevado ({bnp_val} pg/mL). Sugestivo de insuficiência cardíaca ou outras causas de estresse ventricular (ex: TEP, HAP, DRC, idade avançada).")
             abnormalities_list.append(f"BNP Elevado ({bnp_val} pg/mL)")
-            recommendations_list.append("BNP elevado: Avaliar clinicamente para IC e outras causas, considerar ecocardiograma.")
+            recommendations_list.append("BNP elevado: Avaliar clinicamente para IC e outras causas, considerar ecocardiograma. Segundo as diretrizes ESC 2016 para IC, BNP 100-400 pg/mL indica IC compensada ou outras causas.")
+            recommendations_list.append("DIAGNOSTIC WORKUP RECOMMENDED: Solicitar ecocardiograma para avaliar função ventricular. Considerar TEP se fator de risco presente. Avaliar função renal e pulmonar.")
         else: # <=100
             interpretations_list.append(f"BNP ({bnp_val} pg/mL) não elevado. Baixa probabilidade de insuficiência cardíaca descompensada como causa primária de dispneia.")
+            recommendations_list.append("Segundo as diretrizes ESC 2016 para IC, BNP <100 pg/mL tem alto valor preditivo negativo para exclusão de IC. Considerar outras causas de dispneia.")
     
     # Analyze LDH (very non-specific)
     if ldh_val is not None:
@@ -352,4 +435,4 @@ def analisar_marcadores_cardiacos(dados, paciente_info: Optional[Dict] = None):
         "is_critical": is_critical_flag,
         "recommendations": list(set(recommendations_list)),
         "details": details_dict 
-    } 
+    }

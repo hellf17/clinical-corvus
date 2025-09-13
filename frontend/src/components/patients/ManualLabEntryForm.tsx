@@ -127,7 +127,7 @@ export const ManualLabEntryForm: React.FC<ManualLabEntryFormProps> = ({ patientI
            inputData.is_abnormal = true;
        }
 
-      const createdResult = await addManualLabResultClient(patientId, inputData, token);
+      const createdResult = await addManualLabResultClient(patientId, inputData);
       
       toast.success(`Resultado para "${createdResult.test_name}" adicionado com sucesso!`);
       onResultAdded(); 

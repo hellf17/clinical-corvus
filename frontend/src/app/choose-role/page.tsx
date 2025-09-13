@@ -104,35 +104,77 @@ export default function ChooseRolePage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-muted/30 p-4">
-      <div className="max-w-4xl mx-auto w-full">
-        <Card className="max-w-2xl w-full shadow-xl mx-auto">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Bem-vindo(a) ao Clinical Corvus!</CardTitle>
-            <CardDescription>Para otimizar sua experiência, por favor, selecione seu perfil de uso.</CardDescription>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <div className="max-w-5xl mx-auto w-full">
+        {/* Header Section */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full mb-6">
+            <BookOpen className="h-8 w-8 text-white" />
+          </div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Clinical Corvus
+          </h1>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Seu assistente clínico inteligente para decisões baseadas em evidências
+          </p>
+        </div>
+
+        {/* Main Card */}
+        <Card className="max-w-4xl w-full shadow-2xl border-0 bg-white/80 backdrop-blur-sm mx-auto">
+          <CardHeader className="text-center pb-8">
+            <CardTitle className="text-3xl font-bold text-gray-800 mb-2">
+              Bem-vindo(a)!
+            </CardTitle>
+            <CardDescription className="text-lg text-gray-600">
+              Escolha seu perfil para personalizar sua experiência
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Button 
-                variant={selectedProfile === 'professional' ? 'default' : 'outline'} 
-                className="h-28 text-lg flex flex-col gap-2 items-center justify-center p-4" 
+          <CardContent className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Button
+                variant={selectedProfile === 'professional' ? 'default' : 'outline'}
+                className={`h-40 text-xl flex flex-col gap-4 items-center justify-center p-6 transition-all duration-300 ${
+                  selectedProfile === 'professional'
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg transform scale-105'
+                    : 'hover:shadow-lg hover:scale-105 border-2 border-blue-200 hover:border-blue-400'
+                }`}
                 onClick={() => handleProfileSelect('professional')}
                 disabled={loading}
               >
-                <Stethoscope className="h-8 w-8 mb-1" />
-                <span className="text-center">Profissional de Saúde</span>
-                <span className="text-xs text-muted-foreground">Médicos, enfermeiros, etc.</span>
+                <div className={`p-3 rounded-full ${selectedProfile === 'professional' ? 'bg-white/20' : 'bg-blue-100'}`}>
+                  <Stethoscope className={`h-10 w-10 ${selectedProfile === 'professional' ? 'text-white' : 'text-blue-600'}`} />
+                </div>
+                <div className="text-center">
+                  <span className={`font-semibold ${selectedProfile === 'professional' ? 'text-white' : 'text-gray-800'}`}>
+                    Médico
+                  </span>
+                  <p className={`text-sm mt-1 ${selectedProfile === 'professional' ? 'text-blue-100' : 'text-gray-500'}`}>
+                    Profissional de saúde
+                  </p>
+                </div>
               </Button>
-              
-              <Button 
-                variant={selectedProfile === 'medical_student' ? 'default' : 'outline'} 
-                className="h-28 text-lg flex flex-col gap-2 items-center justify-center p-4" 
+
+              <Button
+                variant={selectedProfile === 'medical_student' ? 'default' : 'outline'}
+                className={`h-40 text-xl flex flex-col gap-4 items-center justify-center p-6 transition-all duration-300 ${
+                  selectedProfile === 'medical_student'
+                    ? 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg transform scale-105'
+                    : 'hover:shadow-lg hover:scale-105 border-2 border-purple-200 hover:border-purple-400'
+                }`}
                 onClick={() => handleProfileSelect('medical_student')}
                 disabled={loading}
               >
-                <GraduationCap className="h-8 w-8 mb-1" />
-                <span className="text-center">Estudante/Residente</span>
-                <span className="text-xs text-muted-foreground">Medicina, residência</span>
+                <div className={`p-3 rounded-full ${selectedProfile === 'medical_student' ? 'bg-white/20' : 'bg-purple-100'}`}>
+                  <GraduationCap className={`h-10 w-10 ${selectedProfile === 'medical_student' ? 'text-white' : 'text-purple-600'}`} />
+                </div>
+                <div className="text-center">
+                  <span className={`font-semibold ${selectedProfile === 'medical_student' ? 'text-white' : 'text-gray-800'}`}>
+                    Estudante
+                  </span>
+                  <p className={`text-sm mt-1 ${selectedProfile === 'medical_student' ? 'text-purple-100' : 'text-gray-500'}`}>
+                    Estudante de medicina
+                  </p>
+                </div>
               </Button>
               
               {/* Future patient option (commented out for now) */}
@@ -151,30 +193,53 @@ export default function ChooseRolePage() {
             </div>
             
             {selectedProfile && (
-              <div className="p-4 bg-muted/30 rounded-lg">
-                <h3 className="font-semibold mb-2 flex items-center">
-                  {selectedProfile === 'professional' && <><Stethoscope className="h-4 w-4 mr-2" />Profissional de Saúde</>}
-                  {selectedProfile === 'medical_student' && <><GraduationCap className="h-4 w-4 mr-2" />Estudante/Residente</>}
-                  {/* {selectedProfile === 'patient' && <><User className="h-4 w-4 mr-2" />Paciente</>} */}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {selectedProfile === 'professional' && 
-                    "Acesso completo ao Dr. Corvus Insights, análise laboratorial avançada, gestão de pacientes e todas as ferramentas profissionais."}
-                  {selectedProfile === 'medical_student' && 
-                    "Acesso à Academia Clínica, Dr. Corvus Insights para aprendizado, simulações clínicas e ferramentas educacionais avançadas."}
-                  {/* {selectedProfile === 'patient' && 
-                    "Acesso ao diário de saúde, análise de exames pessoais, chat educacional e ferramentas de acompanhamento."} */}
+              <div className={`p-6 rounded-xl border-2 transition-all duration-300 ${
+                selectedProfile === 'professional'
+                  ? 'bg-blue-50 border-blue-200 shadow-blue-100 shadow-lg'
+                  : 'bg-purple-50 border-purple-200 shadow-purple-100 shadow-lg'
+              }`}>
+                <div className="flex items-center mb-3">
+                  {selectedProfile === 'professional' ? (
+                    <Stethoscope className="h-6 w-6 text-blue-600 mr-3" />
+                  ) : (
+                    <GraduationCap className="h-6 w-6 text-purple-600 mr-3" />
+                  )}
+                  <h3 className={`text-xl font-bold ${
+                    selectedProfile === 'professional' ? 'text-blue-800' : 'text-purple-800'
+                  }`}>
+                    {selectedProfile === 'professional' ? 'Perfil Médico' : 'Perfil Estudante'}
+                  </h3>
+                </div>
+                <p className={`text-base leading-relaxed ${
+                  selectedProfile === 'professional' ? 'text-blue-700' : 'text-purple-700'
+                }`}>
+                  {selectedProfile === 'professional' &&
+                    "Acesso completo ao Dr. Corvus, análise laboratorial avançada, gestão de pacientes e todas as ferramentas profissionais para otimizar seu trabalho clínico."}
+                  {selectedProfile === 'medical_student' &&
+                    "Acesso à Academia Clínica, ferramentas educacionais avançadas, simulações clínicas e Dr. Corvus para acelerar seu aprendizado médico."}
                 </p>
               </div>
             )}
-            
+
             <Button
-              className="w-full mt-4 text-base py-3"
+              className={`w-full mt-6 text-lg py-4 font-semibold transition-all duration-300 ${
+                selectedProfile
+                  ? selectedProfile === 'professional'
+                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl'
+                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg hover:shadow-xl'
+                  : 'bg-gray-300 cursor-not-allowed'
+              }`}
               onClick={handleConfirm}
               disabled={!selectedProfile || loading}
             >
-              {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-              Confirmar e Continuar
+              {loading ? (
+                <div className="flex items-center">
+                  <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                  Configurando seu perfil...
+                </div>
+              ) : (
+                'Confirmar e Começar'
+              )}
             </Button>
           </CardContent>
         </Card>

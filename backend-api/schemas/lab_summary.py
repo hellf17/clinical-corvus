@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import date
 
@@ -14,4 +14,4 @@ class LabSummary(BaseModel):
     overall_status: Optional[str] = None # e.g., 'stable', 'requires attention'
     recent_trends: List[LabTrendItem] = []
 
-    model_config = {"from_attributes": True} 
+    model_config = ConfigDict(from_attributes=True)

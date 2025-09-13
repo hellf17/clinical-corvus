@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     const apiUrl = getAPIUrl();
-    const response = await fetch(`${apiUrl}/clinical/expand-differential-diagnosis`, {
+    const response = await fetch(`${apiUrl}/api/clinical/expand-differential-diagnosis`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

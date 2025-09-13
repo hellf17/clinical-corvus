@@ -292,4 +292,36 @@ def adapt_medication_data(test_data: Dict[str, Any]) -> Dict[str, Any]:
     if "route" not in adapted_data:
         adapted_data["route"] = medication_schemas.MedicationRoute.ORAL
     
-    return adapted_data 
+    return adapted_data
+
+
+class MedicationCRUD:
+    """CRUD operations for Medication model."""
+
+    def get_by_patient_id(self, db: Session, patient_id: int) -> List[Medication]:
+        """Get medications for a specific patient."""
+        return get_medications(db, patient_id)
+
+    def get(self, db: Session, medication_id: int) -> Optional[Medication]:
+        """Get a medication by ID."""
+        return get_medication(db, medication_id)
+
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[Medication]:
+        """Get multiple medications."""
+        return db.query(Medication).offset(skip).limit(limit).all()
+
+    def create(self, db: Session, *, obj_in, patient_id: int, user_id: int) -> Medication:
+        """Create a new medication."""
+        return create_medication(db, medication=obj_in, patient_id=patient_id, user_id=user_id)
+
+    def update(self, db: Session, *, db_obj: Medication, obj_in) -> Medication:
+        """Update a medication."""
+        return update_medication(db, db_obj.medication_id, obj_in)
+
+    def remove(self, db: Session, *, medication_id: int) -> bool:
+        """Remove a medication."""
+        return delete_medication(db, medication_id)
+
+
+# Create instance for easy import
+medication = MedicationCRUD()

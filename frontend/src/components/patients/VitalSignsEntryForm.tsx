@@ -4,12 +4,11 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/Calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/Popover";
 import { VitalSignCreateInput } from "@/types/health";
@@ -91,7 +90,7 @@ export function VitalSignsEntryForm({ patientId, onSuccess }: VitalSignsEntryFor
     const toastId = toast.loading("Saving Vital Signs...");
 
     try {
-      const result = await addVitalSignClient(patientId, apiData, token);
+      const result = await addVitalSignClient(patientId, apiData);
       toast.success("Vital Signs Saved", {
         id: toastId,
         description: `Record ID: ${result.vital_id} at ${format(new Date(result.timestamp), "PPpp")}`,

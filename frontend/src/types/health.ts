@@ -116,5 +116,6 @@ export interface ManualLabResultInput {
   collection_datetime?: string | Date | null;
   reference_range_low?: number | null;
   reference_range_high?: number | null;
+  is_abnormal?: boolean;
   comments?: string | null;
-} 
+}

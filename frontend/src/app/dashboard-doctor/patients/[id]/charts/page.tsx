@@ -3,7 +3,7 @@
 import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation'; // Use App Router hook
 import { usePatientStore } from '@/store/patientStore';
-import ResultsTimelineChart from '@/components/charts/ResultsTimelineChart';
+import ResultsTimelineChart from '@/components/charts/EnhancedResultsTimelineChart';
 // import ResultsTimelineComparison from '@/components/charts/ResultsTimelineComparison'; // Commented out
 import SystemExamsViewer from '@/components/SystemExamsViewer';
 import AIChat from '@/components/patients/AIChat';

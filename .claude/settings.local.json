@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx tsc:*)",
+      "Read(/D:\\d\\clinical-helper/**)",
+      "Read(/D:\\d\\clinical-helper/**)",
+      "Read(/D:\\d\\clinical-helper/**)",
+      "Bash(npm test:*)",
+      "Bash(python -m pytest tests/test_analyzers/test_inflammatory.py -v)",
+      "Bash(pip install:*)",
+      "Bash(python tests:*)",
+      "Bash(python -c \"\nimport sys\nsys.path.append(''.'')\nfrom tests.test_analyzers.test_inflammatory import TestInflammatoryAnalyzer\ntest = TestInflammatoryAnalyzer()\ntest.setup_method()\ntry:\n    test.test_pcr_normal_values()\n    print(''✓ test_pcr_normal_values PASSED'')\nexcept Exception as e:\n    print(f''✗ test_pcr_normal_values FAILED: {e}'')\n\")",
+      "Read(/D:\\d\\clinical-helper/**)",
+      "Read(/D:\\d\\clinical-helper/**)",
+      "Bash(npm run test:ci:*)",
+      "Bash(python:*)",
+      "Bash(npm install:*)",
+      "Bash(docker:*)",
+      "Bash(docker compose:*)",
+      "Read(D:\\d\\clinical-helper/**)",
+      "Read(D:\\d/**)",
+      "Bash(dir:*)",
+      "Read(D:\\d\\clinical-helper/**)",
+      "Read(D:\\d\\clinical-helper\\backend-api\\tests/**)",
+      "Read(D:\\d\\clinical-helper\\backend-api/**)",
+      "Bash(npx playwright test:*)",
+      "Bash(npx jest:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm ls:*)",
+      "Bash(npx next build:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": [],
+    "additionalDirectories": [
+      "D:\\d\\clinical-helper"
+    ]
+  }
+}

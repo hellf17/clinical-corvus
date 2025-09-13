@@ -55,18 +55,6 @@ def create_test_patient(sqlite_session, user_id):
     sqlite_session.commit()
     return patient
 
-def get_auth_headers(user_email, user_id=None, name="Test User"):
-    """Get authorization headers with a valid token."""
-    token_data = {"sub": user_email}
-    
-    # Include user_id and name if available
-    if user_id:
-        token_data["user_id"] = user_id
-    # Include a default name for testing
-    token_data["name"] = name
-    
-    access_token = create_access_token(data=token_data)
-    return {"Authorization": f"Bearer {access_token}"}
 
 def test_create_medical_note(sqlite_client, sqlite_session):
     """Test creating a new medical note."""
@@ -113,7 +101,7 @@ def test_create_medical_note(sqlite_client, sqlite_session):
     # Use the client's set_auth_user method with bypass_auth=True
     sqlite_client.set_auth_user(user, bypass_auth=True)
     
-    response = sqlite_client.post("/api/clinical-notes/", json=note_data)
+    response = sqlite_client.post(f"/api/clinical-notes/patient/{patient.patient_id}", json=note_data)
     
     # Print response details for debugging
     print(f"\nResponse status: {response.status_code}")

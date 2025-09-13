@@ -1,5 +1,7 @@
 import React from 'react';
-import { Message } from 'ai/react';
+import { UIMessage as Message } from '@ai-sdk/react';
+import type { ToolUIPart } from 'ai';
+import { ToolResult } from './ToolResult';
 
 interface ChatMessageProps {
   message: Message;
@@ -7,7 +9,13 @@ interface ChatMessageProps {
 
 const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
-  const timestamp = message.createdAt ? new Date(message.createdAt) : null;
+  
+  // Try to get timestamp from metadata or use null as fallback
+  let timestamp = null;
+  if (message.metadata && typeof message.metadata === 'object' && 'timestamp' in message.metadata) {
+    timestamp = new Date(message.metadata.timestamp as string | number | Date);
+  }
+  
   const formattedTime = timestamp 
     ? timestamp.toLocaleTimeString('pt-BR', {
         hour: '2-digit',
@@ -28,7 +36,34 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           <div className={`text-sm ${isUser ? 'text-primary-foreground opacity-80' : 'text-muted-foreground'}`}>
             {isUser ? 'Você' : 'Dr. Corvus'}
           </div>
-          <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.parts && message.parts.length > 0 ? (
+            message.parts.map((part, index) => {
+              // Type guard for tool parts
+              if (part.type.startsWith('tool-') && 'toolCallId' in part) {
+                const toolPart = part as ToolUIPart;
+                return (
+                  <ToolResult
+                    key={`${toolPart.toolCallId}-${index}`}
+                    toolName={toolPart.type.replace('tool-', '')}
+                    toolData={toolPart.state === 'output-available' ? toolPart.output : undefined}
+                  />
+                );
+              }
+              if (part.type === 'text') {
+                return (
+                  <div key={index} className="whitespace-pre-wrap">
+                    {part.text}
+                  </div>
+                );
+              }
+              return null;
+            })
+          ) : (
+            <div className="whitespace-pre-wrap">
+              {/* Fallback to content if parts don't exist */}
+              {'content' in message ? (message.content as string) : ''}
+            </div>
+          )}
           {formattedTime && (
             <div
               className={`text-xs mt-1 self-end ${

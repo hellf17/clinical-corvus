@@ -18,6 +18,8 @@ class TranslationHealthResponse(BaseModel):
     cache_size: int = 0
     baml_available: bool = False
     deepl_available: bool = False
+    primary_service: str = "deepl"  # Indicates which service is primary
+    fallback_service: str = "baml"  # Indicates which service is fallback
 
 
 
@@ -57,7 +59,9 @@ async def health_check():
         "test_translation_successful": False,
         "cache_size": len(translation_cache),
         "baml_available": False,
-        "deepl_available": False
+        "deepl_available": False,
+        "primary_service": "deepl",
+        "fallback_service": "baml"
     }
     
     try:
@@ -102,5 +106,7 @@ async def health_check():
             "test_translation_successful": False,
             "cache_size": len(translation_cache),
             "baml_available": False,
-            "deepl_available": False
+            "deepl_available": False,
+            "primary_service": "deepl",
+            "fallback_service": "baml"
         }

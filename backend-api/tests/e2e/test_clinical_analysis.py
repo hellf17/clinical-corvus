@@ -104,6 +104,7 @@ def lab_results_text() -> str:
         return f.read()
 
 
+@pytest.mark.skip(reason="E2E test requires a running backend environment")
 def test_pdf_upload_and_analysis(
     auth_headers: Dict[str, str], 
     test_patient: Dict[str, Any],
@@ -160,6 +161,7 @@ def test_pdf_upload_and_analysis(
         )
 
 
+@pytest.mark.skip(reason="E2E test requires a running backend environment")
 def test_text_based_analysis(
     auth_headers: Dict[str, str], 
     test_patient: Dict[str, Any],
@@ -207,6 +209,7 @@ def test_text_based_analysis(
         )
 
 
+@pytest.mark.skip(reason="E2E test requires a running backend environment")
 def test_analysis_specific_modules(
     auth_headers: Dict[str, str], 
     test_patient: Dict[str, Any]
@@ -301,6 +304,7 @@ def test_analysis_specific_modules(
         )
 
 
+@pytest.mark.skip(reason="E2E test requires a running backend environment")
 def test_trend_analysis(
     auth_headers: Dict[str, str], 
     test_patient: Dict[str, Any]

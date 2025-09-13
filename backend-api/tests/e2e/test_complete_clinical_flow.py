@@ -49,6 +49,7 @@ def lab_results_pdf() -> bytes:
         return f.read()
 
 
+@pytest.mark.skip(reason="E2E test requires a running backend environment")
 def test_complete_clinical_flow(auth_headers: Dict[str, str], lab_results_pdf: bytes):
     """
     Test the complete clinical flow from patient admission to discharge.

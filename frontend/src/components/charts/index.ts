@@ -2,9 +2,10 @@
  * Exports all chart components for easier imports elsewhere
  */
 
-export { default as ResultsTimelineChart } from './ResultsTimelineChart';
-export { CorrelationMatrixChart } from './CorrelationMatrixChart';
-export { default as MultiParameterComparisonChart } from './MultiParameterComparisonChart';
-export { default as ScatterPlotChart } from './ScatterPlotChart';
-export { default as ConsolidatedTimelineChart } from './ConsolidatedTimelineChart';
-export { default as SeverityScoresChart } from './SeverityScoresChart'; 
+export { default as EnhancedResultsTimelineChart } from './EnhancedResultsTimelineChart';
+export { default as EnhancedPatientDataChart } from './EnhancedPatientDataChart';
+export { default as EnhancedConsolidatedTimelineChart } from './EnhancedConsolidatedTimelineChart';
+export { default as EnhancedSeverityScoresChart } from './EnhancedSeverityScoresChart';
+export { default as EnhancedMultiParameterComparisonChart } from './EnhancedMultiParameterComparisonChart';
+export { EnhancedCorrelationMatrixChart } from './EnhancedCorrelationMatrixChart';
+export { default as EnhancedScatterPlotChart } from './EnhancedScatterPlotChart';

@@ -1,27 +1,21 @@
 import { Patient, PatientCreate, PatientListResponse, PatientSummary, Exam } from '@/types/patient';
-import { API_URL } from '@/lib/config';
+import { assignPatientToGroup } from './groupService'; // Import group service function
 
 /**
- * Creates a new patient using a client-side fetch call.
- * 
+ * Creates a new patient using Next.js proxy route.
+ *
  * @param patientData The data for the new patient.
- * @param token The authentication token obtained from useAuth().getToken().
  * @returns The created patient data.
  * @throws Error if the creation fails.
  */
-export async function createPatientClient(patientData: PatientCreate, token: string): Promise<Patient> {
-  if (!token) {
-    throw new Error("Authentication token is required to create a patient.");
-  }
-
-  const url = `${API_URL}/api/patients/`;
+export async function createPatientClient(patientData: PatientCreate): Promise<Patient> {
+  const url = `/api/patients`;
   console.log(`Creating patient at: ${url}`);
 
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(patientData),
@@ -40,17 +34,124 @@ export async function createPatientClient(patientData: PatientCreate, token: str
   } catch (error: any) {
     console.error("Network or other error creating patient:", error);
     // Re-throw the error for the form to catch and display
-    throw error; 
+    throw error;
   }
 }
 
-export async function deletePatientClient(patientId: number | string, token: string): Promise<void> {
-  if (!token) throw new Error('Token de autenticação não fornecido.');
-  const headers: HeadersInit = {
-    'Authorization': `Bearer ${token}`,
-  };
-  const endpoint = `${API_URL}/api/patients/${patientId}`;
-  const response = await fetch(endpoint, { method: 'DELETE', headers });
+/**
+ * Creates a new patient and optionally assigns them to a group using Next.js proxy route.
+ *
+ * @param patientData The data for the new patient.
+ * @param groupId Optional group ID to assign the patient to.
+ * @returns The created patient data.
+ * @throws Error if the creation fails.
+ */
+export async function createPatientWithGroupAssignment(patientData: PatientCreate, groupId?: number): Promise<Patient> {
+  const url = `/api/patients`;
+  console.log(`Creating patient at: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patientData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})); // Try to parse error details
+      console.error(`API error creating patient: ${response.status} ${response.statusText}`, errorData);
+      throw new Error(errorData.detail || `Failed to create patient: ${response.statusText}`);
+    }
+
+    const createdPatient: Patient = await response.json();
+    console.log("Patient created successfully:", createdPatient);
+    
+    // If a group ID was provided, assign the patient to that group
+    if (groupId) {
+      try {
+        await assignPatientToGroup(groupId, { patient_id: createdPatient.patient_id });
+        console.log(`Patient assigned to group ${groupId} successfully.`);
+      } catch (groupError: any) {
+        console.error(`Failed to assign patient to group ${groupId}:`, groupError);
+        // We don't throw this error as the patient was created successfully
+        // The group assignment failure is logged but doesn't prevent patient creation
+      }
+    }
+    
+    return createdPatient;
+
+  } catch (error: any) {
+    console.error("Network or other error creating patient:", error);
+    // Re-throw the error for the form to catch and display
+    throw error;
+  }
+}
+
+
+
+
+
+/**
+ * Updates an existing patient using Next.js proxy route.
+ *
+ * @param patientId The ID of the patient to update.
+ * @param patientData The updated patient data.
+ * @param groupId Optional group ID to assign the patient to.
+ * @returns The updated patient data.
+ * @throws Error if the update fails.
+ */
+export async function updatePatientClient(patientId: number, patientData: Partial<Patient>, groupId?: number): Promise<Patient> {
+  const url = `/api/patients/${patientId}`;
+  console.log(`Updating patient at: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patientData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})); // Try to parse error details
+      console.error(`API error updating patient: ${response.status} ${response.statusText}`, errorData);
+      throw new Error(errorData.detail || `Failed to update patient: ${response.statusText}`);
+    }
+
+    const updatedPatient: Patient = await response.json();
+    console.log("Patient updated successfully:", updatedPatient);
+    
+    // If a group ID was provided, assign the patient to that group
+    if (groupId !== undefined) {
+      try {
+        // First, remove patient from current group if any
+        // Then, assign patient to new group if provided
+        if (groupId) {
+          await assignPatientToGroup(groupId, { patient_id: patientId });
+          console.log(`Patient assigned to group ${groupId} successfully.`);
+        }
+      } catch (groupError: any) {
+        console.error(`Failed to assign patient to group ${groupId}:`, groupError);
+        // We don't throw this error as the patient was updated successfully
+        // The group assignment failure is logged but doesn't prevent patient update
+      }
+    }
+    
+    return updatedPatient;
+
+  } catch (error: any) {
+    console.error("Network or other error updating patient:", error);
+    // Re-throw the error for the form to catch and display
+    throw error;
+  }
+}
+
+export async function deletePatientClient(patientId: number | string): Promise<void> {
+  const endpoint = `/api/patients/${patientId}`;
+  const response = await fetch(endpoint, { method: 'DELETE' });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Erro ao deletar paciente: ${response.status} - ${errorText}`);
@@ -62,36 +163,31 @@ interface GetPatientsParams {
   page?: number;
   limit?: number;
   search?: string;
+  groupId?: number; // Add group filter
   // Add other potential filters like status, doctorId, etc.
 }
 
 /**
- * Fetches a list of patients from the backend API (client-side).
- * Requires authentication token.
- * 
+ * Fetches a list of patients using Next.js proxy route.
+ *
  * @param params Query parameters for pagination, search, filtering.
- * @param token Authentication token.
  * @returns A promise resolving to the paginated list of patients.
  */
-export async function getPatientsClient(params: GetPatientsParams, token: string): Promise<PatientListResponse> {
-     if (!token) {
-    throw new Error("Authentication token is required to fetch patients.");
-  }
-
+export async function getPatientsClient(params: GetPatientsParams): Promise<PatientListResponse> {
     const query = new URLSearchParams();
     if (params.page) query.append('page', params.page.toString());
     if (params.limit) query.append('limit', params.limit.toString());
     if (params.search) query.append('search', params.search);
+    if (params.groupId) query.append('group_id', params.groupId.toString()); // Add group filter
     // Append other filters as needed
 
-    const url = `${API_URL}/api/patients/?${query.toString()}`;
+    const url = `/api/patients?${query.toString()}`;
     console.log(`Fetching patients (client-side) from: ${url}`);
 
     try {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
             },
             cache: 'no-store', // Often want fresh patient lists
@@ -118,7 +214,7 @@ export async function getPatientsClient(params: GetPatientsParams, token: string
 }
 
 export async function getPatientByIdClient(patientId: string): Promise<Patient | null> {
-  const endpoint = `${API_URL}/api/patients/${patientId}`;
+  const endpoint = `/api/patients/${patientId}`;
   const response = await fetch(endpoint, { headers: { 'Content-Type': 'application/json' } });
   if (!response.ok) {
     if (response.status === 404) return null;
@@ -130,23 +226,17 @@ export async function getPatientByIdClient(patientId: string): Promise<Patient |
 
 export async function getPatientLabResultsClient(
   patientId: number | string,
-  token: string,
   { page = 1, limit = 1000 }: { page?: number; limit?: number } = {}
 ): Promise<{ items: any[]; total: number }> {
-  if (!token) {
-    throw new Error('Authentication token not provided.');
-  }
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
   const skip = (page - 1) * limit;
   const queryParams = new URLSearchParams({
     skip: skip.toString(),
     limit: limit.toString(),
   });
-  const endpoint = `${API_URL}/api/patients/${patientId}/lab_results?${queryParams.toString()}`;
-  const response = await fetch(endpoint, { headers });
+  const endpoint = `/api/patients/${patientId}/labs?${queryParams.toString()}`;
+  const response = await fetch(endpoint, {
+    headers: { 'Content-Type': 'application/json' }
+  });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`API error fetching lab results: ${response.statusText} - ${errorText}`);
@@ -156,18 +246,12 @@ export async function getPatientLabResultsClient(
 
 export async function addManualLabResultClient(
   patientId: number | string,
-  inputData: any,
-  token: string
+  inputData: any
 ): Promise<any> {
-  if (!token) throw new Error('Authentication token not provided.');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-  const endpoint = `${API_URL}/api/patients/${patientId}/lab_results`;
+  const endpoint = `/api/patients/${patientId}/labs`;
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(inputData),
   });
   if (!response.ok) {
@@ -179,18 +263,12 @@ export async function addManualLabResultClient(
 
 export async function addVitalSignClient(
   patientId: number | string,
-  apiData: any,
-  token: string
+  apiData: any
 ): Promise<any> {
-  if (!token) throw new Error('Authentication token not provided.');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-  const endpoint = `${API_URL}/api/patients/${patientId}/vital_signs`;
+  const endpoint = `/api/patients/${patientId}/vitals`;
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(apiData),
   });
   if (!response.ok) {
@@ -202,18 +280,12 @@ export async function addVitalSignClient(
 
 export async function addExamClient(
   patientId: number | string,
-  examData: Omit<Exam, 'exam_id' | 'patient_id'>,
-  token: string
+  examData: Omit<Exam, 'exam_id' | 'patient_id'>
 ): Promise<Exam> {
-  if (!token) throw new Error('Authentication token not provided.');
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-  };
-  const endpoint = `${API_URL}/api/patients/${patientId}/exams`;
+  const endpoint = `/api/patients/${patientId}/exams`;
   const response = await fetch(endpoint, {
     method: 'POST',
-    headers,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(examData),
   });
   if (!response.ok) {
@@ -225,20 +297,12 @@ export async function addExamClient(
 
 export async function deleteExamClient(
   patientId: number | string,
-  examId: number | string,
-  token: string
+  examId: number | string
 ): Promise<void> {
-  if (!token) throw new Error('Authentication token not provided.');
-  const headers: HeadersInit = {
-    'Authorization': `Bearer ${token}`,
-  };
-  const endpoint = `${API_URL}/api/patients/${patientId}/exams/${examId}`;
-  const response = await fetch(endpoint, {
-    method: 'DELETE',
-    headers,
-  });
+  const endpoint = `/api/patients/${patientId}/exams/${examId}`;
+  const response = await fetch(endpoint, { method: 'DELETE' });
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`API error deleting exam: ${response.statusText} - ${errorText}`);
   }
-} 
+}

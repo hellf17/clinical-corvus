@@ -77,20 +77,58 @@ export default clerkMiddleware(async (auth: ClerkMiddlewareAuth, req: NextReques
     return NextResponse.redirect(new URL('/choose-role', req.url));
   }
   
-  // --- Optional: Role-Based Access Control (Example) can be added here ---
-  /*
-  if (userRole === 'doctor' && !(url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/patients') || url.pathname.startsWith('/analysis'))) {
+  // Role-Based Access Control for dashboard-doctor routes
+  if (url.pathname.startsWith('/dashboard-doctor')) {
+    if (userRole !== 'doctor') {
+      // User is not a doctor, redirect to unauthorized page
       const unauthorizedUrl = new URL('/unauthorized', req.url);
       return NextResponse.redirect(unauthorizedUrl);
+    }
   }
-  if (userRole === 'patient' && !url.pathname.startsWith('/dashboard-paciente')) {
+
+  // Feature-gate: Clinical Validation program (selected testers only)
+  if (url.pathname.startsWith('/dashboard-doctor/clinical-validation')) {
+    const isTester = Boolean((sessionClaims?.publicMetadata as any)?.clinicalValidation === true 
+      || (sessionClaims?.publicMetadata as any)?.betaTester === true);
+    if (!isTester) {
+      const unauthorizedUrl = new URL('/unauthorized', req.url);
+      return NextResponse.redirect(unauthorizedUrl);
+    }
+  }
+
+  // Group-Based Access Control for group routes
+  if (url.pathname.startsWith('/dashboard-doctor/groups')) {
+    // Extract group ID from the URL path
+    const groupPathRegex = /^\/dashboard-doctor\/groups\/(\d+)/;
+    const match = url.pathname.match(groupPathRegex);
+    
+    if (match) {
+      const groupId = match[1];
+      // In a real implementation, we would check if the user has access to this group
+      // For now, we'll allow access to all groups for doctors
+      // This should be replaced with an actual group membership check
+      console.log(`Middleware: Checking group access for user ${userId} to group ${groupId}`);
+    }
+  }
+
+  // Additional role-based access control can be added here
+  /*
+  if (userRole === 'patient' && !url.pathname.startsWith('/dashboard-patient')) {
        const unauthorizedUrl = new URL('/unauthorized', req.url);
        return NextResponse.redirect(unauthorizedUrl);
   }
   */
 
   // User has a role and is accessing an allowed page
-  return NextResponse.next();
+  // Forward the authorization header to the backend
+  const newHeaders = new Headers(req.headers);
+  newHeaders.set('Authorization', req.headers.get('Authorization') || '');
+
+  return NextResponse.next({
+    request: {
+      headers: newHeaders,
+    },
+  });
 });
 
 export const config = {

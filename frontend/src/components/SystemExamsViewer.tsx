@@ -25,47 +25,79 @@ interface SystemExamsViewerProps {
   patientId: number;
 }
 
-// Categorias de exames organizadas por sistemas (conforme versão Streamlit)
+// Categorias de exames organizadas por sistemas (atualizada com os novos analisadores implementados)
 const SYSTEM_CATEGORIES = {
   bloodGas: {
     title: "Gasometria",
-    tests: ["pH", "pCO2", "pO2", "HCO3", "BE", "Lactato", "SatO2", "FiO2"]
+    tests: ["pH", "pCO2", "pO2", "HCO3", "BE", "Lactato", "SatO2", "FiO2", "Bicarbonato"]
   },
   electrolytes: {
     title: "Eletrólitos",
-    tests: ["Sódio", "Potássio", "Cloro", "Cálcio", "Magnésio", "Fósforo"]
+    tests: ["Sódio", "Potássio", "Cloro", "Cálcio", "Magnésio", "Fósforo", "Na", "K", "Cl", "Ca", "Mg", "P"]
   },
   hematology: {
     title: "Hemograma",
-    tests: ["Hemoglobina", "Leucócitos", "Plaquetas", "Hematócrito", "Eritrócitos", "VCM", "HCM", "CHCM", "RDW", "Hemácias"]
+    tests: ["Hemoglobina", "Leucócitos", "Plaquetas", "Hematócrito", "Eritrócitos", "VCM", "HCM", "CHCM", "RDW", "Hemácias", "Hb", "Ht", "RBC", "WBC", "PLT"]
   },
   renal: {
-    title: "Função Renal", 
-    tests: ["Creatinina", "Ureia", "TFG", "Ácido Úrico", "Microalbuminúria"]
+    title: "Função Renal",
+    tests: ["Creatinina", "Ureia", "TFG", "Ácido Úrico", "Microalbuminúria", "Cystatin C", "Beta-2 Microglobulin", "NGAL", "KIM-1"]
   },
   hepatic: {
     title: "Função Hepática",
-    tests: ["TGO", "TGP", "GGT", "Fosfatase Alcalina", "Bilirrubina", "Albumina", "Proteínas Totais"]
+    tests: ["TGO", "TGP", "GGT", "Fosfatase Alcalina", "Bilirrubina", "Albumina", "Proteínas Totais", "AST", "ALT", "ALP", "TB", "DB", "Ammonia", "Ceruloplasmin"]
   },
   cardiac: {
     title: "Marcadores Cardíacos",
-    tests: ["Troponina", "CK", "CK-MB", "BNP", "NT-proBNP", "LDH"]
+    tests: ["Troponina", "CK", "CK-MB", "BNP", "NT-proBNP", "LDH", "Homocysteine", "hsCRP", "MR-proADM", "ST2", "Galectin-3"]
   },
   metabolic: {
     title: "Metabolismo",
-    tests: ["Glicose", "HbA1c", "Triglicérides", "Colesterol Total", "HDL", "LDL", "TSH", "T4 Livre"]
+    tests: ["Glicose", "HbA1c", "Triglicérides", "Colesterol Total", "HDL", "LDL", "Glucose", "TG", "TC", "Hemoglobina Glicada"]
+  },
+  thyroid: {
+    title: "Função Tireoidiana",
+    tests: ["TSH", "T4 Livre", "T3 Livre", "Anti-TPO", "Anti-TG", "TRAb", "T4L", "T3L", "AntiTPO", "AntiTG"]
+  },
+  boneMetabolism: {
+    title: "Metabolismo Ósseo",
+    tests: ["PTH", "Vitamina D", "Cálcio Iônico", "25-OH Vitamina D", "VitD", "IonizedCalcium", "1,25-OH Vitamina D"]
+  },
+  tumorMarkers: {
+    title: "Marcadores Tumorais",
+    tests: ["PSA", "CA 125", "CEA", "AFP", "CA 19-9", "Beta-HCG", "CA125", "CA19-9", "BetaHCG", "Alpha-Fetoprotein"]
+  },
+  autoimmune: {
+    title: "Marcadores Autoimunes",
+    tests: ["ANA", "Anti-dsDNA", "Anti-Sm", "Anti-RNP", "Anti-SSA", "Anti-SSB", "ANCA", "C3", "C4", "Fator Reumatóide", "Anti-CCP", "RF", "AntiDsDNA", "AntiSm", "AntiRNP", "AntiSSA", "AntiSSB"]
+  },
+  infectiousDisease: {
+    title: "Doenças Infecciosas",
+    tests: ["HIV", "HBsAg", "Anti-HBs", "Anti-HBc", "HCV", "Sífilis", "EBV", "CMV", "Toxoplasmose", "AntiHBs", "AntiHBc", "Syphilis", "Toxo"]
+  },
+  hormones: {
+    title: "Hormônios",
+    tests: ["Cortisol", "Prolactina", "Testosterona", "Estradiol", "Progesterona", "LH", "FSH", "DHEA-S", "Cortisol_AM", "Cortisol_PM", "Prolactin", "Testosterone", "Progesterone", "DHEAS"]
+  },
+  drugMonitoring: {
+    title: "Monitoramento de Medicamentos",
+    tests: ["Digoxina", "Fenitoína", "Carbamazepina", "Ácido Valproico", "Lítio", "Gentamicina", "Vancomicina", "Teofilina", "Digoxin", "Phenytoin", "Carbamazepine", "ValproicAcid", "Lithium", "Gentamicin", "Vancomycin", "Theophylline"]
+  },
+  pancreatic: {
+    title: "Função Pancreática",
+    tests: ["Amilase", "Lipase", "Elastase Fecal", "Quimotripsina"]
   },
   inflammation: {
     title: "Marcadores Inflamatórios",
-    tests: ["PCR", "Procalcitonina", "VHS", "Ferritina", "Fibrinogênio", "D-dímero"]
+    tests: ["PCR", "Procalcitonina", "VHS", "Ferritina", "Fibrinogênio", "D-dímero", "IL-6", "CRP", "PCT", "ESR", "IL6", "FerritinIndex", "sIL2R"]
   },
   coagulation: {
     title: "Coagulação",
-    tests: ["TP", "TTPa", "INR", "Fibrinogênio", "D-dímero"]
+    tests: ["TP", "TTPa", "INR", "Fibrinogênio", "D-dímero", "PT", "aPTT", "Fibrinogen", "D-Dimer", "TEG", "von Willebrand", "Fator VIII", "vWF", "FactorVIII"]
   },
   microbiology: {
     title: "Microbiologia",
-    tests: ["Hemocultura", "Urocultura", "Cultura de Escarro", "Cultura de Secreção"]
+    tests: ["Hemocultura", "Urocultura", "Cultura de Escarro", "Cultura de Secreção", "Blood Culture", "Urine Culture", "Sputum Culture", "Wound Culture"]
   }
 };
 
@@ -82,7 +114,7 @@ export const SystemExamsViewer: React.FC<SystemExamsViewerProps> = ({ patientId 
         try {
             const token = await getToken();
             if (!token) throw new Error("Authentication token not found.");
-            const response = await getPatientLabResultsClient(patientId, token, { limit: 1000 });
+            const response = await getPatientLabResultsClient(patientId, { limit: 1000 });
             setLabResults(response.items);
         } catch (err: any) {
             console.error("Failed to fetch lab results for SystemExamsViewer:", err);

@@ -9,16 +9,12 @@ def get_exam(db: Session, exam_id: int) -> Optional[Exam]:
     """Retrieve a single exam by its ID."""
     return db.query(Exam).filter(Exam.exam_id == exam_id).first()
 
-def get_exams_by_patient(db: Session, patient_id: int, skip: int = 0, limit: int = 100) -> List[Exam]:
-    """Retrieve all exams for a specific patient with pagination."""
-    return (
-        db.query(Exam)
-        .filter(Exam.patient_id == patient_id)
-        .order_by(Exam.exam_timestamp.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+def get_exams_by_patient(db: Session, patient_id: int, skip: int = 0, limit: int = 100) -> (List[Exam], int):
+    """Retrieve paginated exams for a specific patient and the total count."""
+    query = db.query(Exam).filter(Exam.patient_id == patient_id)
+    total = query.count()
+    exams = query.order_by(Exam.exam_timestamp.desc()).offset(skip).limit(limit).all()
+    return exams, total
 
 def create_exam(db: Session, exam_data: exam_schemas.ExamCreate, patient_id: int, user_id: int) -> Exam:
     """Create a new exam record."""

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, Field
+from pydantic import BaseModel, Field, Field, ConfigDict
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -25,7 +25,7 @@ class ClinicalScore(ClinicalScoreBase):
     user_id: int
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class ScoreResult(BaseModel):
     score: float

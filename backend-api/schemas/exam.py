@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -39,9 +39,11 @@ class Exam(ExamBase): # Schema for reading/returning exam data
     updated_at: datetime
     lab_results: List[LabResultSchema] = [] # Include associated lab results
 
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 class ExamWithLabResults(Exam): # Alias for clarity if needed, or just use Exam
-    pass 
+    pass
+
+class ExamListResponse(BaseModel):
+    exams: List[Exam]
+    total: int

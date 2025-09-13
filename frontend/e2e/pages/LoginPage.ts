@@ -4,7 +4,7 @@ export class LoginPage {
   constructor(private page: Page) {}
 
   // URLs
-  readonly url = '/auth/login';
+  readonly url = '/sign-in';
 
   // Locators
   private googleLoginButton = () => this.page.getByRole('button', { name: /Google|Entrar com Google/i });
@@ -36,7 +36,7 @@ export class LoginPage {
 
   async expectToBeInLoginPage() {
     // Use a more relaxed check for the URL
-    await expect(this.page).toHaveURL(/.*\/auth\/login.*|.*\/login.*/);
+    await expect(this.page).toHaveURL(/.*\/auth\/login.*|.*\/login.*|.*\/sign-in.*/);
     
     // Check for title with retry and increased timeout
     try {

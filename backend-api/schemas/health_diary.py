@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import date, datetime
 
@@ -26,7 +26,7 @@ class HealthDiaryEntry(HealthDiaryEntryBase):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class HealthDiaryEntryList(BaseModel):
     entries: list[HealthDiaryEntry]

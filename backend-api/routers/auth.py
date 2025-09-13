@@ -68,4 +68,45 @@ async def set_user_role(
     current_user.role = role
     db.commit()
     
-    return {"detail": f"Função do usuário definida como '{role}'"} 
+    return {"detail": f"Função do usuário definida como '{role}'"}
+
+
+# --- Group Token Refresh Endpoint ---
+
+@router.post("/refresh-group-token")
+async def refresh_group_token(
+    current_user: User = Depends(get_current_user_required),
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh the user's group access token.
+    This endpoint generates a new token with updated group claims.
+    """
+    try:
+        # Get user's current group memberships
+        from utils.group_authorization import get_user_group_ids
+        group_ids = get_user_group_ids(db, current_user.user_id)
+        
+        # Create group claims
+        group_claims = []
+        for group_id in group_ids:
+            group_claims.append({
+                "group_id": group_id
+            })
+        
+        # Generate new token with updated group claims
+        # Note: In a real implementation, this would integrate with Clerk's token refresh mechanism
+        # For now, we'll return a mock token with updated claims
+        new_token = {
+            "user_id": current_user.clerk_user_id,
+            "groups": group_claims,
+            "expires_at": datetime.now(timezone.utc).timestamp() + 3600  # 1 hour from now
+        }
+        
+        return new_token
+    except Exception as e:
+        print(f"Error refreshing group token for user {current_user.user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to refresh group access token"
+        )

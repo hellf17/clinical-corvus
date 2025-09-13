@@ -1,108 +1,57 @@
+# docker-compose.prod.yml
+version: '3.8'
 services:
-  postgres:
-    image: postgres:14
+  clinical-multi-agent:
+    image: clinical-corvus/multi-agent:latest
     environment:
-      - POSTGRES_USER=${DB_USER:-clinical_corvus}
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-clinical_corvus_pass}
-      - POSTGRES_DB=${DB_NAME:-clinical_corvus}
-    ports:
-      - "5432:5432"
+      - LANGROID_CONFIG_PATH=/app/config/prod.yaml
+      - PROMETHEUS_METRICS_PORT=9090
+      - HEALTH_CHECK_PORT=8080
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    networks:
-      - clinical-corvus-network
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-clinical_corvus}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  backend-api:
-    build:
-      context: .
-      dockerfile: backend-api/Dockerfile.prod
-    image: clinical-corvus-backend
-    restart: always
-    env_file:
-      - ./.env
+      - ./config:/app/config:ro
+      - ./models:/app/models:ro
     ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - SECRET_KEY=${SECRET_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
-      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
-      - NCBI_API_KEY=${NCBI_API_KEY}
-      - BRAVE_API_KEY=${BRAVE_API_KEY}
-      - POSTGRES_URL=postgresql://${DB_USER:-clinical_corvus}:${DB_PASSWORD:-clinical_corvus_pass}@postgres:5432/${DB_NAME:-clinical_corvus}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
-      - MCP_SERVER_URL=http://mcp_server:8765
-    networks:
-      - clinical-corvus-network
+      - "8001:8000"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: '2.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
-      args:
-        - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        - POSTGRES_URL=postgresql://${DB_USER:-clinical_corvus}:${DB_PASSWORD:-clinical_corvus_pass}@postgres:5432/${DB_NAME:-clinical_corvus}
+  metrics-collector:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
-    env_file:
-      - .env
     environment:
-      - NEXT_PUBLIC_API_URL=${API_URL:-http://backend-api:8000/api}
-      - NODE_ENV=production
-      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - DEEPL_API_KEY=${DEEPL_API_KEY}
-      - LLAMA_CLOUD_API_KEY=${LLAMA_CLOUD_API_KEY}
-    networks:
-      - clinical-corvus-network
-    restart: always
-    depends_on:
-      - backend-api
-
-  mcp_server:
-    build:
-      context: .
-      dockerfile: mcp_server/Dockerfile.prod
-    ports:
-      - "8765:8765"
-    env_file:
-      - ./.env
-    environment:
-      - NCBI_API_KEY=${NCBI_API_KEY}
-      - BRAVE_API_KEY=${BRAVE_API_KEY}
-      - MCP_PORT=8765
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-    networks:
-      - clinical-corvus-network
-    restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8765/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-networks:
-  clinical-corvus-network:
-    driver: bridge
-
-volumes:
-  postgres-data: 
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false

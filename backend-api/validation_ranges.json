@@ -1,0 +1,12 @@
+{
+  "Hemoglobin": { "min": 1, "max": 25, "unit": "g/dL" },
+  "Hematocrit": { "min": 10, "max": 75, "unit": "%" },
+  "Leukocytes": { "min": 100, "max": 100000, "unit": "/mm³" },
+  "Platelets": { "min": 10000, "max": 2000000, "unit": "/mm³" },
+  "Sodium": { "min": 100, "max": 180, "unit": "mEq/L" },
+  "Potassium": { "min": 1.5, "max": 9.0, "unit": "mEq/L" },
+  "Creatinine": { "min": 0.1, "max": 30, "unit": "mg/dL" },
+  "Glucose": { "min": 20, "max": 2000, "unit": "mg/dL" },
+  "AST": { "min": 0, "max": 5000, "unit": "U/L" },
+  "ALT": { "min": 0, "max": 5000, "unit": "U/L" }
+}

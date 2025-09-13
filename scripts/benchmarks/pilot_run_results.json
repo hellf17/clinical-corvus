@@ -1,0 +1,19 @@
+{
+  "run_info": {
+    "timestamp": "2025-09-12T14:21:22.456687Z",
+    "endpoint": "/api/agents/chat",
+    "input_file": "scripts/benchmarks/sample_bench.jsonl"
+  },
+  "results": [
+    {
+      "prompt": "What are the benefits of using metformin for PCOS?",
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+      "latency": 0.017429351806640625
+    },
+    {
+      "prompt": "Is there a correlation between vitamin D deficiency and autoimmune diseases?",
+      "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+      "latency": 0.003648519515991211
+    }
+  ]
+}

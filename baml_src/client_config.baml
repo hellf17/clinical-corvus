@@ -3,46 +3,44 @@
 
 // Define retry policies for better error handling
 retry_policy OpenRouterRetryPolicy {
-  max_retries 3
+  max_retries 1        // Reduced from 3 to 1
   strategy {
     type exponential_backoff
-    delay_ms 1000      // Start with 1 second
-    max_delay_ms 30000 // Max 30 seconds
-    multiplier 2.0     // Double delay each retry
-    jitter true        // Add randomization to prevent thundering herd
+    delay_ms 500       // Reduced from 1000ms
+    max_delay_ms 2000  // Reduced from 30000ms
+    multiplier 1.5     // Reduced multiplier
+    jitter true
   }
 }
 
 retry_policy TranslatorRetryPolicy {
-  max_retries 2
+  max_retries 1        // Reduced from 2 to 1
   strategy {
     type exponential_backoff
-    delay_ms 500       // Start with 500ms for faster translation retries
-    max_delay_ms 10000 // Max 10 seconds
-    multiplier 2.0
+    delay_ms 300       // Reduced from 500ms
+    max_delay_ms 1000  // Reduced from 10000ms
+    multiplier 1.5     // Reduced multiplier
     jitter true
   }
 }
 
 retry_policy FallbackRetryPolicy {
-  max_retries 1
+  max_retries 0        // Disable retries for fallback
   strategy {
     type constant_delay
-    delay_ms 100  // Quick fallback between clients
+    delay_ms 5         // Delay between fallbacks
   }
 }
 
 // Define the primary client that uses a fallback strategy
 client DrCorvusLLM {
   provider fallback
-  retry_policy OpenRouterRetryPolicy
+  retry_policy FallbackRetryPolicy  // Use the faster fallback policy
   options {
-    // The strategy now directly lists the clients in order of fallback
     strategy [
       OpenRouterPrimary,
       OpenRouterSecondary,
-      OpenRouterTertiary,
-      OpenRouterQuaternary
+      OpenRouterTertiary
     ]
   }
 }
@@ -55,7 +53,6 @@ client Translator {
     strategy [
       TranslatorPrimary,
       TranslatorSecondary,
-      OpenRouterPrimary,
       OpenRouterSecondary
     ]
   }
@@ -66,8 +63,8 @@ client TranslatorPrimary {
   provider openai-generic
   retry_policy TranslatorRetryPolicy
   options {
-    model "google/gemini-2.0-flash-exp:free"
-    temperature 0.2  // Lower temperature for more accurate translations
+    model "gpt-oss-120b:free"
+    temperature 0.3  // Lower temperature for more accurate translations
     max_tokens 4000
     base_url "https://openrouter.ai/api/v1"
     api_key env.OPENROUTER_API_KEY
@@ -83,8 +80,8 @@ client TranslatorSecondary {
   provider openai-generic
   retry_policy TranslatorRetryPolicy
   options {
-    model "qwen/qwen3-14b:free"  // Good for multilingual translation
-    temperature 0.2  // Lower temperature for more accurate translations
+    model "google/gemini-2.0-flash-exp:free" 
+    temperature 0.3  // Lower temperature for more accurate translations
     max_tokens 4000
     base_url "https://openrouter.ai/api/v1"
     api_key env.OPENROUTER_API_KEY
@@ -100,7 +97,7 @@ client OpenRouterPrimary {
   provider openai-generic
   retry_policy OpenRouterRetryPolicy
   options {
-    model "google/gemini-2.0-flash-exp:free"
+    model "openai/gpt-oss-120b:free"
     temperature 0.4
     max_tokens 4000
     base_url "https://openrouter.ai/api/v1"
@@ -118,7 +115,7 @@ client OpenRouterSecondary {
   provider openai-generic
   retry_policy OpenRouterRetryPolicy
   options {
-    model "deepseek/deepseek-r1-0528-qwen3-8b:free"
+    model "google/gemini-2.0-flash-exp:free"
     temperature 0.4
     max_tokens 4000
     base_url "https://openrouter.ai/api/v1"
@@ -130,29 +127,11 @@ client OpenRouterSecondary {
     timeout_ms 30000
   }
 }
-
 client OpenRouterTertiary {
   provider openai-generic
   retry_policy OpenRouterRetryPolicy
   options {
-    model "deepseek/deepseek-r1-0528:free"
-    temperature 0.4
-    max_tokens 4000
-    base_url "https://openrouter.ai/api/v1"
-    api_key env.OPENROUTER_API_KEY
-    headers {
-      "HTTP-Referer" "https://clinical-corvus.com"
-      "X-Title" "Clinical Corvus AI Assistant"
-    }
-    timeout_ms 30000
-  }
-}
-
-client OpenRouterQuaternary {
-  provider openai-generic
-  retry_policy OpenRouterRetryPolicy
-  options {
-    model "qwen/qwen3-14b:free"
+    model "qwen/qwen3-235b-a22b:free"
     temperature 0.4
     max_tokens 4000
     base_url "https://openrouter.ai/api/v1"
@@ -189,9 +168,9 @@ client BatchProcessingClient {
   provider openai-generic
   retry_policy TranslatorRetryPolicy  // Faster retries for batch operations
   options {
-    model "qwen/qwen3-14b:free"  // Good balance of speed and quality
-    temperature 0.2
-    max_tokens 2000  // Smaller tokens for faster processing
+    model "google/gemini-2.0-flash-exp:free"  // Good balance of speed and quality
+    temperature 0.3
+    max_tokens 3000  // Smaller tokens for faster processing
     base_url "https://openrouter.ai/api/v1"
     api_key env.OPENROUTER_API_KEY
     headers {

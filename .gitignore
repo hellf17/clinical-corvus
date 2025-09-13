@@ -191,7 +191,7 @@ dist/
 *.tfstate.backup
 
 # IDE
-.kilocode
+# .kilocode
 
 # Other related files
 clinical-corvus.code-workspace

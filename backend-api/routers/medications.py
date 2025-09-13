@@ -13,6 +13,7 @@ from crud import patients as patient_crud
 from crud import is_doctor_assigned_to_patient
 from security import get_current_user_required, verify_doctor_patient_access
 from routers.vital_signs import check_patient_access, check_modify_permission
+from utils.group_authorization import is_user_authorized_for_patient
 
 logger = logging.getLogger(__name__)
 
@@ -202,11 +203,15 @@ def create_patient_medication_endpoint(
     """Creates a new medication record for a specific patient."""
     logger.info(f"User {current_user.user_id} creating medication for patient {patient_id}")
     try:
-        db_medication = medication_crud.create_patient_medication(
-            db=db, 
-            medication=medication, 
-            patient_id=patient_id,
-            user_id=current_user.user_id
+        # Create medication using the existing create_medication function
+        # First, convert the MedicationPatientCreate to a dict and add patient_id
+        medication_dict = medication.model_dump() if hasattr(medication, 'model_dump') else medication.dict()
+        medication_dict['patient_id'] = patient_id
+        medication_dict['user_id'] = current_user.user_id
+    
+        db_medication = medication_crud.create_medication(
+            db=db,
+            medication_data=medication_dict
         )
         return db_medication
     except Exception as e:
@@ -292,15 +297,17 @@ def get_active_medications_by_patient(
     current_user: models.User = Depends(get_current_user_required)
 ):
     """Get active medications for a specific patient.
-    Requires doctor to be assigned to patient, or user to be the patient."""
+    Requires doctor to be assigned to patient directly or through groups, or user to be the patient."""
     # Authorization Check (Same as get_medications_by_patient)
     authorized = False
-    if current_user.role == 'doctor':
-        if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        if is_user_authorized_for_patient(db, current_user, patient_id):
             authorized = True
     elif current_user.role == 'patient':
         # Check if the requested patient_id matches the patient's own record ID
-        patient_record = db.query(Patient).filter(Patient.user_id == current_user.user_id).first()
+        patient_record = db.query(models.Patient).filter(models.Patient.user_id == current_user.user_id).first()
         if patient_record and patient_record.patient_id == patient_id:
             authorized = True
 
@@ -319,4 +326,4 @@ def get_active_medications_by_patient(
     for med in medications:
         result.append(format_medication_response(med))
     
-    return result 
+    return result

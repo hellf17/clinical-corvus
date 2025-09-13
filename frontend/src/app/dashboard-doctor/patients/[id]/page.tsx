@@ -32,9 +32,6 @@ export default function PatientDetailPage() {
       <div className="bg-card text-card-foreground p-4 rounded shadow">
         <div className="font-semibold">Nome: {patient.name}</div>
         <div className="font-semibold">ID: {patient.patient_id}</div>
-        {patient.birthDate && (
-          <div>Nascimento: {new Date(patient.birthDate).toLocaleDateString()}</div>
-        )}
         {patient.primary_diagnosis && (
           <div>Diagnóstico: {patient.primary_diagnosis}</div>
         )}

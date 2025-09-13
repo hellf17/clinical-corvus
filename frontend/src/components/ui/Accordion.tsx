@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 interface AccordionProps {
   type?: 'single' | 'multiple';
   className?: string;
+  defaultValue?: string[];
   children: React.ReactNode;
 }
 
@@ -33,12 +34,13 @@ interface AccordionContextProps {
 
 const AccordionContext = React.createContext<AccordionContextProps | undefined>(undefined);
 
-export const Accordion: React.FC<AccordionProps> = ({ 
-  type = 'single', 
-  className = '', 
-  children 
+export const Accordion: React.FC<AccordionProps> = ({
+  type = 'single',
+  className = '',
+  defaultValue = [],
+  children
 }) => {
-  const [openItems, setOpenItems] = useState<string[]>([]);
+  const [openItems, setOpenItems] = useState<string[]>(defaultValue);
 
   const toggleItem = (value: string) => {
     if (type === 'single') {

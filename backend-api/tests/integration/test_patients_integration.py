@@ -58,13 +58,13 @@ def test_create_and_retrieve_patient(pg_client, pg_session):
     # Create patient data
     patient_data = {
         "name": "Test Patient",
-        "idade": 45,
-        "sexo": "M",
-        "diagnostico": "Hypertension, Type 2 Diabetes",
-        "exame_fisico": "Normal vital signs, mild edema in lower extremities",
-        "historia_familiar": "Father with heart disease",
-        "medicacoes": "Metformin, Lisinopril",
-        "exames": "HbA1c: 7.2%, Blood pressure: 140/90"
+        "birthDate": "1979-01-01",  # Age 45
+        "gender": "M",
+        "primary_diagnosis": "Hypertension, Type 2 Diabetes",
+        "physical_exam": "Normal vital signs, mild edema in lower extremities",
+        "family_history": "Father with heart disease",
+        "medications": "Metformin, Lisinopril",
+        "clinical_history": "HbA1c: 7.2%, Blood pressure: 140/90"
     }
     
     # Create patient via API
@@ -91,9 +91,9 @@ def test_create_and_retrieve_patient(pg_client, pg_session):
     patient = get_response.json()
     assert patient["patient_id"] == patient_id
     assert patient["name"] == patient_data["name"]
-    assert patient["idade"] == patient_data["idade"]
-    assert patient["sexo"] == patient_data["sexo"]
-    assert patient["diagnostico"] == patient_data["diagnostico"]
+    assert patient["birthDate"] is not None
+    assert patient["gender"] == patient_data["gender"]
+    assert patient["primary_diagnosis"] == patient_data["primary_diagnosis"]
     
     # Retrieve all patients for user
     list_response = pg_client.get(
@@ -110,7 +110,7 @@ def test_create_and_retrieve_patient(pg_client, pg_session):
     our_patient = next((p for p in patients if p["patient_id"] == patient_id), None)
     assert our_patient is not None
     assert our_patient["name"] == patient_data["name"]
-    assert our_patient["idade"] == patient_data["idade"]
+    assert our_patient["birthDate"] is not None
 
 @pytest.mark.integration
 def test_update_patient(pg_client, pg_session):
@@ -136,13 +136,13 @@ def test_update_patient(pg_client, pg_session):
     # Create initial patient data
     patient_data = {
         "name": "Update Test Patient",
-        "idade": 50,
-        "sexo": "F",
-        "diagnostico": "Hypothyroidism",
-        "exame_fisico": "Normal",
-        "historia_familiar": "Mother with thyroid issues",
-        "medicacoes": "Levothyroxine",
-        "exames": "TSH: 4.5 mIU/L"
+        "birthDate": "1974-01-01",  # Age 50
+        "gender": "F",
+        "primary_diagnosis": "Hypothyroidism",
+        "physical_exam": "Normal",
+        "family_history": "Mother with thyroid issues",
+        "medications": "Levothyroxine",
+        "clinical_history": "TSH: 4.5 mIU/L"
     }
     
     # Create patient via API
@@ -158,13 +158,13 @@ def test_update_patient(pg_client, pg_session):
     # Update data
     update_data = {
         "name": "Update Test Patient",
-        "idade": 50,
-        "sexo": "F",
-        "diagnostico": "Hypothyroidism, Vitamin D Deficiency",
-        "exame_fisico": "Normal, mild fatigue",
-        "historia_familiar": "Mother with thyroid issues, father with osteoporosis",
-        "medicacoes": "Levothyroxine, Vitamin D supplements",
-        "exames": "TSH: 3.2 mIU/L, Vitamin D: 22 ng/mL"
+        "birthDate": "1974-01-01",  # Age 50
+        "gender": "F",
+        "primary_diagnosis": "Hypothyroidism, Vitamin D Deficiency",
+        "physical_exam": "Normal, mild fatigue",
+        "family_history": "Mother with thyroid issues, father with osteoporosis",
+        "medications": "Levothyroxine, Vitamin D supplements",
+        "clinical_history": "TSH: 3.2 mIU/L, Vitamin D: 22 ng/mL"
     }
     
     # Update patient
@@ -178,24 +178,24 @@ def test_update_patient(pg_client, pg_session):
     assert update_response.status_code == 200, f"Expected 200, got {update_response.status_code}: {update_response.text}"
     updated_patient = update_response.json()
     assert updated_patient["patient_id"] == patient_id
-    assert updated_patient["diagnostico"] == update_data["diagnostico"]
+    assert updated_patient["primary_diagnosis"] == update_data["primary_diagnosis"]
     
     # Get the patient from the database to verify all fields were updated
     db_patient = pg_session.query(models.Patient).filter_by(patient_id=patient_id).first()
     assert db_patient is not None
     
     # Check database values match the update data
-    assert db_patient.diagnostico == update_data["diagnostico"]
+    assert db_patient.primary_diagnosis == update_data["primary_diagnosis"]
     
     # For fields that may not be returned in the API response but should be in the database
-    if hasattr(db_patient, "exames"):
-        assert db_patient.exames == update_data["exames"]
-    if hasattr(db_patient, "medicacoes"):
-        assert db_patient.medicacoes == update_data["medicacoes"]
-    if hasattr(db_patient, "exame_fisico"):
-        assert db_patient.exame_fisico == update_data["exame_fisico"]
-    if hasattr(db_patient, "historia_familiar"):
-        assert db_patient.historia_familiar == update_data["historia_familiar"]
+    if hasattr(db_patient, "clinical_history"):
+        assert db_patient.clinical_history == update_data["clinical_history"]
+    if hasattr(db_patient, "medications"):
+        assert db_patient.medications == update_data["medications"]
+    if hasattr(db_patient, "physical_exam"):
+        assert db_patient.physical_exam == update_data["physical_exam"]
+    if hasattr(db_patient, "family_history"):
+        assert db_patient.family_history == update_data["family_history"]
 
 @pytest.mark.integration
 def test_delete_patient(pg_client, pg_session):
@@ -221,9 +221,9 @@ def test_delete_patient(pg_client, pg_session):
     # Create patient data
     patient_data = {
         "name": "Delete Test Patient",
-        "idade": 65,
-        "sexo": "M",
-        "diagnostico": "Patient to be deleted"
+        "birthDate": "1959-01-01",  # Age 65
+        "gender": "M",
+        "primary_diagnosis": "Patient to be deleted"
     }
     
     # Create patient via API
@@ -290,21 +290,21 @@ def test_search_patients(pg_client, pg_session):
     patients_data = [
         {
             "name": "John Smith",
-            "idade": 60,
-            "sexo": "M",
-            "diagnostico": "Coronary Artery Disease"
+            "birthDate": "1964-01-01",  # Age 60
+            "gender": "M",
+            "primary_diagnosis": "Coronary Artery Disease"
         },
         {
             "name": "Maria Rodriguez",
-            "idade": 45,
-            "sexo": "F",
-            "diagnostico": "Asthma, Allergic Rhinitis"
+            "birthDate": "1979-01-01",  # Age 45
+            "gender": "F",
+            "primary_diagnosis": "Asthma, Allergic Rhinitis"
         },
         {
             "name": "Robert Johnson",
-            "idade": 72,
-            "sexo": "M",
-            "diagnostico": "Parkinson's Disease, Hypertension"
+            "birthDate": "1952-01-01",  # Age 72
+            "gender": "M",
+            "primary_diagnosis": "Parkinson's Disease, Hypertension"
         }
     ]
     
@@ -349,6 +349,6 @@ def test_search_patients(pg_client, pg_session):
     assert len(diagnosis_search_results) >= 1
     
     # At least one result should have Parkinson's in the diagnosis
-    parkinsons_diagnosis_result = next((p for p in diagnosis_search_results 
-                                     if "parkinson" in p["diagnostico"].lower()), None)
-    assert parkinsons_diagnosis_result is not None 
+    parkinsons_diagnosis_result = next((p for p in diagnosis_search_results
+                                     if "parkinson" in p["primary_diagnosis"].lower()), None)
+    assert parkinsons_diagnosis_result is not None

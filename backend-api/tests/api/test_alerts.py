@@ -27,7 +27,7 @@ def sample_alert_data():
 class TestAlertEndpoints:
     """Testes para os endpoints do módulo de alertas."""
 
-    def test_create_alert(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_create_alert(self, sqlite_client, sample_alert_data):
         """Testa a criação de um novo alerta."""
         # Create a test user and configure authentication
         from database.models import User
@@ -70,13 +70,12 @@ class TestAlertEndpoints:
             print(f"Validation error: {response.json()}")
             # O teste passa pois o endpoint existe, mas há um problema de validação
 
-    def test_get_alerts_by_patient(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_get_alerts_by_patient(self, sqlite_client, sample_alert_data):
         """Testa a obtenção de alertas para um paciente específico."""
         # Primeiro tenta criar um alerta para garantir que haja dados
         create_response = sqlite_client.post(
             "/api/alerts/",
-            json=sample_alert_data,
-            headers=mock_auth_headers
+            json=sample_alert_data
         )
         
         # Se a criação do alerta falhar por causa do endpoint não existir, pular o teste
@@ -95,8 +94,7 @@ class TestAlertEndpoints:
             # Faz a requisição para obter alertas do paciente
             patient_id = sample_alert_data["patient_id"]
             response = sqlite_client.get(
-                f"/api/alerts/patient/{patient_id}",
-                headers=mock_auth_headers
+                f"/api/alerts/patient/{patient_id}"
             )
             
             if response.status_code in [404, 422]:
@@ -120,13 +118,12 @@ class TestAlertEndpoints:
             print(f"Error in test_get_alerts_by_patient: {str(e)}")
             pytest.skip(f"Skipping test due to error: {str(e)}")
 
-    def test_update_alert_status(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_update_alert_status(self, sqlite_client, sample_alert_data):
         """Testa a atualização do status de um alerta."""
         # Primeiro cria um alerta para obter um ID válido
         create_response = sqlite_client.post(
             "/api/alerts/",
-            json=sample_alert_data,
-            headers=mock_auth_headers
+            json=sample_alert_data
         )
         
         # Se a criação do alerta falhar por causa do endpoint não existir, pular o teste
@@ -147,8 +144,7 @@ class TestAlertEndpoints:
             # Faz a requisição para atualizar o status
             response = sqlite_client.patch(
                 f"/api/alerts/{alert_id}/status",
-                json=update_data,
-                headers=mock_auth_headers
+                json=update_data
             )
             
             # Se o endpoint não existir, pular o teste
@@ -163,7 +159,7 @@ class TestAlertEndpoints:
             assert result["status"] == update_data["status"]
             assert result["resolution_notes"] == update_data["resolution_notes"]
 
-    def test_get_alerts_with_filters(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_get_alerts_with_filters(self, sqlite_client, sample_alert_data):
         """Testa a obtenção de alertas com filtros."""
         # Create a test user and configure authentication
         from database.models import User
@@ -204,8 +200,7 @@ class TestAlertEndpoints:
         
         # Testa filtro por status não lido
         response = sqlite_client.get(
-            "/api/alerts/by-status/unread",
-            headers=mock_auth_headers
+            "/api/alerts/by-status/unread"
         )
         
         # Verificações semelhantes para outros filtros
@@ -213,13 +208,12 @@ class TestAlertEndpoints:
             result = response.json()
             assert isinstance(result, list)
 
-    def test_delete_alert(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_delete_alert(self, sqlite_client, sample_alert_data):
         """Testa a exclusão de um alerta."""
         # Primeiro cria um alerta para obter um ID válido
         create_response = sqlite_client.post(
             "/api/alerts/",
-            json=sample_alert_data,
-            headers=mock_auth_headers
+            json=sample_alert_data
         )
         
         # Se a criação do alerta falhar por causa do endpoint não existir, pular o teste
@@ -233,8 +227,7 @@ class TestAlertEndpoints:
             
             # Faz a requisição para excluir o alerta
             response = sqlite_client.delete(
-                f"/api/alerts/{alert_id}",
-                headers=mock_auth_headers
+                f"/api/alerts/{alert_id}"
             )
             
             # Se o endpoint não existir, pular o teste
@@ -246,20 +239,18 @@ class TestAlertEndpoints:
             
             # Tenta obter o alerta excluído para confirmar que foi removido
             get_response = sqlite_client.get(
-                f"/api/alerts/{alert_id}",
-                headers=mock_auth_headers
+                f"/api/alerts/{alert_id}"
             )
             
             # Deve retornar 404 (Not Found)
             assert get_response.status_code == 404
 
-    def test_batch_update_alerts(self, sqlite_client, mock_auth_headers, sample_alert_data):
+    def test_batch_update_alerts(self, sqlite_client, sample_alert_data):
         """Testa a atualização em lote de alertas."""
         # Cria um alerta para teste
         create_response = sqlite_client.post(
             "/api/alerts/",
-            json=sample_alert_data,
-            headers=mock_auth_headers
+            json=sample_alert_data
         )
         
         # Se a criação do alerta falhar por causa do endpoint não existir, pular o teste
@@ -280,8 +271,7 @@ class TestAlertEndpoints:
             # Faz a requisição para atualizar em lote
             response = sqlite_client.put(
                 "/api/alerts/batch",
-                json=batch_data,
-                headers=mock_auth_headers
+                json=batch_data
             )
             
             # Se o endpoint não existir, pular o teste
@@ -298,7 +288,6 @@ class TestAlertEndpoints:
             # Confirma que o alerta foi atualizado
             get_response = sqlite_client.get(
                 f"/api/alerts/{alert_id}",
-                headers=mock_auth_headers
             )
             
             if get_response.status_code == 200:

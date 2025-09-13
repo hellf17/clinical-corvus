@@ -1,0 +1,41 @@
+# Optimized Development Dockerfile for Frontend
+# Uses a multi-stage build for a lean image and better caching.
+
+# --- Base Stage ---
+FROM node:18-alpine as base
+
+# Set working directory.
+WORKDIR /app
+
+# --- Builder Stage ---
+# This stage installs dependencies.
+FROM base as builder
+
+# Install minimal required system dependencies.
+RUN apk add --no-cache git
+
+# Copy package management files.
+COPY package.json package-lock.json* ./
+
+# Install all dependencies in a single, cached layer.
+RUN npm install --force
+
+# --- Development Stage ---
+# This is the final image for development.
+FROM builder as development
+
+# Copy dependencies from the builder stage.
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy the rest of the application code.
+COPY . .
+
+# Expose the application and debug ports.
+EXPOSE 3000 9229
+
+# Healthcheck to ensure the service is running.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Command to run the development server.
+CMD ["npm", "run", "dev"]

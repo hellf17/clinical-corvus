@@ -80,34 +80,62 @@ def get_patient_with_labs(
         
     return patient
 
+def get_patient_basic(
+    db: Session,
+    patient_id: int
+) -> Optional[Patient]:
+    """
+    Get a specific patient by ID, without loading related data.
+    """
+    return (
+        db.query(Patient)
+        .filter(Patient.patient_id == patient_id)
+        .first()
+    )
+
 def create_patient_record(
-    db: Session, 
-    patient_data: patient_schemas.PatientCreate, 
+    db: Session,
+    patient_data: patient_schemas.PatientCreate,
     user_id: int
 ) -> Patient:
     """
-    Creates a new patient data record, linked to a specific user account (the patient themselves).
-    Ensures the user account exists before creating the patient record.
+    Creates a new patient data record and assigns them to a group atomically.
+    Ensures the user account exists and has permission before creating.
+    If group assignment fails, the entire transaction is rolled back.
     """
-    # Verify the user exists
-    user = db.query(User).filter(User.user_id == user_id).first()
-    if not user:
-        raise ValueError(f"User with ID {user_id} not found. Cannot create patient record.")
-        
-    # Prevent creating multiple patient records for the same user account
-    existing_patient = db.query(Patient).filter(Patient.user_id == user_id).first()
-    if existing_patient:
-        raise ValueError(f"Patient record already exists for user ID {user_id}.") # Or return existing?
+    # Extract group_id and remove it from the main patient data
+    group_id = patient_data.group_id
+    data = patient_data.model_dump(exclude={'group_id'})
+    data['user_id'] = user_id
 
-    # Prepare data, ensuring user_id is set correctly
-    data = patient_data.model_dump()
-    data['user_id'] = user_id # Ensure the link to the user account
+    try:
+        # Create the patient instance
+        db_patient = Patient(**data)
+        db.add(db_patient)
+        db.flush()  # Use flush to get the patient_id without committing
 
-    db_patient = Patient(**data)
-    db.add(db_patient)
-    db.commit()
-    db.refresh(db_patient)
-    return db_patient
+        # If a group_id is provided, perform the assignment
+        if group_id:
+            from .groups import assign_patient_to_group, is_user_admin_of_group
+            
+            # Check if user is admin of the group
+            if not is_user_admin_of_group(db, user_id, group_id):
+                raise Exception("User does not have admin rights for this group.")
+            
+            # Assign patient to group
+            from schemas.group import GroupPatientCreate
+            assignment_data = GroupPatientCreate(patient_id=db_patient.patient_id)
+            assign_patient_to_group(db, group_id, assignment_data, user_id)
+
+        # Commit the entire transaction
+        db.commit()
+        db.refresh(db_patient)
+        return db_patient
+
+    except Exception as e:
+        db.rollback()
+        logging.error(f"Failed to create patient and assign to group: {e}")
+        raise e
 
 def update_patient(
     db: Session, 
@@ -208,10 +236,53 @@ def get_assigned_patients_for_doctor(
     
     return patients, total
 
+# --- CRUD Object for Easy Import ---
+class PatientCRUD:
+    """CRUD operations for Patient model."""
+
+    def get(self, db: Session, patient_id: int) -> Optional[Patient]:
+        """Get a patient by ID."""
+        return get_patient(db, patient_id)
+
+    def get_multi(self, db: Session, *, skip: int = 0, limit: int = 100) -> List[Patient]:
+        """Get multiple patients."""
+        patients, _ = get_patients(db, skip=skip, limit=limit)
+        return patients
+
+    def create(self, db: Session, *, obj_in: patient_schemas.PatientCreate, user_id: int) -> Patient:
+        """Create a new patient."""
+        return create_patient_record(db, obj_in, user_id)
+
+    def update(self, db: Session, *, db_obj: Patient, obj_in: patient_schemas.PatientUpdate) -> Patient:
+        """Update a patient."""
+        update_data = obj_in.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(db_obj, key, value)
+        db_obj.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
+    def remove(self, db: Session, *, patient_id: int) -> bool:
+        """Remove a patient."""
+        return delete_patient(db, patient_id)
+
+    def get_by_user_id(self, db: Session, user_id: int) -> Optional[Patient]:
+        """Get patient by user ID."""
+        return get_patient_profile(db, user_id)
+
+    def get_assigned_for_doctor(self, db: Session, doctor_id: int, *, skip: int = 0, limit: int = 100) -> List[Patient]:
+        """Get patients assigned to a doctor."""
+        patients, _ = get_assigned_patients_for_doctor(db, doctor_id, skip=skip, limit=limit)
+        return patients
+
+
+# Create instance for easy import
+patient = PatientCRUD()
+
 # --- Deprecated/Old Functions Removed ---
 # Removed: get_patients (replaced by router logic)
 # Removed: get_patients_by_user (deprecated)
 # Removed: get_patient_with_labs (functionality can be handled by schema or specific fetches)
 # Removed: create_patient (replaced by create_patient_record)
 # Removed: count_patients_by_user (likely unused)
-

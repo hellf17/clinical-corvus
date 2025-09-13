@@ -18,18 +18,25 @@ const routeMap: Record<string, string> = {
   '/dashboard/doctor': 'Pacientes',
   '/dashboard/patient': 'Meu Resumo',
   '/patients': 'Pacientes',
-  '/patients/new': 'Cadastrar Paciente',
+ '/patients/new': 'Cadastrar Paciente',
   '/upload': 'Upload de Exames',
   '/risk-scores': 'Escores de Risco',
   '/chat': 'Chat IA',
   '/my-exams': 'Meus Exames',
   '/analysis': 'Análises',
-  // Dinâmicas
+ '/dashboard-doctor': 'Dashboard',
+  '/dashboard-doctor/groups': 'Grupos',
+  '/dashboard-doctor/groups/new': 'Criar Grupo',
+ // Dinâmicas
   '/patients/[id]/overview': 'Resumo',
   '/patients/[id]/notes': 'Notas Clínicas',
   '/patients/[id]/medications': 'Medicações',
   '/patients/[id]/labs': 'Análise Laboratorial',
   '/patients/[id]/charts': 'Visualização Gráfica',
+  '/dashboard-doctor/groups/[id]': 'Detalhes do Grupo',
+  '/dashboard-doctor/groups/[id]/members': 'Membros',
+  '/dashboard-doctor/groups/[id]/patients': 'Pacientes',
+  '/dashboard-doctor/groups/[id]/settings': 'Configurações',
 };
 
 function getBreadcrumbs(pathname: string) {

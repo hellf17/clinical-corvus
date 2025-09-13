@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field, validator, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
+from pydantic.config import ConfigDict
 
 # --- Test Category Schemas ---
 class TestCategoryBase(BaseModel):
@@ -13,7 +14,7 @@ class TestCategoryCreate(TestCategoryBase):
 class TestCategory(TestCategoryBase):
     category_id: int
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Lab Result Schemas ---
 class LabResultBase(BaseModel):
@@ -26,12 +27,13 @@ class LabResultBase(BaseModel):
     reference_range_high: Optional[float] = None
     exam_id: Optional[int] = None
 
-    @model_validator(mode='after')
-    def validate_value_presence(cls, model):
+    @field_validator('value_numeric', 'value_text', mode='before')
+    @classmethod
+    def validate_value_presence(cls, v, info):
         """Validate that at least one value (numeric or text) is provided."""
-        if model.value_numeric is None and model.value_text is None:
+        if v is None and info.data.get('value_numeric') is None and info.data.get('value_text') is None:
             raise ValueError("Either value_numeric or value_text must be provided")
-        return model
+        return v
 
 class LabResultCreate(LabResultBase):
     patient_id: int
@@ -44,7 +46,7 @@ class LabResult(LabResultBase):
     category_id: Optional[int] = None
     created_at: datetime
     
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class LabInterpretationBase(BaseModel):
     interpretation_text: str
@@ -59,9 +61,9 @@ class LabInterpretation(LabInterpretationBase):
     user_id: int
     created_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class LabResultWithInterpretations(LabResult):
     interpretations: List[LabInterpretation] = []
 
-    model_config = {"from_attributes": True} 
+    model_config = ConfigDict(from_attributes=True)

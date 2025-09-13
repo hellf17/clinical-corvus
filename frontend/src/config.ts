@@ -7,7 +7,7 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://backend-api:8000/api';
 
 // Outras configurações
-export const APP_NAME = 'Clinical Helper';
+export const APP_NAME = 'Clinical Corvus';
 export const DEFAULT_PAGINATION_LIMIT = 20;
 
 // Security settings

@@ -8,6 +8,7 @@ from database.models import User, Patient, ClinicalNote as ClinicalNoteModel
 from crud import clinical_note as notes_crud
 from crud import is_doctor_assigned_to_patient
 from security import get_current_user_required, verify_doctor_patient_access
+from utils.group_authorization import is_user_authorized_for_patient
 
 """
 IMPORTANTE: Sobre a ordem das rotas no FastAPI
@@ -30,7 +31,7 @@ com note_id = "search", resultando em erros 422 Unprocessable Entity.
 # def get_auth_user(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_required)):
 #     return current_user
 
-router = APIRouter(tags=["clinical_notes"], prefix="/clinical-notes") # Add prefix for clarity
+router = APIRouter(tags=["clinical_notes"]) # Remove prefix to avoid double prefixing
 
 # Remove generic POST / as it's less useful than patient-specific one
 # @router.post("/", response_model=ClinicalNote, status_code=status.HTTP_201_CREATED)
@@ -70,8 +71,10 @@ def search_clinical_notes(
     if patient_id is not None:
         # Authorization Check for the specified patient_id
         authorized = False
-        if current_user.role == 'doctor':
-            if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+        if current_user.role == 'admin':
+            authorized = True
+        elif current_user.role == 'doctor':
+            if is_user_authorized_for_patient(db, current_user, patient_id):
                 authorized = True
         elif current_user.role == 'patient':
             patient_record = db.query(Patient.patient_id).filter(Patient.user_id == current_user.user_id).first()
@@ -93,26 +96,30 @@ def search_clinical_notes(
 
 
 # Patient-specific endpoints
-@router.get("/patient/{patient_id}", response_model=List[clinical_note_schemas.ClinicalNote])
+@router.get("/patient/{patient_id}", response_model=clinical_note_schemas.ClinicalNoteList)
 def get_patient_notes(
     patient_id: int,
     db: Session = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
     current_user: User = Depends(get_current_user_required)
 ):
     """
-    Get all clinical notes for a specific patient.
+    Get paginated clinical notes for a specific patient.
     Requires doctor to be assigned to patient, or user to be the patient.
     """
     # Authorization Check
     authorized = False
-    if current_user.role == 'doctor':
-        if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        if is_user_authorized_for_patient(db, current_user, patient_id):
             authorized = True
     elif current_user.role == 'patient':
         patient_record = db.query(Patient.patient_id).filter(Patient.user_id == current_user.user_id).first()
         if patient_record and patient_record.patient_id == patient_id:
             authorized = True
-
+    
     if not authorized:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -120,8 +127,8 @@ def get_patient_notes(
         )
         
     # Fetch notes AFTER authorization check
-    notes = notes_crud.get_notes(db, patient_id=patient_id)
-    return notes
+    notes, total = notes_crud.get_notes(db, patient_id=patient_id, skip=skip, limit=limit)
+    return {"notes": notes, "total": total}
 
 # Added POST endpoint for patient notes
 @router.post("/patient/{patient_id}", response_model=clinical_note_schemas.ClinicalNote, status_code=status.HTTP_201_CREATED)
@@ -171,14 +178,16 @@ def get_note(
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to non-patient note.")
 
     authorized = False
-    if current_user.role == 'doctor':
-        if is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor':
+        if is_user_authorized_for_patient(db, current_user, patient_id):
             authorized = True
     elif current_user.role == 'patient':
         patient_record = db.query(Patient.patient_id).filter(Patient.user_id == current_user.user_id).first()
         if patient_record and patient_record.patient_id == patient_id:
             authorized = True
-
+    
     if not authorized:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -207,7 +216,14 @@ def update_note(
     if patient_id is None:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot update non-patient note.")
          
-    if current_user.role != 'doctor' or not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor' and is_user_authorized_for_patient(db, current_user, patient_id):
+        authorized = True
+    else:
+        authorized = False
+        
+    if not authorized:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only assigned doctors can update this clinical note."
@@ -238,7 +254,14 @@ def delete_note(
     if patient_id is None:
          raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot delete non-patient note.")
          
-    if current_user.role != 'doctor' or not is_doctor_assigned_to_patient(db, doctor_user_id=current_user.user_id, patient_patient_id=patient_id):
+    if current_user.role == 'admin':
+        authorized = True
+    elif current_user.role == 'doctor' and is_user_authorized_for_patient(db, current_user, patient_id):
+        authorized = True
+    else:
+        authorized = False
+        
+    if not authorized:
          raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only assigned doctors can delete this clinical note."
@@ -249,4 +272,4 @@ def delete_note(
         # Should have been caught by the initial get_note check
         raise HTTPException(status_code=404, detail="Clinical note not found during deletion.")
 
-    return None 
+    return None

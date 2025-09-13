@@ -83,26 +83,27 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
       <div className="max-w-6xl mx-auto space-y-8">
         <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none">
           <CardHeader>
-            <CardTitle className="text-3xl font-bold text-center">Resumo da Sessão do Dr. Corvus</CardTitle>
+            <CardTitle className="text-3xl font-extrabold text-center text-white">Resumo da Sessão do Dr. Corvus</CardTitle>
+            <CardDescription className="text-center text-blue-100">Análise detalhada do seu raciocínio clínico no modelo SNAPPS.</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <div className="text-4xl font-bold mb-2">Pontuação Geral: {overallScore}</div>
-            <p className="text-blue-500">Sua performance média nas habilidades avaliadas.</p>
+            <div className="text-4xl font-bold text-white mb-2">Pontuação Geral: {overallScore}</div>
+            <p className="text-blue-200">Sua performance média nas habilidades avaliadas.</p>
           </CardContent>
         </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="lg:col-span-1 bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
             <CardHeader>
-              <CardTitle className="flex items-center text-xl"><BrainCircuit className="mr-3 h-7 w-7 t" /> Performance de Habilidades</CardTitle>
+              <CardTitle className="flex items-center text-white text-xl"><BrainCircuit className="mr-3 h-7 w-7 text-blue-300" /> Performance de Habilidades</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={350}>
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
                   <PolarGrid stroke="#4F46E5" strokeOpacity={0.5} />
                   <PolarAngleAxis dataKey="skill" tick={{ fill: '#E0E7FF', fontSize: 12 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} tick={{ fill: '#E0E7FF', fontSize: 10 }} stroke="#4F46E5" strokeOpacity={0.7} />
-                  <Radar name="Sua Pontuação" dataKey="score" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.85} />
+                  <PolarRadiusAxis angle={30} domain={[0, 5]} tickCount={6} tick={{ fill: '#E0E7FF', fontSize: 10 }} stroke="#4F46E5" strokeOpacity={0.5} />
+                  <Radar name="Sua Pontuação" dataKey="score" stroke="#8B5CF6" fill="#8B5CF6" fillOpacity={0.7} />
                   <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: 'none', borderRadius: '8px' }} itemStyle={{ color: '#E0E7FF' }} />
                   <Legend wrapperStyle={{ color: '#E0E7FF', paddingTop: '10px' }} />
                 </RadarChart>
@@ -112,10 +113,10 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
           <div className="space-y-8">
             <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
               <CardHeader>
-                <CardTitle className="flex items-center text-xl"><CheckCircle className="mr-3 h-7 w-7 text-green-400" /> Pontos Fortes</CardTitle>
+                <CardTitle className="flex items-center text-white text-xl"><CheckCircle className="mr-3 h-7 w-7 text-green-400" /> Pontos Fortes</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-blue-100">
                   {safeKeyStrengths.map((item, index) => (
                     <li key={index} className="flex items-start">
                       <CheckCircle className="h-5 w-5 text-green-400 mr-2 mt-1 flex-shrink-0" />
@@ -127,10 +128,10 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
             </Card>
             <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
               <CardHeader>
-                <CardTitle className="flex items-center text-xl"><XCircle className="mr-3 h-7 w-7 text-red-400" /> Áreas para Desenvolvimento</CardTitle>
+                <CardTitle className="flex items-center text-white text-xl"><XCircle className="mr-3 h-7 w-7 text-red-400" /> Áreas para Desenvolvimento</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-blue-100">
                   {safeAreasForDevelopment.map((item, index) => (
                     <li key={index} className="flex items-start">
                       <XCircle className="h-5 w-5 text-red-400 mr-2 mt-1 flex-shrink-0" />
@@ -146,7 +147,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
         <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
           <Collapsible>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="flex items-center text-xl">
+              <CardTitle className="flex items-center text-white text-xl">
                 <Lightbulb className="mr-3 h-7 w-7 text-yellow-300" /> Insight Metacognitivo
               </CardTitle>
               <CollapsibleTrigger asChild>
@@ -158,7 +159,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
             </CardHeader>
             <CollapsibleContent>
               <CardContent className="pt-0">
-                <p className="text-lg">
+                <p className="text-lg italic text-blue-100">
                   {safeMetacognitiveInsight}
                 </p>
               </CardContent>
@@ -170,7 +171,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
         <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
           <Collapsible>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="flex items-center text-xl">
+              <CardTitle className="flex items-center text-white text-xl">
                 <CheckCircle className="mr-3 h-7 w-7 text-green-300" /> Objetivos de Aprendizado Atingidos
               </CardTitle>
               <CollapsibleTrigger asChild>
@@ -182,7 +183,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
             </CardHeader>
             <CollapsibleContent>
               <CardContent className="pt-0">
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-blue-100">
                   {Array.isArray(learning_objectives_met) && learning_objectives_met.length > 0 ? (
                     learning_objectives_met.map((item, index) => (
                       <li key={index} className="flex items-start">
@@ -191,7 +192,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
                       </li>
                     ))
                   ) : (
-                    <p className="text-lg italic">Nenhum objetivo de aprendizado específico foi identificado.</p>
+                    <p className="text-lg italic text-blue-100">Nenhum objetivo de aprendizado específico foi identificado.</p>
                   )}
                 </ul>
               </CardContent>
@@ -202,7 +203,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
         <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
           <Collapsible>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="flex items-center text-xl">
+              <CardTitle className="flex items-center text-white text-xl">
                 <Lightbulb className="mr-3 h-7 w-7 text-yellow-300" /> Tópicos de Estudo Recomendados
               </CardTitle>
               <CollapsibleTrigger asChild>
@@ -214,7 +215,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
             </CardHeader>
             <CollapsibleContent>
               <CardContent className="pt-0">
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-blue-100">
                   {Array.isArray(recommended_study_topics) && recommended_study_topics.length > 0 ? (
                     recommended_study_topics.map((item, index) => (
                       <li key={index} className="flex items-start">
@@ -223,7 +224,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
                       </li>
                     ))
                   ) : (
-                    <p className="text-lg italic">Nenhum tópico de estudo recomendado foi identificado.</p>
+                    <p className="text-lg italic text-blue-100">Nenhum tópico de estudo recomendado foi identificado.</p>
                   )}
                 </ul>
               </CardContent>
@@ -234,7 +235,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
         <Card className="bg-white/10 backdrop-blur-sm shadow-lg rounded-xl border-none transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl">
           <Collapsible>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="flex items-center text-xl">
+              <CardTitle className="flex items-center text-white text-xl">
                 <CheckCircle className="mr-3 h-7 w-7 text-green-300" /> Sugestões de Próximos Casos
               </CardTitle>
               <CollapsibleTrigger asChild>
@@ -246,7 +247,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
             </CardHeader>
             <CollapsibleContent>
               <CardContent className="pt-0">
-                <ul className="space-y-3">
+                <ul className="space-y-3 text-blue-100">
                   {Array.isArray(next_cases_suggestions) && next_cases_suggestions.length > 0 ? (
                     next_cases_suggestions.map((item, index) => (
                       <li key={index} className="flex items-start">
@@ -255,7 +256,7 @@ export const SimulationSummaryDashboard: React.FC<SimulationSummaryDashboardProp
                       </li>
                     ))
                   ) : (
-                    <p className="text-lg italic">Nenhuma sugestão de próximos casos foi identificada.</p>
+                    <p className="text-lg italic text-blue-100">Nenhuma sugestão de próximos casos foi identificada.</p>
                   )}
                 </ul>
               </CardContent>

@@ -18,7 +18,8 @@ testing.postgresql==1.3.0
 # Test Utilities
 freezegun==1.4.0  # Time freezing for tests
 factory-boy==3.3.0  # Test data generation
-Faker==22.6.0  # Fake data generation
+# Align Faker with app constraint to avoid resolver conflict
+Faker>=18.9,<19  # Fake data generation
 responses==0.24.1  # Mock HTTP responses
 
 # Install backend production dependencies as well

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -23,7 +23,7 @@ class HealthTip(HealthTipBase):
     created_at: datetime
     is_general: bool = True # Tip can be general or user-specific (future?)
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 class HealthTipList(BaseModel):
     tips: list[HealthTip] 
